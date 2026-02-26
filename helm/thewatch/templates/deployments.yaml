@@ -1,0 +1,158 @@
+{{/*
+  Generates a Deployment for each enabled service in .Values.services
+*/}}
+{{- range $name, $svc := .Values.services }}
+{{- if $svc.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "thewatch.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  {{- if not (and $svc.hpa $svc.hpa.enabled) }}
+  replicas: {{ $svc.replicaCount | default 2 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "thewatch.labels" $ | nindent 8 }}
+        app.kubernetes.io/name: {{ $name }}
+        app.kubernetes.io/instance: {{ $.Release.Name }}
+        app.kubernetes.io/component: {{ $name }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") $ | sha256sum }}
+    spec:
+      {{- with $.Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          image: {{ $.Values.image.registry }}/{{ $svc.image.repository }}:{{ default $.Values.image.tag (($svc.image).tag) }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $svc.port | default 8080 }}
+              protocol: TCP
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: {{ $.Values.global.environment | default "Production" }}
+            - name: ASPNETCORE_URLS
+              value: "http://+:{{ $svc.port | default 8080 }}"
+            # JWT configuration
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef:
+                  name: thewatch-jwt-credentials
+                  key: signing-key
+            - name: Jwt__Issuer
+              valueFrom:
+                configMapKeyRef:
+                  name: thewatch-config
+                  key: jwt-issuer
+            - name: Jwt__Audience
+              valueFrom:
+                configMapKeyRef:
+                  name: thewatch-config
+                  key: jwt-audience
+            {{- if and $svc.dbType (ne $svc.dbType "none") }}
+            # Database password injected from secret
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: thewatch-db-credentials
+                  key: {{ if eq $svc.dbType "postgres" }}postgres-password{{ else }}sql-sa-password{{ end }}
+            {{- end }}
+            {{- if and $svc.dbType (eq $svc.dbType "sqlserver") }}
+            - name: ConnectionStrings__{{ $svc.database }}
+              value: "Server={{ $.Values.sqlserver.host }},{{ $.Values.sqlserver.port }};Database={{ $svc.database }};User Id={{ $.Values.sqlserver.user }};Password=$(DB_PASSWORD);TrustServerCertificate=true"
+            {{- end }}
+            {{- if and $svc.dbType (eq $svc.dbType "postgres") }}
+            - name: ConnectionStrings__{{ $svc.database }}
+              value: "Host={{ $.Values.postgres.host }};Port={{ $.Values.postgres.port }};Database={{ $svc.database }};Username={{ $.Values.postgres.user }};Password=$(DB_PASSWORD)"
+            {{- end }}
+            {{- if $svc.kafka }}
+            - name: Kafka__BootstrapServers
+              valueFrom:
+                configMapKeyRef:
+                  name: thewatch-config
+                  key: kafka-bootstrap-servers
+            {{- end }}
+            {{- if eq $name "dashboard" }}
+            # Dashboard service discovery — point to internal ClusterIP services
+            - name: services__p1-coregateway__http__0
+              value: "http://p1-coregateway:8080"
+            - name: services__p2-voiceemergency__http__0
+              value: "http://p2-voiceemergency:8080"
+            - name: services__p3-meshnetwork__http__0
+              value: "http://p3-meshnetwork:8080"
+            - name: services__p4-wearable__http__0
+              value: "http://p4-wearable:8080"
+            - name: services__p5-authsecurity__http__0
+              value: "http://p5-authsecurity:8080"
+            - name: services__p6-firstresponder__http__0
+              value: "http://p6-firstresponder:8080"
+            - name: services__p7-familyhealth__http__0
+              value: "http://p7-familyhealth:8080"
+            - name: services__p8-disasterrelief__http__0
+              value: "http://p8-disasterrelief:8080"
+            - name: services__p9-doctorservices__http__0
+              value: "http://p9-doctorservices:8080"
+            - name: services__p10-gamification__http__0
+              value: "http://p10-gamification:8080"
+            - name: services__geospatial__http__0
+              value: "http://geospatial:8080"
+            {{- end }}
+          {{- if and $svc.dbType (ne $svc.dbType "none") }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          {{- else }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- end }}
+          resources:
+            {{- toYaml $svc.resources | nindent 12 }}
+      terminationGracePeriodSeconds: 30
+{{- end }}
+{{- end }}

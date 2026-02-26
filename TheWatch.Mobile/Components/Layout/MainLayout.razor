@@ -1,9 +1,20 @@
 @inherits LayoutComponentBase
+@inject IConnectivityMonitorService Connectivity
+@implements IDisposable
 
 <RadzenLayout>
     <RadzenBody>
         <RadzenNotification />
         <RadzenDialog />
+
+        @if (!Connectivity.IsOnline)
+        {
+            <div class="offline-banner">
+                <span class="material-symbols-outlined" style="font-size: 1rem;">cloud_off</span>
+                <span>Offline — queued changes will sync when reconnected</span>
+            </div>
+        }
+
         @Body
     </RadzenBody>
 </RadzenLayout>
@@ -13,3 +24,22 @@
         <NavMenu />
     </Authorized>
 </AuthorizeView>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Connectivity.OnlineRestored += OnConnectivityChanged;
+        Connectivity.OfflineDetected += OnConnectivityChanged;
+    }
+
+    private void OnConnectivityChanged(object? sender, EventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Connectivity.OnlineRestored -= OnConnectivityChanged;
+        Connectivity.OfflineDetected -= OnConnectivityChanged;
+    }
+}

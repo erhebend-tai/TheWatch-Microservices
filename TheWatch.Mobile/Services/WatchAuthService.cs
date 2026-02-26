@@ -122,6 +122,57 @@ public class WatchAuthService
         }
     }
 
+    public async Task<(bool Success, string? Error)> ForgotPasswordAsync(string baseUrl, string email)
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            var response = await http.PostAsJsonAsync(
+                $"{baseUrl}/api/auth/forgot-password",
+                new ForgotPasswordRequest(email));
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                return (false, body.Contains("not found")
+                    ? "Email address not found."
+                    : $"Request failed: {response.StatusCode}");
+            }
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Cannot reach auth service: {ex.Message}");
+        }
+    }
+
+    public async Task<(bool Success, string? Error)> ResetPasswordAsync(
+        string baseUrl, string email, string token, string newPassword)
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            var response = await http.PostAsJsonAsync(
+                $"{baseUrl}/api/auth/reset-password",
+                new ResetPasswordRequest(email, token, newPassword));
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                return (false, body.Contains("invalid") || body.Contains("expired")
+                    ? "Invalid or expired reset token."
+                    : $"Reset failed: {response.StatusCode}");
+            }
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Cannot reach auth service: {ex.Message}");
+        }
+    }
+
     public async Task LogoutAsync()
     {
         _accessToken = null;

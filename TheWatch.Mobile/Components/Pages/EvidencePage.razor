@@ -1,0 +1,232 @@
+@page "/evidence"
+@attribute [Authorize]
+@inject CameraService Camera
+@inject EvidenceMetadataService Evidence
+@inject EvidenceUploadService Uploader
+@inject EmergencyLocationService LocationService
+@inject ContentModerationService Moderation
+@inject HapticService Haptics
+@inject NavigationManager Nav
+@inject NotificationService Notification
+
+<div class="page-content">
+    <RadzenStack Gap="1rem">
+        <RadzenText TextStyle="TextStyle.H5">Evidence Collection</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--watch-muted);">
+            Capture photos and videos with GPS/timestamp metadata for chain-of-custody.
+        </RadzenText>
+
+        <!-- Capture Buttons -->
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+            <RadzenButton Text="Take Photo" Icon="photo_camera" ButtonStyle="ButtonStyle.Primary"
+                          Click="@OnCapturePhoto" IsBusy="@_capturing" />
+            <RadzenButton Text="Record Video" Icon="videocam" ButtonStyle="ButtonStyle.Secondary"
+                          Click="@OnCaptureVideo" IsBusy="@_capturing" />
+            <RadzenButton Text="Pick from Gallery" Icon="photo_library" ButtonStyle="ButtonStyle.Light"
+                          Click="@OnPickPhoto" IsBusy="@_capturing" />
+        </RadzenStack>
+
+        <!-- Location Overlay Info -->
+        @if (LocationService.LastLocation is not null)
+        {
+            <div class="watch-card" style="font-size: 0.8rem;">
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                    <span class="material-symbols-outlined" style="font-size: 1rem; color: var(--watch-success);">my_location</span>
+                    <span style="color: var(--watch-muted);">
+                        @LocationService.LastLocation.Latitude.ToString("F6"),
+                        @LocationService.LastLocation.Longitude.ToString("F6")
+                        — @DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") UTC
+                    </span>
+                </RadzenStack>
+            </div>
+        }
+
+        <!-- Evidence Queue -->
+        @if (Evidence.Records.Count > 0)
+        {
+            <RadzenText TextStyle="TextStyle.Subtitle1" Style="margin-top: 0.5rem;">
+                Evidence (@Evidence.Records.Count items)
+            </RadzenText>
+
+            @foreach (var record in Evidence.Records.OrderByDescending(r => r.CapturedAt))
+            {
+                <div class="watch-card">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenStack Orientation="Orientation.Horizontal"
+                                     JustifyContent="JustifyContent.SpaceBetween"
+                                     AlignItems="AlignItems.Center">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                <span class="material-symbols-outlined">
+                                    @(record.MediaType == MediaType.Photo ? "image" : "videocam")
+                                </span>
+                                <RadzenText TextStyle="TextStyle.Body2">
+                                    @Path.GetFileName(record.FilePath)
+                                </RadzenText>
+                            </RadzenStack>
+                            <span class="status-badge @GetStatusClass(record.Status)">@record.Status</span>
+                        </RadzenStack>
+
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            @record.CapturedAt.ToString("g") — @FormatSize(record.FileSize)
+                            @if (record.Latitude != 0)
+                            {
+                                <text> — @record.Latitude.ToString("F4"), @record.Longitude.ToString("F4")</text>
+                            }
+                        </RadzenText>
+
+                        @if (record.IsFlagged)
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Warning" Size="AlertSize.Small"
+                                         AllowClose="false" ShowIcon="true">
+                                Content flagged by moderation (score: @record.ModerationScore?.ToString("P0"))
+                            </RadzenAlert>
+                        }
+
+                        @if (record.Status == EvidenceStatus.Uploading)
+                        {
+                            <RadzenProgressBar Value="@(record.UploadProgress * 100)" ShowValue="true"
+                                               Style="height: 6px;" />
+                        }
+
+                        @if (record.Status is EvidenceStatus.Captured or EvidenceStatus.Failed)
+                        {
+                            <RadzenButton Text="Upload" Icon="cloud_upload" Size="ButtonSize.ExtraSmall"
+                                          ButtonStyle="ButtonStyle.Info" Variant="Variant.Text"
+                                          Click="@(() => UploadEvidence(record))" />
+                        }
+                    </RadzenStack>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="watch-card">
+                <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--watch-muted); text-align: center;">
+                    No evidence captured yet. Use the buttons above to start.
+                </RadzenText>
+            </div>
+        }
+    </RadzenStack>
+</div>
+
+@code {
+    private bool _capturing;
+
+    protected override void OnInitialized()
+    {
+        Uploader.OnUploadProgressChanged += OnProgressChanged;
+        Uploader.OnUploadCompleted += OnUploadDone;
+        Uploader.StartWorker();
+    }
+
+    private async Task OnCapturePhoto()
+    {
+        _capturing = true;
+        try
+        {
+            var media = await Camera.CapturePhotoAsync();
+            if (media is not null)
+            {
+                var record = await Evidence.CreateRecordAsync(media);
+
+                // Run content moderation
+                var modResult = await Moderation.AnalyzeImageAsync(media.FilePath);
+                if (Moderation.ShouldFlag(modResult))
+                {
+                    record.IsFlagged = true;
+                    record.ModerationScore = modResult.Confidence;
+                    Notification.Notify(NotificationSeverity.Warning, "Content Flagged",
+                        "This image was flagged by content moderation. Review before uploading.");
+                }
+
+                Haptics.Click();
+                Notification.Notify(NotificationSeverity.Success, "Photo Captured",
+                    $"Evidence recorded with GPS metadata.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Capture Failed", ex.Message);
+        }
+        _capturing = false;
+    }
+
+    private async Task OnCaptureVideo()
+    {
+        _capturing = true;
+        try
+        {
+            var media = await Camera.CaptureVideoAsync();
+            if (media is not null)
+            {
+                await Evidence.CreateRecordAsync(media);
+                Haptics.Click();
+                Notification.Notify(NotificationSeverity.Success, "Video Captured",
+                    $"Evidence recorded ({FormatSize(media.FileSize)}).");
+            }
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Capture Failed", ex.Message);
+        }
+        _capturing = false;
+    }
+
+    private async Task OnPickPhoto()
+    {
+        _capturing = true;
+        try
+        {
+            var media = await Camera.PickPhotoAsync();
+            if (media is not null)
+            {
+                await Evidence.CreateRecordAsync(media);
+                Haptics.Click();
+            }
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Pick Failed", ex.Message);
+        }
+        _capturing = false;
+    }
+
+    private async Task UploadEvidence(EvidenceRecord record)
+    {
+        await Uploader.UploadAsync(record);
+    }
+
+    private void OnProgressChanged(Guid id, double progress)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnUploadDone(Guid id, bool success)
+    {
+        InvokeAsync(() =>
+        {
+            if (success)
+                Notification.Notify(NotificationSeverity.Success, "Upload Complete", "Evidence uploaded to server.");
+            else
+                Notification.Notify(NotificationSeverity.Error, "Upload Failed", "Will retry automatically.");
+            StateHasChanged();
+        });
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
+    }
+
+    private static string GetStatusClass(EvidenceStatus status) => status switch
+    {
+        EvidenceStatus.Captured => "status-warning",
+        EvidenceStatus.Queued => "status-warning",
+        EvidenceStatus.Uploading => "status-warning",
+        EvidenceStatus.Uploaded or EvidenceStatus.Verified => "status-safe",
+        EvidenceStatus.Failed => "status-danger",
+        _ => "status-offline"
+    };
+}

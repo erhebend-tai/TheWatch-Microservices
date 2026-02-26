@@ -2,6 +2,10 @@
 @attribute [Authorize]
 @inject WatchAuthService AuthService
 @inject SpeechListenerService SpeechService
+@inject HapticService Haptics
+@inject BiometricGateService Biometric
+@inject LocationTrackingService LocationTracking
+@inject BatteryMonitorService Battery
 @inject NavigationManager Nav
 @inject NotificationService Notification
 
@@ -72,6 +76,67 @@
                 </RadzenStack>
             </div>
 
+            <!-- Haptic Feedback -->
+            <div class="watch-card">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                             AlignItems="AlignItems.Center">
+                    <RadzenStack>
+                        <RadzenText TextStyle="TextStyle.Body1">Haptic Feedback</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            Vibration patterns for SOS, alerts, check-ins
+                        </RadzenText>
+                    </RadzenStack>
+                    <RadzenSwitch Value="@Haptics.IsEnabled" Change="@((bool v) => OnHapticToggle(v))" />
+                </RadzenStack>
+            </div>
+
+            <!-- Biometric Gate -->
+            <div class="watch-card">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                             AlignItems="AlignItems.Center">
+                    <RadzenStack>
+                        <RadzenText TextStyle="TextStyle.Body1">Biometric Lock</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            Require fingerprint/face to open app
+                        </RadzenText>
+                    </RadzenStack>
+                    <RadzenSwitch Value="@Biometric.IsEnabled" Change="@((bool v) => OnBiometricToggle(v))" />
+                </RadzenStack>
+            </div>
+
+            <!-- Location Tracking -->
+            <div class="watch-card">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                             AlignItems="AlignItems.Center">
+                    <RadzenStack>
+                        <RadzenText TextStyle="TextStyle.Body1">Background Location</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            Track location for responder dispatch
+                        </RadzenText>
+                    </RadzenStack>
+                    <RadzenSwitch Value="@LocationTracking.HasConsent" Change="@((bool v) => OnLocationToggle(v))" />
+                </RadzenStack>
+            </div>
+
+            <!-- Battery Status -->
+            <div class="watch-card">
+                <RadzenStack Gap="0.25rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenText TextStyle="TextStyle.Body1">Battery Mode</RadzenText>
+                        <span class="status-badge @GetBatteryClass()">@Battery.CurrentMode</span>
+                    </RadzenStack>
+                    <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                        @(Battery.CurrentBatteryLevel.ToString("P0")) — @Battery.CurrentMode switch
+                        {
+                            BatteryListeningMode.FullListening => "Full continuous listening",
+                            BatteryListeningMode.ReducedListening => "5s on / 10s off",
+                            BatteryListeningMode.MinimalListening => "2s on / 30s off",
+                            _ => "Unknown"
+                        }
+                    </RadzenText>
+                </RadzenStack>
+            </div>
+
             <!-- About Section -->
             <RadzenText TextStyle="TextStyle.Subtitle1" Style="margin-top: 0.5rem;">About</RadzenText>
             <div class="watch-card">
@@ -106,9 +171,38 @@
             await SpeechService.StopListeningAsync();
     }
 
+    private void OnHapticToggle(bool enabled)
+    {
+        Haptics.IsEnabled = enabled;
+        if (enabled) Haptics.Click();
+    }
+
+    private void OnBiometricToggle(bool enabled)
+    {
+        Biometric.IsEnabled = enabled;
+    }
+
+    private async void OnLocationToggle(bool enabled)
+    {
+        LocationTracking.HasConsent = enabled;
+        if (enabled)
+            await LocationTracking.StartTrackingAsync();
+        else
+            LocationTracking.StopTracking();
+    }
+
+    private string GetBatteryClass() => Battery.CurrentMode switch
+    {
+        BatteryListeningMode.FullListening => "status-safe",
+        BatteryListeningMode.ReducedListening => "status-warning",
+        BatteryListeningMode.MinimalListening => "status-danger",
+        _ => "status-offline"
+    };
+
     private async Task OnLogout()
     {
         await SpeechService.StopListeningAsync();
+        LocationTracking.StopTracking();
         await AuthService.LogoutAsync();
         Nav.NavigateTo("/login");
     }

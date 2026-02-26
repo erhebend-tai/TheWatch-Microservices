@@ -124,6 +124,20 @@ html, body {
     margin-bottom: 0.75rem;
 }
 
+/* Offline banner */
+.offline-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: rgba(245, 158, 11, 0.15);
+    color: #F59E0B;
+    padding: 0.4rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(245, 158, 11, 0.25);
+}
+
 /* Error UI */
 #blazor-error-ui {
     background: lightyellow;

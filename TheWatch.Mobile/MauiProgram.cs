@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
 using Radzen;
 using TheWatch.Mobile.Auth;
+using TheWatch.Mobile.Data;
 using TheWatch.Mobile.Services;
 
 namespace TheWatch.Mobile;
@@ -48,8 +49,42 @@ public static class MauiProgram
 
         // App services
         builder.Services.AddSingleton<WatchApiClient>();
-        builder.Services.AddSingleton<SpeechListenerService>();
         builder.Services.AddSingleton<PhraseService>();
+        builder.Services.AddSingleton<SpeechListenerService>();
+
+        // Platform-specific speech recognition (items 81-83)
+#if ANDROID
+        builder.Services.AddSingleton<ISpeechRecognitionEngine, Platforms.Android.Services.AndroidSpeechRecognizer>();
+#elif IOS
+        builder.Services.AddSingleton<ISpeechRecognitionEngine, Platforms.iOS.Services.IosSpeechRecognizer>();
+#elif WINDOWS
+        builder.Services.AddSingleton<ISpeechRecognitionEngine, Platforms.Windows.Services.WindowsSpeechRecognizer>();
+#endif
+
+        // Battery monitoring + connectivity (items 85, 87-92)
+        builder.Services.AddSingleton<BatteryMonitorService>();
+        builder.Services.AddSingleton<WatchLocalDbContext>();
+        builder.Services.AddSingleton<IConnectivityMonitorService, ConnectivityMonitorService>();
+        builder.Services.AddSingleton<ConnectivityMonitorService>();
+        builder.Services.AddSingleton<IOfflineQueueService, OfflineQueueService>();
+        builder.Services.AddSingleton<OfflineQueueService>();
+        builder.Services.AddSingleton<CacheService>();
+        builder.Services.AddSingleton<SyncEngine>();
+        builder.Services.AddSingleton<MeshFallbackService>();
+
+        // Native features (items 93-98)
+        builder.Services.AddSingleton<CameraService>();
+        builder.Services.AddSingleton<EmergencyLocationService>();
+        builder.Services.AddSingleton<HapticService>();
+        builder.Services.AddSingleton<BiometricGateService>();
+        builder.Services.AddSingleton<LocationTrackingService>();
+
+        // Evidence collection (items 99-105)
+        builder.Services.AddSingleton<ChainOfCustodyService>();
+        builder.Services.AddSingleton<EvidenceMetadataService>();
+        builder.Services.AddSingleton<EvidenceUploadService>();
+        builder.Services.AddSingleton<SitrepService>();
+        builder.Services.AddSingleton<ContentModerationService>();
 
         // Push notifications
         builder.Services.AddSingleton<WatchPushNotificationService>();

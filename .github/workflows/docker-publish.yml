@@ -1,0 +1,112 @@
+name: Docker — Build & Push to ACR
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "helm/**"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/security.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ${{ vars.ACR_REGISTRY || 'thewatch.azurecr.io' }}
+
+jobs:
+  # ===========================================================
+  # Build and push Docker images for all services
+  # ===========================================================
+  build-and-push:
+    name: Build ${{ matrix.service.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - { name: p1-coregateway,     dockerfile: TheWatch.P1.CoreGateway/Dockerfile }
+          - { name: p2-voiceemergency,  dockerfile: TheWatch.P2.VoiceEmergency/Dockerfile }
+          - { name: p3-meshnetwork,     dockerfile: TheWatch.P3.MeshNetwork/Dockerfile }
+          - { name: p4-wearable,        dockerfile: TheWatch.P4.Wearable/Dockerfile }
+          - { name: p5-authsecurity,    dockerfile: TheWatch.P5.AuthSecurity/Dockerfile }
+          - { name: p6-firstresponder,  dockerfile: TheWatch.P6.FirstResponder/Dockerfile }
+          - { name: p7-familyhealth,    dockerfile: TheWatch.P7.FamilyHealth/Dockerfile }
+          - { name: p8-disasterrelief,  dockerfile: TheWatch.P8.DisasterRelief/Dockerfile }
+          - { name: p9-doctorservices,  dockerfile: TheWatch.P9.DoctorServices/Dockerfile }
+          - { name: p10-gamification,   dockerfile: TheWatch.P10.Gamification/Dockerfile }
+          - { name: geospatial,         dockerfile: TheWatch.Geospatial/Dockerfile }
+          - { name: dashboard,          dockerfile: TheWatch.Dashboard/Dockerfile }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/thewatch-${{ matrix.service.name }}
+          tags: |
+            type=sha,prefix=
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value={{date 'YYYYMMDD-HHmmss'}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_CONFIGURATION=Release
+
+      - name: Verify image
+        run: |
+          echo "Pushed image: ${{ env.REGISTRY }}/thewatch-${{ matrix.service.name }}"
+          echo "Tags: ${{ steps.meta.outputs.tags }}"
+
+  # ===========================================================
+  # Summary of all pushed images
+  # ===========================================================
+  summary:
+    name: Push Summary
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: always()
+
+    steps:
+      - name: Report results
+        run: |
+          echo "## Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| All 12 services | ${{ needs.build-and-push.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Registry: \`${{ env.REGISTRY }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,251 @@
+@page "/report/{IncidentId:guid}"
+@attribute [Authorize]
+@inject WatchApiClient Api
+@inject EvidenceMetadataService Evidence
+@inject SitrepService Sitrep
+@inject HapticService Haptics
+@inject NavigationManager Nav
+@inject NotificationService Notification
+
+<div class="page-content">
+    <RadzenStack Gap="1rem">
+        <RadzenText TextStyle="TextStyle.H5">Incident Report</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--watch-muted);">
+            SITREP framework post-incident questionnaire
+        </RadzenText>
+
+        <!-- Step Indicator -->
+        <RadzenSteps @bind-SelectedIndex="_currentStep" Change="@OnStepChanged">
+            <Steps>
+                <RadzenStepsItem Text="Situation" />
+                <RadzenStepsItem Text="Incident" />
+                <RadzenStepsItem Text="Terrain" />
+                <RadzenStepsItem Text="Resources" />
+                <RadzenStepsItem Text="Evacuation" />
+                <RadzenStepsItem Text="Personnel" />
+                <RadzenStepsItem Text="Evidence" />
+            </Steps>
+        </RadzenSteps>
+
+        <!-- Step Content -->
+        @switch (_currentStep)
+        {
+            case 0:
+                <div class="watch-card">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Subtitle1">Situation Overview</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            Describe the overall situation and context.
+                        </RadzenText>
+                        <RadzenTextArea @bind-Value="_report.Situation" Rows="5"
+                                        Placeholder="What is the overall situation? What events led to this incident?"
+                                        Style="width: 100%;" />
+                    </RadzenStack>
+                </div>
+                break;
+
+            case 1:
+                <div class="watch-card">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Subtitle1">Incident Details</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            Describe the incident type and specifics.
+                        </RadzenText>
+                        <RadzenTextArea @bind-Value="_report.Incident" Rows="5"
+                                        Placeholder="What type of incident? When did it start? What is the current status?"
+                                        Style="width: 100%;" />
+                    </RadzenStack>
+                </div>
+                break;
+
+            case 2:
+                <div class="watch-card">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Subtitle1">Terrain / Environment</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            Describe the physical environment.
+                        </RadzenText>
+                        <RadzenTextArea @bind-Value="_report.Terrain" Rows="5"
+                                        Placeholder="What are the terrain conditions? Weather? Hazards? Access points?"
+                                        Style="width: 100%;" />
+                    </RadzenStack>
+                </div>
+                break;
+
+            case 3:
+                <div class="watch-card">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Subtitle1">Resources</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            Resources available and needed.
+                        </RadzenText>
+                        <RadzenTextArea @bind-Value="_report.Resources" Rows="5"
+                                        Placeholder="What resources were used? What additional resources are needed?"
+                                        Style="width: 100%;" />
+                    </RadzenStack>
+                </div>
+                break;
+
+            case 4:
+                <div class="watch-card">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Subtitle1">Evacuation</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            Evacuation routes and actions taken.
+                        </RadzenText>
+                        <RadzenTextArea @bind-Value="_report.Evacuation" Rows="5"
+                                        Placeholder="Were evacuations necessary? Routes used? People evacuated?"
+                                        Style="width: 100%;" />
+                    </RadzenStack>
+                </div>
+                break;
+
+            case 5:
+                <div class="watch-card">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Subtitle1">Personnel</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            People involved in the incident.
+                        </RadzenText>
+                        <RadzenTextArea @bind-Value="_report.Personnel" Rows="5"
+                                        Placeholder="How many victims? Injuries? Responders involved? Witnesses?"
+                                        Style="width: 100%;" />
+                    </RadzenStack>
+                </div>
+                break;
+
+            case 6:
+                <div class="watch-card">
+                    <RadzenStack Gap="0.75rem">
+                        <RadzenText TextStyle="TextStyle.Subtitle1">Attached Evidence</RadzenText>
+                        @if (_incidentEvidence.Count > 0)
+                        {
+                            @foreach (var ev in _incidentEvidence)
+                            {
+                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem"
+                                             AlignItems="AlignItems.Center">
+                                    <span class="material-symbols-outlined" style="font-size: 1rem;">
+                                        @(ev.MediaType == MediaType.Photo ? "image" : "videocam")
+                                    </span>
+                                    <RadzenText TextStyle="TextStyle.Body2">
+                                        @Path.GetFileName(ev.FilePath) (@FormatSize(ev.FileSize))
+                                    </RadzenText>
+                                    <span class="status-badge status-safe">@ev.Status</span>
+                                </RadzenStack>
+                            }
+                        }
+                        else
+                        {
+                            <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--watch-muted);">
+                                No evidence attached. Go to Evidence page to capture.
+                            </RadzenText>
+                        }
+
+                        <RadzenButton Text="Go to Evidence Collection" Icon="photo_camera"
+                                      Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Info"
+                                      Variant="Variant.Text"
+                                      Click="@(() => Nav.NavigateTo("/evidence"))" />
+                    </RadzenStack>
+                </div>
+                break;
+        }
+
+        <!-- Navigation Buttons -->
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+            @if (_currentStep > 0)
+            {
+                <RadzenButton Text="Previous" Icon="arrow_back"
+                              ButtonStyle="ButtonStyle.Light" Click="@PreviousStep" />
+            }
+            else
+            {
+                <div></div>
+            }
+
+            @if (_currentStep < 6)
+            {
+                <RadzenButton Text="Next" Icon="arrow_forward"
+                              ButtonStyle="ButtonStyle.Primary" Click="@NextStep" />
+            }
+            else
+            {
+                <RadzenButton Text="Submit Report" Icon="send"
+                              ButtonStyle="ButtonStyle.Success" Click="@SubmitReport"
+                              IsBusy="@_submitting" />
+            }
+        </RadzenStack>
+    </RadzenStack>
+</div>
+
+@code {
+    [Parameter] public Guid IncidentId { get; set; }
+
+    private SitrepReport _report = new();
+    private int _currentStep;
+    private bool _submitting;
+    private List<EvidenceRecord> _incidentEvidence = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _report.IncidentId = IncidentId;
+        _incidentEvidence = Evidence.GetByIncident(IncidentId);
+
+        try
+        {
+            var incidents = await Api.GetRecentIncidentsAsync(50);
+            var incident = incidents.FirstOrDefault(i => i.Id == IncidentId);
+            if (incident is not null)
+            {
+                _report.Situation = $"Incident type: {incident.Type}, Severity: {incident.Severity}/5";
+                _report.Incident = incident.Type.ToString();
+            }
+        }
+        catch { /* offline */ }
+    }
+
+    private void NextStep()
+    {
+        if (_currentStep < 6) _currentStep++;
+        Haptics.Click();
+    }
+
+    private void PreviousStep()
+    {
+        if (_currentStep > 0) _currentStep--;
+    }
+
+    private void OnStepChanged(int step) => _currentStep = step;
+
+    private async Task SubmitReport()
+    {
+        _submitting = true;
+        try
+        {
+            var formattedReport = Sitrep.FormatReport(_report);
+
+            await Api.CreateIncidentAsync(new CreateIncidentRequest(
+                EmergencyType.MedicalEmergency,
+                formattedReport,
+                new LocationDto(0, 0),
+                Guid.Empty,
+                null, null, 3));
+
+            await Haptics.SOSConfirmAsync();
+            Notification.Notify(NotificationSeverity.Success, "Report Submitted",
+                "SITREP report has been submitted successfully.");
+            Nav.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Submit Failed", ex.Message);
+        }
+        _submitting = false;
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
+    }
+}

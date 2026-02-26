@@ -5,6 +5,9 @@ using TheWatch.P3.MeshNetwork;
 using TheWatch.P3.MeshNetwork.Mesh;
 using TheWatch.P3.MeshNetwork.Services;
 using TheWatch.Shared.Contracts;
+using TheWatch.P3.MeshNetwork.Data.Seeders;
+using TheWatch.Shared.Gcp;
+using TheWatch.Shared.Cloudflare;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -15,6 +18,8 @@ builder.AddWatchPersistenceAspire();
 builder.ConfigureWatchNotifications();
 builder.AddWatchKafka();
 builder.AddWatchKafkaConsumer<DispatchRequestedConsumer>();
+builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
+builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
 // CORS
 builder.Services.AddCors(options =>
@@ -32,8 +37,10 @@ builder.Services.AddHangfireServer();
 builder.Services.AddScoped<IMeshService, MeshService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.AddWatchSecurity();
+builder.Services.AddScoped<IWatchDataSeeder, MeshNetworkSeeder>();
 
 var app = builder.Build();
+await app.UseWatchMigrations();
 
 app.UseCors();
 app.UseWatchSecurity();

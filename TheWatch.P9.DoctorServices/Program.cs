@@ -5,6 +5,9 @@ using TheWatch.P9.DoctorServices;
 using TheWatch.P9.DoctorServices.Doctors;
 using TheWatch.P9.DoctorServices.Services;
 using TheWatch.Shared.Contracts;
+using TheWatch.P9.DoctorServices.Data.Seeders;
+using TheWatch.Shared.Gcp;
+using TheWatch.Shared.Cloudflare;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -13,6 +16,8 @@ builder.ConfigureWatchSerilog();
 builder.ConfigureWatchOpenApi();
 builder.AddWatchPersistenceAspire();
 builder.ConfigureWatchNotifications();
+builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
+builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
 // CORS
 builder.Services.AddCors(options =>
@@ -30,8 +35,10 @@ builder.Services.AddHangfireServer();
 builder.Services.AddScoped<IDoctorService, DoctorService>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.AddWatchSecurity();
+builder.Services.AddScoped<IWatchDataSeeder, DoctorServicesSeeder>();
 
 var app = builder.Build();
+await app.UseWatchMigrations();
 
 app.UseCors();
 app.UseWatchSecurity();

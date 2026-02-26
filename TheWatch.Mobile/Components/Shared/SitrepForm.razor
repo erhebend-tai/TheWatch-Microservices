@@ -1,0 +1,135 @@
+@inject SitrepService Sitrep
+@inject NotificationService Notification
+
+<div class="watch-card">
+    <RadzenStack Gap="0.75rem">
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                     AlignItems="AlignItems.Center">
+            <RadzenText TextStyle="TextStyle.Subtitle1">SITREP Report</RadzenText>
+            <RadzenButton Text="@(_isDictating ? "Stop Dictation" : "Voice Dictate")"
+                          Icon="@(_isDictating ? "mic_off" : "mic")"
+                          Size="ButtonSize.Small"
+                          ButtonStyle="@(_isDictating ? ButtonStyle.Danger : ButtonStyle.Info)"
+                          Click="@ToggleDictation" />
+        </RadzenStack>
+
+        @if (_isDictating)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info" Size="AlertSize.Small" AllowClose="false">
+                Listening... Speak naturally. Your words will appear in the active section.
+            </RadzenAlert>
+        }
+
+        <!-- Situation -->
+        <RadzenFormField Text="Situation" Style="width: 100%;">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="Report.Situation" Rows="3"
+                                Placeholder="Describe the overall situation..."
+                                Style="width: 100%;" class="@GetActiveClass("situation")"
+                                @onfocus="@(() => _activeSection = "situation")" />
+            </ChildContent>
+        </RadzenFormField>
+
+        <!-- Incident -->
+        <RadzenFormField Text="Incident Details" Style="width: 100%;">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="Report.Incident" Rows="3"
+                                Placeholder="Describe the incident type and specifics..."
+                                Style="width: 100%;" class="@GetActiveClass("incident")"
+                                @onfocus="@(() => _activeSection = "incident")" />
+            </ChildContent>
+        </RadzenFormField>
+
+        <!-- Terrain -->
+        <RadzenFormField Text="Terrain / Environment" Style="width: 100%;">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="Report.Terrain" Rows="2"
+                                Placeholder="Describe the terrain and environment..."
+                                Style="width: 100%;" class="@GetActiveClass("terrain")"
+                                @onfocus="@(() => _activeSection = "terrain")" />
+            </ChildContent>
+        </RadzenFormField>
+
+        <!-- Resources -->
+        <RadzenFormField Text="Resources Needed/Used" Style="width: 100%;">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="Report.Resources" Rows="2"
+                                Placeholder="Resources available and needed..."
+                                Style="width: 100%;" class="@GetActiveClass("resources")"
+                                @onfocus="@(() => _activeSection = "resources")" />
+            </ChildContent>
+        </RadzenFormField>
+
+        <!-- Evacuation -->
+        <RadzenFormField Text="Evacuation" Style="width: 100%;">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="Report.Evacuation" Rows="2"
+                                Placeholder="Evacuation routes and actions..."
+                                Style="width: 100%;" class="@GetActiveClass("evacuation")"
+                                @onfocus="@(() => _activeSection = "evacuation")" />
+            </ChildContent>
+        </RadzenFormField>
+
+        <!-- Personnel -->
+        <RadzenFormField Text="Personnel" Style="width: 100%;">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="Report.Personnel" Rows="2"
+                                Placeholder="Personnel involved (victims, responders)..."
+                                Style="width: 100%;" class="@GetActiveClass("personnel")"
+                                @onfocus="@(() => _activeSection = "personnel")" />
+            </ChildContent>
+        </RadzenFormField>
+    </RadzenStack>
+</div>
+
+@code {
+    [Parameter] public SitrepReport Report { get; set; } = new();
+    [Parameter] public EventCallback<SitrepReport> ReportChanged { get; set; }
+
+    private bool _isDictating;
+    private string _activeSection = "situation";
+
+    private async Task ToggleDictation()
+    {
+        if (_isDictating)
+        {
+            await Sitrep.StopDictationAsync();
+            Sitrep.OnDictationResult -= OnDictationText;
+            _isDictating = false;
+        }
+        else
+        {
+            Sitrep.OnDictationResult += OnDictationText;
+            await Sitrep.StartDictationAsync();
+            _isDictating = true;
+        }
+    }
+
+    private async void OnDictationText(string text)
+    {
+        await InvokeAsync(() =>
+        {
+            // Append dictated text to the active section
+            switch (_activeSection)
+            {
+                case "situation": Report.Situation = AppendText(Report.Situation, text); break;
+                case "incident": Report.Incident = AppendText(Report.Incident, text); break;
+                case "terrain": Report.Terrain = AppendText(Report.Terrain, text); break;
+                case "resources": Report.Resources = AppendText(Report.Resources, text); break;
+                case "evacuation": Report.Evacuation = AppendText(Report.Evacuation, text); break;
+                case "personnel": Report.Personnel = AppendText(Report.Personnel, text); break;
+            }
+            StateHasChanged();
+        });
+    }
+
+    private static string AppendText(string existing, string newText)
+    {
+        return string.IsNullOrWhiteSpace(existing) ? newText : $"{existing} {newText}";
+    }
+
+    private string GetActiveClass(string section)
+    {
+        return _isDictating && _activeSection == section ? "dictation-active" : "";
+    }
+}

@@ -1,0 +1,12 @@
+apiVersion: v2
+name: thewatch
+description: TheWatch — Citizen Emergency Response Microservices Platform
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - emergency-response
+  - microservices
+  - dotnet
+maintainers:
+  - name: TheWatch Team

@@ -1,0 +1,93 @@
+{
+  "_comment": "TheWatch Cloudflare WAF Rules — deploy via Cloudflare API or dashboard",
+  "managed_rulesets": [
+    {
+      "id": "efb7b8c949ac4650a09736fc376e9aee",
+      "name": "Cloudflare Managed Ruleset",
+      "enabled": true
+    },
+    {
+      "id": "c2e184081120413c86c3ab7e14069605",
+      "name": "Cloudflare OWASP Core Ruleset",
+      "enabled": true,
+      "overrides": {
+        "sensitivity_level": "medium"
+      }
+    }
+  ],
+  "custom_rules": [
+    {
+      "description": "Block SQL injection in query parameters",
+      "expression": "(http.request.uri.query contains \"UNION SELECT\") or (http.request.uri.query contains \"DROP TABLE\") or (http.request.uri.query contains \"--\") or (http.request.uri.query contains \"/**/\")",
+      "action": "block",
+      "priority": 1,
+      "enabled": true
+    },
+    {
+      "description": "Block XSS attempts in request body",
+      "expression": "(http.request.body.raw contains \"<script\") or (http.request.body.raw contains \"javascript:\")",
+      "action": "block",
+      "priority": 2,
+      "enabled": true
+    },
+    {
+      "description": "Challenge suspicious auth endpoint access",
+      "expression": "http.request.uri.path contains \"/api/auth/\" and not ip.geoip.country in {\"US\" \"CA\" \"GB\" \"AU\"}",
+      "action": "managed_challenge",
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "description": "Block requests without User-Agent",
+      "expression": "not any(http.request.headers[\"user-agent\"][*] ne \"\")",
+      "action": "block",
+      "priority": 20,
+      "enabled": true
+    },
+    {
+      "description": "Protect admin endpoints — require known IPs or Cloudflare Access",
+      "expression": "http.request.uri.path contains \"/admin\" or http.request.uri.path contains \"/hangfire\"",
+      "action": "managed_challenge",
+      "priority": 5,
+      "enabled": true
+    }
+  ],
+  "rate_limiting_rules": [
+    {
+      "description": "Rate limit auth login endpoint",
+      "expression": "http.request.uri.path eq \"/api/auth/login\"",
+      "action": "challenge",
+      "characteristics": ["ip.src"],
+      "period": 60,
+      "requests_per_period": 10,
+      "mitigation_timeout": 600
+    },
+    {
+      "description": "Rate limit auth registration",
+      "expression": "http.request.uri.path eq \"/api/auth/register\"",
+      "action": "challenge",
+      "characteristics": ["ip.src"],
+      "period": 3600,
+      "requests_per_period": 5,
+      "mitigation_timeout": 3600
+    },
+    {
+      "description": "Rate limit SOS emergency endpoints",
+      "expression": "http.request.uri.path contains \"/api/incidents\"",
+      "action": "log",
+      "characteristics": ["ip.src", "http.request.headers[\"x-user-id\"]"],
+      "period": 60,
+      "requests_per_period": 30,
+      "mitigation_timeout": 60
+    },
+    {
+      "description": "General API rate limit",
+      "expression": "http.request.uri.path contains \"/api/\"",
+      "action": "challenge",
+      "characteristics": ["ip.src"],
+      "period": 60,
+      "requests_per_period": 100,
+      "mitigation_timeout": 120
+    }
+  ]
+}

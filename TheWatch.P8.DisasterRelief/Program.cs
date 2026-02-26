@@ -5,6 +5,9 @@ using TheWatch.P8.DisasterRelief;
 using TheWatch.P8.DisasterRelief.Relief;
 using TheWatch.P8.DisasterRelief.Services;
 using TheWatch.Shared.Contracts;
+using TheWatch.P8.DisasterRelief.Data.Seeders;
+using TheWatch.Shared.Gcp;
+using TheWatch.Shared.Cloudflare;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -13,6 +16,8 @@ builder.ConfigureWatchSerilog();
 builder.ConfigureWatchOpenApi();
 builder.AddWatchPersistenceAspire();
 builder.ConfigureWatchNotifications();
+builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
+builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
 // CORS
 builder.Services.AddCors(options =>
@@ -31,8 +36,10 @@ builder.Services.AddScoped<IDisasterEventService, DisasterEventService>();
 builder.Services.AddScoped<IShelterService, ShelterService>();
 builder.Services.AddScoped<IResourceService, ResourceService>();
 builder.AddWatchSecurity();
+builder.Services.AddScoped<IWatchDataSeeder, DisasterReliefSeeder>();
 
 var app = builder.Build();
+await app.UseWatchMigrations();
 
 app.UseCors();
 app.UseWatchSecurity();

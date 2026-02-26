@@ -1,0 +1,157 @@
+# TheWatch — Alertmanager Configuration
+# Routes alerts to PagerDuty, Slack, and email based on severity/team
+
+global:
+  resolve_timeout: 5m
+  pagerduty_url: "https://events.pagerduty.com/v2/enqueue"
+
+templates:
+  - "/etc/alertmanager/templates/*.tmpl"
+
+# Inhibition rules: suppress less severe alerts when critical is firing
+inhibit_rules:
+  # If ServiceDown is firing, suppress HighErrorRate and HighLatency for same service
+  - source_matchers:
+      - alertname = "ServiceDown"
+    target_matchers:
+      - alertname =~ "HighErrorRate|HighLatency"
+    equal: ["service"]
+
+  # If EmergencyServiceDown fires, suppress all other alerts for that service
+  - source_matchers:
+      - alertname = "EmergencyServiceDown"
+    target_matchers:
+      - severity =~ "warning|critical"
+    equal: ["service"]
+
+# Routing tree
+route:
+  group_by: ["alertname", "service"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: "default-slack"
+
+  routes:
+    # PAGE: Emergency services down — PagerDuty immediate
+    - matchers:
+        - severity = "page"
+      receiver: "pagerduty-emergency"
+      group_wait: 10s
+      repeat_interval: 5m
+      continue: true
+
+    # CRITICAL: PagerDuty + Slack
+    - matchers:
+        - severity = "critical"
+      receiver: "pagerduty-critical"
+      group_wait: 30s
+      repeat_interval: 1h
+      continue: true
+
+    # Emergency team alerts
+    - matchers:
+        - team = "emergency"
+      receiver: "slack-emergency"
+      group_wait: 15s
+      repeat_interval: 30m
+
+    # Health team alerts
+    - matchers:
+        - team = "health"
+      receiver: "slack-health"
+      repeat_interval: 1h
+
+    # Security/compliance alerts
+    - matchers:
+        - team =~ "security|compliance"
+      receiver: "slack-security"
+      repeat_interval: 1h
+
+    # Platform/infrastructure warnings
+    - matchers:
+        - severity = "warning"
+        - team = "platform"
+      receiver: "slack-platform"
+      repeat_interval: 4h
+
+# Receivers
+receivers:
+  - name: "default-slack"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#thewatch-alerts"
+        title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        text: |
+          *Service:* {{ .CommonLabels.service }}
+          *Severity:* {{ .CommonLabels.severity }}
+          {{ range .Alerts }}
+          {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+
+  - name: "pagerduty-emergency"
+    pagerduty_configs:
+      - service_key: "${PAGERDUTY_EMERGENCY_KEY}"
+        severity: critical
+        description: '{{ .CommonLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        details:
+          service: '{{ .CommonLabels.service }}'
+          severity: '{{ .CommonLabels.severity }}'
+          description: '{{ .CommonAnnotations.description }}'
+
+  - name: "pagerduty-critical"
+    pagerduty_configs:
+      - service_key: "${PAGERDUTY_CRITICAL_KEY}"
+        severity: '{{ .CommonLabels.severity }}'
+        description: '{{ .CommonLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        details:
+          service: '{{ .CommonLabels.service }}'
+
+  - name: "slack-emergency"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#thewatch-emergency"
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+        title: '🚨 [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+
+  - name: "slack-health"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#thewatch-health"
+        color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
+        title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+
+  - name: "slack-security"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#thewatch-security"
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+        title: '🔒 [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+
+  - name: "slack-platform"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#thewatch-platform"
+        title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true

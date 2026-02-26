@@ -1,0 +1,107 @@
+{
+  "_comment": "TheWatch Cloudflare Zero Trust Access configuration",
+  "organization": {
+    "name": "TheWatch",
+    "auth_domain": "thewatch.cloudflareaccess.com"
+  },
+  "identity_providers": [
+    {
+      "name": "GitHub",
+      "type": "github",
+      "config": {
+        "client_id": "{github-oauth-client-id}",
+        "client_secret": "{github-oauth-client-secret}"
+      }
+    },
+    {
+      "name": "Google Workspace",
+      "type": "google",
+      "config": {
+        "client_id": "{google-oauth-client-id}",
+        "client_secret": "{google-oauth-client-secret}"
+      }
+    },
+    {
+      "name": "One-time PIN",
+      "type": "onetimepin"
+    }
+  ],
+  "access_applications": [
+    {
+      "name": "TheWatch Dashboard",
+      "domain": "dashboard.thewatch.app",
+      "type": "self_hosted",
+      "session_duration": "12h",
+      "policies": [
+        {
+          "name": "Allow TheWatch team",
+          "decision": "allow",
+          "include": [
+            { "email_domain": { "domain": "thewatch.app" } }
+          ],
+          "require": [
+            { "login_method": { "id": ["github", "google"] } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TheWatch Admin Panel",
+      "domain": "admin.thewatch.app",
+      "type": "self_hosted",
+      "session_duration": "1h",
+      "policies": [
+        {
+          "name": "Admin access only",
+          "decision": "allow",
+          "include": [
+            { "email": { "email": "admin@thewatch.app" } }
+          ],
+          "require": [
+            { "login_method": { "id": ["github"] } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Hangfire Dashboard",
+      "domain": "api.thewatch.app",
+      "path": "/hangfire",
+      "type": "self_hosted",
+      "session_duration": "4h",
+      "policies": [
+        {
+          "name": "Operations team",
+          "decision": "allow",
+          "include": [
+            { "email_domain": { "domain": "thewatch.app" } },
+            { "group": { "id": "ops-team" } }
+          ]
+        }
+      ]
+    }
+  ],
+  "service_tokens": [
+    {
+      "name": "CI/CD Pipeline",
+      "duration": "8760h",
+      "_comment": "Used by GitHub Actions for deployment health checks"
+    },
+    {
+      "name": "Monitoring",
+      "duration": "8760h",
+      "_comment": "Used by external monitoring services for health probes"
+    }
+  ],
+  "device_posture_rules": [
+    {
+      "name": "Require updated OS",
+      "type": "os_version",
+      "description": "Require Windows 11 or macOS 14+",
+      "match": [
+        { "platform": "windows", "operator": ">=", "version": "10.0.22621" },
+        { "platform": "mac", "operator": ">=", "version": "14.0.0" }
+      ]
+    }
+  ]
+}

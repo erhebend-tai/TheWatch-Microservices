@@ -7,6 +7,9 @@ using TheWatch.P2.VoiceEmergency.Emergency;
 using TheWatch.P2.VoiceEmergency.Services;
 using TheWatch.Shared.Contracts;
 using TheWatch.Shared.Events;
+using TheWatch.P2.VoiceEmergency.Data.Seeders;
+using TheWatch.Shared.Gcp;
+using TheWatch.Shared.Cloudflare;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -16,6 +19,8 @@ builder.ConfigureWatchOpenApi();
 builder.AddWatchPersistenceAspire();
 builder.AddWatchKafka();
 builder.ConfigureWatchNotifications();
+builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
+builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
 // CORS (configured for SignalR — requires AllowCredentials)
 builder.Services.AddCors(options =>
@@ -40,8 +45,10 @@ builder.AddWatchSecurity();
 // Services
 builder.Services.AddScoped<IEmergencyService, EmergencyService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
+builder.Services.AddScoped<IWatchDataSeeder, VoiceEmergencySeeder>();
 
 var app = builder.Build();
+await app.UseWatchMigrations();
 
 app.UseCors();
 app.UseWatchSecurity();

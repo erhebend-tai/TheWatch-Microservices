@@ -6,6 +6,9 @@ using TheWatch.P1.CoreGateway.Core;
 using TheWatch.P1.CoreGateway.Services;
 using TheWatch.Shared.Contracts;
 using TheWatch.Shared.Notifications;
+using TheWatch.P1.CoreGateway.Data.Seeders;
+using TheWatch.Shared.Gcp;
+using TheWatch.Shared.Cloudflare;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -14,6 +17,8 @@ builder.ConfigureWatchSerilog();
 builder.ConfigureWatchOpenApi();
 builder.AddWatchPersistenceAspire();
 builder.ConfigureWatchNotifications();
+builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
+builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
 builder.Services.AddCors(options =>
 {
@@ -29,8 +34,10 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddSingleton<IConfigService, ConfigService>();
 builder.Services.AddHttpClient("services");
 builder.AddWatchSecurity();
+builder.Services.AddScoped<IWatchDataSeeder, CoreGatewaySeeder>();
 
 var app = builder.Build();
+await app.UseWatchMigrations();
 
 app.UseCors();
 app.UseWatchSecurity();

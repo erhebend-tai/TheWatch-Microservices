@@ -145,19 +145,25 @@ public class PushNotificationData
     public string GetDeepLinkRoute()
     {
         if (Data.TryGetValue("incidentId", out var incidentId))
-            return $"/incidents/{incidentId}";
+            return $"/sos";
         if (Data.TryGetValue("dispatchId", out var dispatchId))
-            return $"/dispatch/{dispatchId}";
+            return $"/map";
         if (Data.TryGetValue("alertId", out var alertId))
-            return $"/alerts/{alertId}";
+            return $"/health";
+        if (Data.TryGetValue("evidenceId", out var evidenceId))
+            return $"/evidence";
+        if (Data.TryGetValue("reportId", out var reportId) && Guid.TryParse(reportId, out var reportGuid))
+            return $"/report/{reportGuid}";
         if (Data.TryGetValue("source", out var source))
         {
             return source switch
             {
                 "VoiceEmergency" => "/sos",
                 "FamilyHealth" => "/health",
-                "DisasterRelief" => "/alerts",
+                "DisasterRelief" => "/map",
+                "FirstResponder" => "/map",
                 "Gamification" => "/profile",
+                "Evidence" => "/evidence",
                 _ => "/"
             };
         }

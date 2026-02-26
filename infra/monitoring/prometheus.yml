@@ -1,0 +1,182 @@
+# TheWatch — Prometheus Configuration
+# Scrapes metrics from all 12 microservices via OpenTelemetry Prometheus exporter
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+  external_labels:
+    cluster: "thewatch-local"
+    environment: "development"
+
+# Rule files for alerting
+rule_files:
+  - "alert-rules.yml"
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - "alertmanager:9093"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ============================================================
+  # TheWatch Microservices (P1-P10 + Geospatial + Dashboard)
+  # Each service exposes /metrics via OpenTelemetry Prometheus exporter
+  # ============================================================
+
+  - job_name: "thewatch-p1-coregateway"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["p1-coregateway:8080"]
+        labels:
+          service: "P1-CoreGateway"
+          tier: "api-gateway"
+
+  - job_name: "thewatch-p2-voiceemergency"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["p2-voiceemergency:8080"]
+        labels:
+          service: "P2-VoiceEmergency"
+          tier: "emergency"
+
+  - job_name: "thewatch-p3-meshnetwork"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["p3-meshnetwork:8080"]
+        labels:
+          service: "P3-MeshNetwork"
+          tier: "communication"
+
+  - job_name: "thewatch-p4-wearable"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["p4-wearable:8080"]
+        labels:
+          service: "P4-Wearable"
+          tier: "iot"
+
+  - job_name: "thewatch-p5-authsecurity"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["p5-authsecurity:8080"]
+        labels:
+          service: "P5-AuthSecurity"
+          tier: "security"
+
+  - job_name: "thewatch-p6-firstresponder"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["p6-firstresponder:8080"]
+        labels:
+          service: "P6-FirstResponder"
+          tier: "emergency"
+
+  - job_name: "thewatch-p7-familyhealth"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["p7-familyhealth:8080"]
+        labels:
+          service: "P7-FamilyHealth"
+          tier: "health"
+
+  - job_name: "thewatch-p8-disasterrelief"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["p8-disasterrelief:8080"]
+        labels:
+          service: "P8-DisasterRelief"
+          tier: "emergency"
+
+  - job_name: "thewatch-p9-doctorservices"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["p9-doctorservices:8080"]
+        labels:
+          service: "P9-DoctorServices"
+          tier: "health"
+
+  - job_name: "thewatch-p10-gamification"
+    metrics_path: "/metrics"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["p10-gamification:8080"]
+        labels:
+          service: "P10-Gamification"
+          tier: "engagement"
+
+  - job_name: "thewatch-geospatial"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["geospatial:8080"]
+        labels:
+          service: "Geospatial"
+          tier: "infrastructure"
+
+  - job_name: "thewatch-dashboard"
+    metrics_path: "/metrics"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["dashboard:8080"]
+        labels:
+          service: "Dashboard"
+          tier: "frontend"
+
+  # ============================================================
+  # Infrastructure Exporters
+  # ============================================================
+
+  - job_name: "sql-server"
+    metrics_path: "/metrics"
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["sql-exporter:9399"]
+        labels:
+          service: "SQLServer"
+          tier: "database"
+
+  - job_name: "postgres"
+    metrics_path: "/metrics"
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+        labels:
+          service: "PostgreSQL"
+          tier: "database"
+
+  - job_name: "kafka"
+    metrics_path: "/metrics"
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["kafka-exporter:9308"]
+        labels:
+          service: "Kafka"
+          tier: "messaging"
+
+  - job_name: "redis"
+    metrics_path: "/metrics"
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+        labels:
+          service: "Redis"
+          tier: "cache"

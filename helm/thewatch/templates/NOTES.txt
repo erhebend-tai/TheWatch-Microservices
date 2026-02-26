@@ -1,0 +1,56 @@
+TheWatch has been deployed!
+
+============================================================
+  Services deployed:
+============================================================
+{{- range $name, $svc := .Values.services }}
+{{- if $svc.enabled }}
+  - {{ $name }}: {{ $svc.replicaCount | default 2 }} replica(s)
+    {{- if and $svc.hpa $svc.hpa.enabled }}
+    (HPA: {{ $svc.hpa.minReplicas }}-{{ $svc.hpa.maxReplicas }} replicas)
+    {{- end }}
+{{- end }}
+{{- end }}
+
+============================================================
+  Infrastructure:
+============================================================
+  - SQL Server: {{ .Values.sqlserver.host }}:{{ .Values.sqlserver.port }}
+  - PostgreSQL/PostGIS: {{ .Values.postgres.host }}:{{ .Values.postgres.port }}
+  - Kafka: {{ .Values.kafka.bootstrapServers }}
+  - Redis: {{ .Values.redis.host }}:{{ .Values.redis.port }}
+
+============================================================
+  Access:
+============================================================
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  Dashboard:  https://{{ .host }}/
+  Auth API:   https://{{ .host }}/api/auth
+  Incidents:  https://{{ .host }}/api/incidents
+  Responders: https://{{ .host }}/api/responders
+  Geospatial: https://{{ .host }}/api/geo
+{{- end }}
+{{- else }}
+  Port-forward to access the dashboard:
+    kubectl port-forward svc/dashboard 5100:8080
+
+  Port-forward to access P5 Auth:
+    kubectl port-forward svc/p5-authsecurity 5105:8080
+{{- end }}
+
+============================================================
+  Quick start:
+============================================================
+  1. Register a user:
+     curl -X POST https://{{ (index .Values.ingress.hosts 0).host }}/api/auth/register \
+       -H "Content-Type: application/json" \
+       -d '{"email":"admin@thewatch.io","password":"Admin123!","displayName":"Admin"}'
+
+  2. Login:
+     curl -X POST https://{{ (index .Values.ingress.hosts 0).host }}/api/auth/login \
+       -H "Content-Type: application/json" \
+       -d '{"email":"admin@thewatch.io","password":"Admin123!"}'
+
+  3. Check health:
+     curl https://{{ (index .Values.ingress.hosts 0).host }}/api/incidents/../health

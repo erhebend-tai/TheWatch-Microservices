@@ -223,7 +223,7 @@ public class DbContextGenerator : IIncrementalGenerator
 
     private static void WriteDbContext(StringBuilder sb, string ctxName, List<EntityInfo> entities, bool isPostgres)
     {
-        sb.AppendLine($"public class {ctxName} : DbContext");
+        sb.AppendLine($"public partial class {ctxName} : DbContext");
         sb.AppendLine("{");
         sb.AppendLine($"    public {ctxName}(DbContextOptions<{ctxName}> options) : base(options) {{ }}");
         sb.AppendLine();
@@ -295,6 +295,7 @@ public class DbContextGenerator : IIncrementalGenerator
             sb.AppendLine();
         }
 
+        sb.AppendLine($"        modelBuilder.ApplyConfigurationsFromAssembly(typeof({ctxName}).Assembly);");
         sb.AppendLine("    }");
         sb.AppendLine("}");
         sb.AppendLine();

@@ -1,0 +1,64 @@
+# TheWatch Cloudflare Tunnel (Argo) Configuration
+# Deploy: cloudflared tunnel --config argo-tunnels.yaml run thewatch-tunnel
+#
+# Prerequisites:
+# 1. cloudflared tunnel create thewatch-tunnel
+# 2. cloudflared tunnel route dns thewatch-tunnel api.thewatch.app
+# 3. cloudflared tunnel route dns thewatch-tunnel dashboard.thewatch.app
+# 4. Store credentials at /etc/cloudflared/{tunnel-id}.json
+
+tunnel: "{tunnel-id}"
+credentials-file: /etc/cloudflared/{tunnel-id}.json
+
+# ─── Origin server health ───
+originRequest:
+  connectTimeout: 30s
+  tlsTimeout: 10s
+  noHappyEyeballs: false
+  keepAliveConnections: 100
+  keepAliveTimeout: 90s
+  httpHostHeader: ""
+  originServerName: ""
+  noTLSVerify: false
+
+# ─── Ingress Rules ───
+# Routes external hostnames to internal services
+ingress:
+  # ─── API Gateway (P1 CoreGateway) ───
+  - hostname: api.thewatch.app
+    service: http://localhost:5001
+    originRequest:
+      noTLSVerify: true
+
+  # ─── Dashboard (Blazor Server) ───
+  - hostname: dashboard.thewatch.app
+    service: http://localhost:5100
+    originRequest:
+      noTLSVerify: true
+
+  # ─── P2 VoiceEmergency (high priority) ───
+  - hostname: emergency.thewatch.app
+    service: http://localhost:5002
+    originRequest:
+      connectTimeout: 10s
+
+  # ─── P5 Auth Service ───
+  - hostname: auth.thewatch.app
+    service: http://localhost:5005
+    originRequest:
+      noTLSVerify: true
+
+  # ─── P6 FirstResponder ───
+  - hostname: responder.thewatch.app
+    service: http://localhost:5006
+    originRequest:
+      noTLSVerify: true
+
+  # ─── Geospatial Service ───
+  - hostname: geo.thewatch.app
+    service: http://localhost:5050
+    originRequest:
+      noTLSVerify: true
+
+  # ─── Catch-all: 404 ───
+  - service: http_status:404

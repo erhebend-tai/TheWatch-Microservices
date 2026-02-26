@@ -1,0 +1,49 @@
+{{/*
+  ConfigMap for shared service configuration (feature flags, endpoints, settings)
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: thewatch-config
+  labels:
+    {{- include "thewatch.labels" . | nindent 4 }}
+data:
+  # JWT settings (non-secret values)
+  jwt-issuer: {{ .Values.jwt.issuer | quote }}
+  jwt-audience: {{ .Values.jwt.audience | quote }}
+
+  # Kafka
+  kafka-bootstrap-servers: {{ .Values.kafka.bootstrapServers | quote }}
+
+  # Redis
+  redis-host: {{ .Values.redis.host | quote }}
+  redis-port: {{ .Values.redis.port | quote }}
+
+  # Database hosts (non-secret)
+  sql-host: {{ .Values.sqlserver.host | quote }}
+  sql-port: {{ .Values.sqlserver.port | quote }}
+  postgres-host: {{ .Values.postgres.host | quote }}
+  postgres-port: {{ .Values.postgres.port | quote }}
+
+  # Feature flags
+  feature-signalr-enabled: "true"
+  feature-kafka-events-enabled: "true"
+  feature-push-notifications-enabled: "true"
+  feature-geospatial-enabled: "true"
+
+  # Logging
+  serilog-minimum-level: "Information"
+
+  # Service URLs (for inter-service communication within cluster)
+  service-url-p1: "http://p1-coregateway:8080"
+  service-url-p2: "http://p2-voiceemergency:8080"
+  service-url-p3: "http://p3-meshnetwork:8080"
+  service-url-p4: "http://p4-wearable:8080"
+  service-url-p5: "http://p5-authsecurity:8080"
+  service-url-p6: "http://p6-firstresponder:8080"
+  service-url-p7: "http://p7-familyhealth:8080"
+  service-url-p8: "http://p8-disasterrelief:8080"
+  service-url-p9: "http://p9-doctorservices:8080"
+  service-url-p10: "http://p10-gamification:8080"
+  service-url-geo: "http://geospatial:8080"
+  service-url-dashboard: "http://dashboard:8080"

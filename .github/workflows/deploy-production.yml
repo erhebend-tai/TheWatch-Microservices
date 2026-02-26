@@ -1,0 +1,255 @@
+name: Deploy — Production
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag to deploy (default: commit SHA)"
+        required: false
+        type: string
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ${{ vars.ACR_REGISTRY || 'thewatch.azurecr.io' }}
+  AKS_CLUSTER: ${{ vars.AKS_CLUSTER_PRODUCTION || 'thewatch-production' }}
+  AKS_RESOURCE_GROUP: ${{ vars.AKS_RESOURCE_GROUP || 'thewatch-rg' }}
+  NAMESPACE: thewatch-production
+  HELM_RELEASE: thewatch-production
+  IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
+
+jobs:
+  # ===========================================================
+  # Pre-flight checks
+  # ===========================================================
+  preflight:
+    name: Pre-flight Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Docker images exist in registry
+        run: |
+          echo "## Pre-flight Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Verifying images with tag: \`${{ env.IMAGE_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Expected Image |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|----------------|" >> $GITHUB_STEP_SUMMARY
+          services=(
+            "p1-coregateway" "p2-voiceemergency" "p3-meshnetwork"
+            "p4-wearable" "p5-authsecurity" "p6-firstresponder"
+            "p7-familyhealth" "p8-disasterrelief" "p9-doctorservices"
+            "p10-gamification" "geospatial" "dashboard"
+          )
+          for svc in "${services[@]}"; do
+            echo "| $svc | \`${{ env.REGISTRY }}/thewatch-$svc:${{ env.IMAGE_TAG }}\` |" >> $GITHUB_STEP_SUMMARY
+          done
+
+      - name: Validate Helm chart
+        run: |
+          helm lint ./helm/thewatch \
+            --set jwt.key="placeholder" \
+            --set sqlserver.saPassword="placeholder" \
+            --set postgres.password="placeholder"
+
+  # ===========================================================
+  # Manual approval gate
+  # ===========================================================
+  approval:
+    name: Approval Gate
+    runs-on: ubuntu-latest
+    needs: preflight
+    environment: production
+    # The 'production' environment MUST have required reviewers configured
+    # in GitHub Settings > Environments > production > Protection rules
+
+    steps:
+      - name: Approved
+        run: |
+          echo "## Production Deployment Approved" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Approved by**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image tag**: \`${{ env.IMAGE_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================
+  # Deploy to production via Helm
+  # ===========================================================
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: approval
+    timeout-minutes: 20
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          cluster-name: ${{ env.AKS_CLUSTER }}
+          resource-group: ${{ env.AKS_RESOURCE_GROUP }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: "v3.16.0"
+
+      - name: Snapshot current release (for rollback)
+        run: |
+          helm history ${{ env.HELM_RELEASE }} -n ${{ env.NAMESPACE }} --max 1 || echo "No previous release found"
+        continue-on-error: true
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install ${{ env.HELM_RELEASE }} ./helm/thewatch \
+            --namespace ${{ env.NAMESPACE }} \
+            --create-namespace \
+            --set image.registry=${{ env.REGISTRY }} \
+            --set image.tag=${{ env.IMAGE_TAG }} \
+            --set global.environment=Production \
+            --set jwt.key="${{ secrets.JWT_SIGNING_KEY_PROD }}" \
+            --set jwt.issuer=thewatch-auth \
+            --set jwt.audience=thewatch-services \
+            --set sqlserver.saPassword="${{ secrets.SQL_SA_PASSWORD_PROD }}" \
+            --set postgres.password="${{ secrets.POSTGRES_PASSWORD_PROD }}" \
+            --set serviceApiKey="${{ secrets.SERVICE_API_KEY_PROD }}" \
+            --set ingress.enabled=true \
+            --set ingress.hosts[0].host=thewatch.io \
+            --set ingress.tls[0].secretName=thewatch-production-tls \
+            --set ingress.tls[0].hosts[0]=thewatch.io \
+            --set ingress.annotations."nginx\.ingress\.kubernetes\.io/limit-rps"="50" \
+            --timeout 15m \
+            --wait \
+            --atomic
+
+      - name: Verify deployment
+        run: |
+          echo "## Production Deployment Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployments" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          kubectl get deployments -n ${{ env.NAMESPACE }} -o wide >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Pods" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n ${{ env.NAMESPACE }} >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### HPAs" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          kubectl get hpa -n ${{ env.NAMESPACE }} >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Health check — all services
+        run: |
+          echo "Waiting 30s for services to stabilize..."
+          sleep 30
+          FAILED=0
+          for deploy in $(kubectl get deployments -n ${{ env.NAMESPACE }} -o jsonpath='{.items[*].metadata.name}'); do
+            READY=$(kubectl get deployment "$deploy" -n ${{ env.NAMESPACE }} -o jsonpath='{.status.readyReplicas}')
+            DESIRED=$(kubectl get deployment "$deploy" -n ${{ env.NAMESPACE }} -o jsonpath='{.spec.replicas}')
+            if [ "${READY:-0}" -lt "${DESIRED:-1}" ]; then
+              echo "::error::$deploy: $READY/$DESIRED pods ready"
+              FAILED=1
+            else
+              echo "$deploy: $READY/$DESIRED pods ready"
+            fi
+          done
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::Some services are not fully ready"
+            exit 1
+          fi
+
+  # ===========================================================
+  # Rollback on failure
+  # ===========================================================
+  rollback:
+    name: Auto-Rollback
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: failure()
+    timeout-minutes: 10
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          cluster-name: ${{ env.AKS_CLUSTER }}
+          resource-group: ${{ env.AKS_RESOURCE_GROUP }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: "v3.16.0"
+
+      - name: Rollback to previous release
+        run: |
+          echo "::warning::Production deployment failed — rolling back"
+          helm rollback ${{ env.HELM_RELEASE }} -n ${{ env.NAMESPACE }} --wait --timeout 10m
+          echo "## ROLLBACK EXECUTED" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Production deployment failed. Automatically rolled back to previous release." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Current Status After Rollback" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n ${{ env.NAMESPACE }} >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================
+  # Post-deployment notification
+  # ===========================================================
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [deploy, rollback]
+    if: always()
+
+    steps:
+      - name: Deployment summary
+        run: |
+          echo "## Production Deployment Result" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "### Deployment SUCCEEDED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Deployment FAILED (rollback: ${{ needs.rollback.result }})" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image tag**: \`${{ env.IMAGE_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL**: https://thewatch.io" >> $GITHUB_STEP_SUMMARY

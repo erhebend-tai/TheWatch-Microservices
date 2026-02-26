@@ -38,6 +38,21 @@ public class WearableDevice
     public int? BatteryPercent { get; set; }
     public DateTime? LastSyncAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public bool HasHeartRateSensor { get; set; } = true;
+    public bool HasGpsSensor { get; set; }
+    public bool HasAccelerometer { get; set; } = true;
+    public bool HasGyroscope { get; set; }
+    public bool HasBloodOxygen { get; set; }
+    public bool HasEcg { get; set; }
+    public bool HasTemperatureSensor { get; set; }
+    public string? ScreenShape { get; set; }
+    public int? ScreenWidthPx { get; set; }
+    public int? ScreenHeightPx { get; set; }
+    public int? BatteryCapacityMah { get; set; }
+    public double? BatteryHealthPct { get; set; }
+    public string? BluetoothVersion { get; set; }
+    public bool IsDeleted { get; set; }
 }
 
 public class HeartbeatReading

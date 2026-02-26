@@ -32,7 +32,8 @@ builder.Services.AddHangfire(config =>
     config.UseInMemoryStorage());
 builder.Services.AddHangfireServer();
 
-builder.Services.AddScoped<IGeospatialService, PostGisGeospatialService>();
+// Configurable: PostGIS (default) or Azure Maps (when Azure:UseAzureMaps = true)
+builder.Services.AddGeospatialProvider(builder.Configuration);
 builder.AddWatchSecurity();
 
 var app = builder.Build();

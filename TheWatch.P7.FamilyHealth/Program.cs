@@ -5,6 +5,9 @@ using TheWatch.P7.FamilyHealth;
 using TheWatch.P7.FamilyHealth.Family;
 using TheWatch.P7.FamilyHealth.Services;
 using TheWatch.Shared.Contracts;
+using TheWatch.P7.FamilyHealth.Data.Seeders;
+using TheWatch.Shared.Gcp;
+using TheWatch.Shared.Cloudflare;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -13,6 +16,8 @@ builder.ConfigureWatchSerilog();
 builder.ConfigureWatchOpenApi();
 builder.AddWatchPersistenceAspire();
 builder.ConfigureWatchNotifications();
+builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
+builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
 // CORS (configured for SignalR — requires AllowCredentials)
 builder.Services.AddCors(options =>
@@ -34,8 +39,10 @@ builder.Services.AddScoped<IFamilyService, FamilyService>();
 builder.Services.AddScoped<ICheckInService, CheckInService>();
 builder.Services.AddScoped<IVitalService, VitalService>();
 builder.AddWatchSecurity();
+builder.Services.AddScoped<IWatchDataSeeder, FamilyHealthSeeder>();
 
 var app = builder.Build();
+await app.UseWatchMigrations();
 
 app.UseCors();
 app.UseWatchSecurity();

@@ -7,6 +7,8 @@ using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using TheWatch.Shared.Azure;
+using TheWatch.Shared.Monitoring;
 
 namespace TheWatch.Aspire.ServiceDefaults;
 
@@ -22,6 +24,13 @@ public static class Extensions
             http.AddStandardResilienceHandler();
             http.AddServiceDiscovery();
         });
+
+        // Register TheWatch custom metrics as singleton
+        builder.Services.AddSingleton<IWatchMetrics, WatchMetrics>();
+
+        // Conditionally layer Application Insights alongside OpenTelemetry + Serilog
+        builder.AddApplicationInsightsIfConfigured();
+
         return builder;
     }
 
@@ -38,7 +47,9 @@ public static class Extensions
             {
                 metrics.AddAspNetCoreInstrumentation()
                        .AddHttpClientInstrumentation()
-                       .AddRuntimeInstrumentation();
+                       .AddRuntimeInstrumentation()
+                       .AddMeter(WatchMetrics.MeterName)              // TheWatch custom metrics
+                       .AddPrometheusExporter();                       // Prometheus /metrics endpoint
             })
             .WithTracing(tracing =>
             {
@@ -75,6 +86,10 @@ public static class Extensions
         {
             Predicate = r => r.Tags.Contains("live")
         });
+
+        // Expose Prometheus metrics endpoint
+        app.MapPrometheusScrapingEndpoint("/metrics");
+
         return app;
     }
 }

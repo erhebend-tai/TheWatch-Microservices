@@ -5,6 +5,9 @@ using TheWatch.P6.FirstResponder;
 using TheWatch.P6.FirstResponder.Responders;
 using TheWatch.P6.FirstResponder.Services;
 using TheWatch.Shared.Contracts;
+using TheWatch.P6.FirstResponder.Data.Seeders;
+using TheWatch.Shared.Gcp;
+using TheWatch.Shared.Cloudflare;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -15,6 +18,8 @@ builder.AddWatchPersistenceAspire();
 builder.ConfigureWatchNotifications();
 builder.AddWatchKafka();
 builder.AddWatchKafkaConsumer<IncidentCreatedConsumer>();
+builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
+builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
 // CORS (configured for SignalR — requires AllowCredentials)
 builder.Services.AddCors(options =>
@@ -35,8 +40,10 @@ builder.Services.AddHangfireServer();
 builder.Services.AddScoped<IResponderService, ResponderService>();
 builder.Services.AddScoped<ICheckInService, CheckInService>();
 builder.AddWatchSecurity();
+builder.Services.AddScoped<IWatchDataSeeder, FirstResponderSeeder>();
 
 var app = builder.Build();
+await app.UseWatchMigrations();
 
 app.UseCors();
 app.UseWatchSecurity();

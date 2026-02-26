@@ -18,5 +18,15 @@
     <PackageReference Include="Serilog.Enrichers.Thread" Version="4.*" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.*" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.*" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.*" />
+    <!-- Azure managed service alternatives (conditional via configuration) -->
+    <PackageReference Include="Microsoft.Azure.SignalR" Version="1.*" />
+    <PackageReference Include="Azure.Communication.Sms" Version="1.*" />
+    <PackageReference Include="Azure.Communication.Email" Version="1.*" />
+    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.*" />
+    <!-- Google Cloud service integrations (conditional via configuration) -->
+    <PackageReference Include="Google.Cloud.Speech.V2" Version="1.*" />
+    <PackageReference Include="Google.Cloud.Vision.V1" Version="3.*" />
+    <PackageReference Include="Google.Apis.CloudHealthcare.v1" Version="1.*" />
   </ItemGroup>
 </Project>

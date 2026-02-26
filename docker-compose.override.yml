@@ -1,0 +1,162 @@
+# TheWatch — Development Override
+# Automatically applied: docker compose up -d
+# This file overrides docker-compose.yml with dev-specific settings.
+
+services:
+  # ============================================================
+  # Infrastructure — dev ports and relaxed settings
+  # ============================================================
+
+  sqlserver:
+    environment:
+      MSSQL_SA_PASSWORD: "Watch@Dev2024!"
+    ports:
+      - "1433:1433"
+
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: "Watch@GeoDev!"
+    ports:
+      - "5432:5432"
+
+  kafka:
+    ports:
+      - "9092:9092"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  # ============================================================
+  # All services — Development environment + debug logging
+  # ============================================================
+
+  p1-coregateway:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WatchCoreGatewayDB: "Server=sqlserver;Database=WatchCoreGatewayDB;User Id=sa;Password=Watch@Dev2024!;TrustServerCertificate=true"
+      Logging__LogLevel__Default: Debug
+      Serilog__MinimumLevel: Debug
+    ports:
+      - "5101:8080"
+    volumes:
+      - ./TheWatch.P1.CoreGateway/logs:/app/logs
+
+  p2-voiceemergency:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WatchVoiceEmergencyDB: "Server=sqlserver;Database=WatchVoiceEmergencyDB;User Id=sa;Password=Watch@Dev2024!;TrustServerCertificate=true"
+      Logging__LogLevel__Default: Debug
+      Serilog__MinimumLevel: Debug
+    ports:
+      - "5102:8080"
+    volumes:
+      - ./TheWatch.P2.VoiceEmergency/logs:/app/logs
+
+  p3-meshnetwork:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WatchMeshNetworkDB: "Server=sqlserver;Database=WatchMeshNetworkDB;User Id=sa;Password=Watch@Dev2024!;TrustServerCertificate=true"
+      Logging__LogLevel__Default: Debug
+      Serilog__MinimumLevel: Debug
+    ports:
+      - "5103:8080"
+    volumes:
+      - ./TheWatch.P3.MeshNetwork/logs:/app/logs
+
+  p4-wearable:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WatchWearableDB: "Server=sqlserver;Database=WatchWearableDB;User Id=sa;Password=Watch@Dev2024!;TrustServerCertificate=true"
+      Logging__LogLevel__Default: Debug
+      Serilog__MinimumLevel: Debug
+    ports:
+      - "5104:8080"
+    volumes:
+      - ./TheWatch.P4.Wearable/logs:/app/logs
+
+  p5-authsecurity:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WatchAuthSecurityDB: "Server=sqlserver;Database=WatchAuthSecurityDB;User Id=sa;Password=Watch@Dev2024!;TrustServerCertificate=true"
+      Logging__LogLevel__Default: Debug
+      Serilog__MinimumLevel: Debug
+    ports:
+      - "5105:8080"
+    volumes:
+      - ./TheWatch.P5.AuthSecurity/logs:/app/logs
+
+  p6-firstresponder:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WatchFirstResponderDB: "Server=sqlserver;Database=WatchFirstResponderDB;User Id=sa;Password=Watch@Dev2024!;TrustServerCertificate=true"
+      Logging__LogLevel__Default: Debug
+      Serilog__MinimumLevel: Debug
+    ports:
+      - "5106:8080"
+    volumes:
+      - ./TheWatch.P6.FirstResponder/logs:/app/logs
+
+  p7-familyhealth:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WatchFamilyHealthDB: "Server=sqlserver;Database=WatchFamilyHealthDB;User Id=sa;Password=Watch@Dev2024!;TrustServerCertificate=true"
+      Logging__LogLevel__Default: Debug
+      Serilog__MinimumLevel: Debug
+    ports:
+      - "5107:8080"
+    volumes:
+      - ./TheWatch.P7.FamilyHealth/logs:/app/logs
+
+  p8-disasterrelief:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WatchDisasterReliefDB: "Server=sqlserver;Database=WatchDisasterReliefDB;User Id=sa;Password=Watch@Dev2024!;TrustServerCertificate=true"
+      Logging__LogLevel__Default: Debug
+      Serilog__MinimumLevel: Debug
+    ports:
+      - "5108:8080"
+    volumes:
+      - ./TheWatch.P8.DisasterRelief/logs:/app/logs
+
+  p9-doctorservices:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WatchDoctorServicesDB: "Server=sqlserver;Database=WatchDoctorServicesDB;User Id=sa;Password=Watch@Dev2024!;TrustServerCertificate=true"
+      Logging__LogLevel__Default: Debug
+      Serilog__MinimumLevel: Debug
+    ports:
+      - "5109:8080"
+    volumes:
+      - ./TheWatch.P9.DoctorServices/logs:/app/logs
+
+  p10-gamification:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WatchGamificationDB: "Server=sqlserver;Database=WatchGamificationDB;User Id=sa;Password=Watch@Dev2024!;TrustServerCertificate=true"
+      Logging__LogLevel__Default: Debug
+      Serilog__MinimumLevel: Debug
+    ports:
+      - "5110:8080"
+    volumes:
+      - ./TheWatch.P10.Gamification/logs:/app/logs
+
+  geospatial:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WatchGeospatialDB: "Host=postgres;Port=5432;Database=WatchGeospatialDB;Username=postgres;Password=Watch@GeoDev!"
+      Logging__LogLevel__Default: Debug
+      Serilog__MinimumLevel: Debug
+    ports:
+      - "5111:8080"
+    volumes:
+      - ./TheWatch.Geospatial/logs:/app/logs
+
+  dashboard:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Logging__LogLevel__Default: Debug
+    ports:
+      - "5100:8080"
+    volumes:
+      - ./TheWatch.Dashboard/logs:/app/logs

@@ -1,0 +1,4 @@
+{{/*
+  Optional namespace creation. Only created if namespace doesn't already exist.
+  Usage: helm install thewatch ./helm/thewatch --create-namespace -n thewatch
+*/}}

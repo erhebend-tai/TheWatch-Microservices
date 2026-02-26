@@ -1,0 +1,179 @@
+name: Security — CodeQL & Dependency Review
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  schedule:
+    # Run CodeQL weekly on Monday at 06:00 UTC
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  DOTNET_QUALITY: "preview"
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  # ===========================================================
+  # CodeQL Analysis (C# / .NET)
+  # ===========================================================
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+          queries: security-and-quality
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          dotnet-quality: ${{ env.DOTNET_QUALITY }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore dependencies
+        run: dotnet restore TheWatch.sln
+
+      # Build per-project to avoid OOM (D017)
+      - name: Build for CodeQL analysis
+        run: |
+          dotnet build TheWatch.Shared/TheWatch.Shared.csproj -c Release --no-restore
+          dotnet build TheWatch.Generators/TheWatch.Generators.csproj -c Release --no-restore
+          for project in \
+            TheWatch.P1.CoreGateway \
+            TheWatch.P2.VoiceEmergency \
+            TheWatch.P3.MeshNetwork \
+            TheWatch.P4.Wearable \
+            TheWatch.P5.AuthSecurity \
+            TheWatch.P6.FirstResponder \
+            TheWatch.P7.FamilyHealth \
+            TheWatch.P8.DisasterRelief \
+            TheWatch.P9.DoctorServices \
+            TheWatch.P10.Gamification \
+            TheWatch.Geospatial \
+            TheWatch.Dashboard; do
+            dotnet build "$project/$project.csproj" -c Release --no-restore
+          done
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:csharp"
+
+  # ===========================================================
+  # Dependency Review (on PRs only)
+  # ===========================================================
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-3.0, AGPL-3.0
+          comment-summary-in-pr: always
+
+  # ===========================================================
+  # .NET Security Audit (vulnerable NuGet packages)
+  # ===========================================================
+  nuget-audit:
+    name: NuGet Vulnerability Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          dotnet-quality: ${{ env.DOTNET_QUALITY }}
+
+      - name: Restore and audit
+        run: |
+          dotnet restore TheWatch.sln
+          echo "## NuGet Security Audit" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          dotnet list TheWatch.sln package --vulnerable --include-transitive 2>&1 | tee audit-output.txt
+          if grep -q "has the following vulnerable packages" audit-output.txt; then
+            echo "::warning::Vulnerable NuGet packages detected"
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat audit-output.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No vulnerable packages found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ===========================================================
+  # Secret scanning (detect accidentally committed secrets)
+  # ===========================================================
+  secrets-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect secrets in PR diff
+        run: |
+          echo "## Secret Detection" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          # Check for common secret patterns in the diff
+          PATTERNS=(
+            'password\s*=\s*"[^"]{8,}'
+            'secret\s*=\s*"[^"]{8,}'
+            'api[_-]?key\s*=\s*"[^"]{8,}'
+            'connectionstring.*password=[^;]{8,}'
+            'BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY'
+          )
+          FOUND=0
+          for pattern in "${PATTERNS[@]}"; do
+            if git diff origin/${{ github.base_ref }}..HEAD -- ':(exclude)*.md' ':(exclude)*.yml' ':(exclude)*.yaml' | grep -iP "$pattern" > /dev/null 2>&1; then
+              echo "::warning::Potential secret pattern detected: $pattern"
+              FOUND=1
+            fi
+          done
+          if [ "$FOUND" -eq 0 ]; then
+            echo "No secrets detected in PR diff." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "::warning::Potential secrets detected — please review" >> $GITHUB_STEP_SUMMARY
+          fi

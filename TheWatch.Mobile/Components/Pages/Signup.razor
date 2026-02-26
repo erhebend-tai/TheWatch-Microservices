@@ -1,0 +1,123 @@
+@page "/signup"
+@inject WatchAuthService AuthService
+@inject NavigationManager Nav
+@inject NotificationService Notification
+
+<div class="page-content" style="display: flex; justify-content: center; align-items: center; min-height: 80vh;">
+    <RadzenCard Style="width: 100%; max-width: 400px; padding: 2rem;">
+        <RadzenStack AlignItems="AlignItems.Center" Gap="1rem" Style="margin-bottom: 1.5rem;">
+            <span class="material-symbols-outlined" style="font-size: 3rem; color: var(--rz-primary);">person_add</span>
+            <RadzenText TextStyle="TextStyle.H4">Create Account</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--watch-muted); text-align: center;">
+                Join TheWatch emergency response network
+            </RadzenText>
+        </RadzenStack>
+
+        <RadzenTemplateForm TItem="SignupModel" Data="@_model" Submit="@OnSubmit">
+            <RadzenStack Gap="1rem">
+                <RadzenFormField Text="Display Name" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_model.DisplayName" Name="DisplayName" Placeholder="Enter your full name" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="DisplayName" Text="Display name is required" />
+                        <RadzenLengthValidator Component="DisplayName" Min="2" Text="Name must be at least 2 characters" />
+                    </Helper>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Email Address" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_model.Email" Name="Email" Placeholder="Enter your email" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="Email" Text="Email is required" />
+                        <RadzenEmailValidator Component="Email" Text="Invalid email address" />
+                    </Helper>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Password" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenPassword @bind-Value="_model.Password" Name="Password" Placeholder="Create a password" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="Password" Text="Password is required" />
+                        <RadzenLengthValidator Component="Password" Min="6" Text="Password must be at least 6 characters" />
+                    </Helper>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Confirm Password" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenPassword @bind-Value="_model.ConfirmPassword" Name="ConfirmPassword" Placeholder="Confirm your password" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="ConfirmPassword" Text="Please confirm your password" />
+                        <RadzenCompareValidator Component="ConfirmPassword" Value="@_model.Password" Text="Passwords do not match" />
+                    </Helper>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Phone Number (Optional)" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_model.Phone" Placeholder="Enter your phone number" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <RadzenCheckBox @bind-Value="_model.AcceptTerms" Name="AcceptTerms" />
+                <RadzenLabel Text="I accept the Terms of Service and Privacy Policy" Component="AcceptTerms" Style="margin-left: 0.5rem;" />
+                <RadzenRequiredValidator Component="AcceptTerms" Text="You must accept the terms to continue" />
+
+                <RadzenButton Text="Create Account" ButtonType="ButtonType.Submit"
+                              ButtonStyle="ButtonStyle.Primary" Style="width: 100%;" IsBusy="@_loading" />
+                
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.Center" Gap="0.5rem" Style="margin-top: 1rem;">
+                    <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--watch-muted);">Already have an account?</RadzenText>
+                    <RadzenLink Text="Sign In" @onclick="@(() => Nav.NavigateTo("/login"))" />
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenTemplateForm>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Dark"
+                         AllowClose="false" Style="margin-top: 0.5rem;">@_error</RadzenAlert>
+        }
+    </RadzenCard>
+</div>
+
+@code {
+    private SignupModel _model = new();
+    private bool _loading;
+    private string? _error;
+
+    private string P5Url => "http://localhost:5005";
+
+    private async Task OnSubmit()
+    {
+        _loading = true;
+        _error = null;
+        
+        var (success, error) = await AuthService.RegisterAsync(
+            P5Url, _model.Email, _model.Password, _model.DisplayName, _model.Phone);
+        
+        if (success)
+        {
+            // Registration successful, user is automatically logged in
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            _error = error;
+        }
+        
+        _loading = false;
+    }
+
+    private class SignupModel
+    {
+        public string DisplayName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string ConfirmPassword { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+        public bool AcceptTerms { get; set; }
+    }
+}

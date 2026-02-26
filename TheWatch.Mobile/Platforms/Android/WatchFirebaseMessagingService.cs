@@ -2,6 +2,7 @@
 using Android.App;
 using Firebase.Messaging;
 using Microsoft.Extensions.Logging;
+using TheWatch.Mobile.Services;
 
 namespace TheWatch.Mobile.Platforms.Android;
 
@@ -15,7 +16,7 @@ public class WatchFirebaseMessagingService : FirebaseMessagingService
 
         // Resolve the push service and register the new token
         var pushService = MauiApplication.Current.Services
-            .GetService<Services.WatchPushNotificationService>();
+            .GetService<WatchPushNotificationService>();
         if (pushService != null)
         {
             _ = pushService.OnTokenRefreshedAsync(token);
@@ -27,10 +28,10 @@ public class WatchFirebaseMessagingService : FirebaseMessagingService
         base.OnMessageReceived(message);
 
         var pushService = MauiApplication.Current.Services
-            .GetService<Services.WatchPushNotificationService>();
+            .GetService<WatchPushNotificationService>();
         if (pushService == null) return;
 
-        var data = new Services.PushNotificationData
+        var data = new PushNotificationData
         {
             Title = message.GetNotification()?.Title,
             Body = message.GetNotification()?.Body,
@@ -45,7 +46,7 @@ public class WatchFirebaseMessagingService : FirebaseMessagingService
         ShowLocalNotification(data);
     }
 
-    private void ShowLocalNotification(Services.PushNotificationData data)
+    private void ShowLocalNotification(PushNotificationData data)
     {
         var channelId = data.Data.TryGetValue("source", out var source)
             ? $"watch_{source.ToLowerInvariant()}"

@@ -1,0 +1,97 @@
+{
+  "_comment": "TheWatch Cloudflare CDN configuration — static assets and API caching rules",
+  "zone": {
+    "domain": "thewatch.app",
+    "ssl_mode": "full_strict",
+    "always_use_https": true,
+    "min_tls_version": "1.2",
+    "automatic_https_rewrites": true,
+    "opportunistic_encryption": true,
+    "http2": true,
+    "http3": true,
+    "early_hints": true
+  },
+  "cache_rules": [
+    {
+      "description": "Cache static CSS/JS/images for 7 days",
+      "expression": "http.request.uri.path.extension in {\"css\" \"js\" \"png\" \"jpg\" \"jpeg\" \"gif\" \"svg\" \"woff\" \"woff2\" \"ttf\" \"eot\" \"ico\"}",
+      "action": {
+        "cache": true,
+        "edge_ttl": 604800,
+        "browser_ttl": 86400
+      }
+    },
+    {
+      "description": "Cache Blazor framework files for 30 days",
+      "expression": "http.request.uri.path contains \"/_framework/\" or http.request.uri.path contains \"/_content/\"",
+      "action": {
+        "cache": true,
+        "edge_ttl": 2592000,
+        "browser_ttl": 604800
+      }
+    },
+    {
+      "description": "Bypass cache for API endpoints",
+      "expression": "http.request.uri.path contains \"/api/\"",
+      "action": {
+        "cache": false
+      }
+    },
+    {
+      "description": "Bypass cache for auth endpoints",
+      "expression": "http.request.uri.path contains \"/auth/\" or http.request.uri.path contains \"/login\"",
+      "action": {
+        "cache": false
+      }
+    },
+    {
+      "description": "Bypass cache for SignalR/WebSocket endpoints",
+      "expression": "http.request.uri.path contains \"/hubs/\"",
+      "action": {
+        "cache": false
+      }
+    },
+    {
+      "description": "Cache health endpoints for 30s at edge only",
+      "expression": "http.request.uri.path eq \"/health\" or http.request.uri.path eq \"/alive\"",
+      "action": {
+        "cache": true,
+        "edge_ttl": 30,
+        "browser_ttl": 0
+      }
+    }
+  ],
+  "page_rules": [
+    {
+      "url": "*.thewatch.app/api/*",
+      "actions": {
+        "cache_level": "bypass",
+        "security_level": "high"
+      }
+    },
+    {
+      "url": "*.thewatch.app/css/*",
+      "actions": {
+        "cache_level": "cache_everything",
+        "edge_cache_ttl": 604800,
+        "browser_cache_ttl": 86400
+      }
+    },
+    {
+      "url": "*.thewatch.app/js/*",
+      "actions": {
+        "cache_level": "cache_everything",
+        "edge_cache_ttl": 604800,
+        "browser_cache_ttl": 86400
+      }
+    }
+  ],
+  "security_headers": {
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "SAMEORIGIN",
+    "X-XSS-Protection": "1; mode=block",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self' wss://*.thewatch.app https://*.thewatch.app; font-src 'self' data:; frame-ancestors 'self'"
+  }
+}

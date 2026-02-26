@@ -1,0 +1,33 @@
+name = "thewatch-edge-auth"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+# ─── Environment: Staging ───
+[env.staging]
+name = "thewatch-edge-auth-staging"
+vars = { ENVIRONMENT = "staging" }
+routes = [
+  { pattern = "api-staging.thewatch.app/*", zone_name = "thewatch.app" }
+]
+
+[env.staging.vars]
+JWT_ISSUER = "https://auth-staging.thewatch.app"
+JWT_AUDIENCE = "thewatch-api-staging"
+JWKS_ENDPOINT = "https://auth-staging.thewatch.app/.well-known/jwks.json"
+
+# ─── Environment: Production ───
+[env.production]
+name = "thewatch-edge-auth"
+vars = { ENVIRONMENT = "production" }
+routes = [
+  { pattern = "api.thewatch.app/*", zone_name = "thewatch.app" }
+]
+
+[env.production.vars]
+JWT_ISSUER = "https://auth.thewatch.app"
+JWT_AUDIENCE = "thewatch-api"
+JWKS_ENDPOINT = "https://auth.thewatch.app/.well-known/jwks.json"
+
+# ─── Secrets (set via wrangler secret put) ───
+# JWT_SECRET - Symmetric key for HMAC validation (fallback)
+# CF_ACCESS_AUD - Cloudflare Access Application AUD tag

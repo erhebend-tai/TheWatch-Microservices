@@ -1,0 +1,297 @@
+# TheWatch Helm Chart — Default Values
+# Override per environment with -f values-staging.yaml or -f values-production.yaml
+
+global:
+  imageRegistry: ""  # e.g., myregistry.azurecr.io
+  imagePullSecrets: []
+  environment: Production
+
+# Container registry prefix (set to your ACR/ECR/GCR)
+image:
+  registry: thewatch.azurecr.io
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# JWT configuration (shared across all services)
+jwt:
+  key: ""        # Override via --set or secrets
+  issuer: "thewatch-auth"
+  audience: "thewatch-services"
+
+# ============================================================
+# Infrastructure
+# ============================================================
+
+sqlserver:
+  enabled: true
+  host: "thewatch-sql"
+  port: 1433
+  user: "sa"
+  # Password provided via Kubernetes Secret (thewatch-db-credentials)
+
+postgres:
+  enabled: true
+  host: "thewatch-postgis"
+  port: 5432
+  user: "postgres"
+  database: "WatchGeospatialDB"
+
+kafka:
+  enabled: true
+  bootstrapServers: "thewatch-kafka:9092"
+
+redis:
+  enabled: true
+  host: "thewatch-redis"
+  port: 6379
+
+# ============================================================
+# Microservices
+# ============================================================
+
+services:
+  p1-coregateway:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p1-coregateway
+    port: 8080
+    database: WatchCoreGatewayDB
+    dbType: sqlserver
+    kafka: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    pathPrefix: /api/p1
+
+  p2-voiceemergency:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: thewatch-p2-voiceemergency
+    port: 8080
+    database: WatchVoiceEmergencyDB
+    dbType: sqlserver
+    kafka: true
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+    pathPrefix: /api/p2
+    hpa:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 20
+      targetCPU: 60
+      targetMemory: 75
+
+  p3-meshnetwork:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p3-meshnetwork
+    port: 8080
+    database: WatchMeshNetworkDB
+    dbType: sqlserver
+    kafka: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    pathPrefix: /api/p3
+
+  p4-wearable:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p4-wearable
+    port: 8080
+    database: WatchWearableDB
+    dbType: sqlserver
+    kafka: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    pathPrefix: /api/p4
+
+  p5-authsecurity:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p5-authsecurity
+    port: 8080
+    database: WatchAuthSecurityDB
+    dbType: sqlserver
+    kafka: false
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+    pathPrefix: /api/p5
+
+  p6-firstresponder:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: thewatch-p6-firstresponder
+    port: 8080
+    database: WatchFirstResponderDB
+    dbType: sqlserver
+    kafka: true
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+    pathPrefix: /api/p6
+    hpa:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 15
+      targetCPU: 65
+      targetMemory: 75
+
+  p7-familyhealth:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p7-familyhealth
+    port: 8080
+    database: WatchFamilyHealthDB
+    dbType: sqlserver
+    kafka: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    pathPrefix: /api/p7
+
+  p8-disasterrelief:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p8-disasterrelief
+    port: 8080
+    database: WatchDisasterReliefDB
+    dbType: sqlserver
+    kafka: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    pathPrefix: /api/p8
+
+  p9-doctorservices:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p9-doctorservices
+    port: 8080
+    database: WatchDoctorServicesDB
+    dbType: sqlserver
+    kafka: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    pathPrefix: /api/p9
+
+  p10-gamification:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: thewatch-p10-gamification
+    port: 8080
+    database: WatchGamificationDB
+    dbType: sqlserver
+    kafka: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    pathPrefix: /api/p10
+
+  geospatial:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-geospatial
+    port: 8080
+    database: WatchGeospatialDB
+    dbType: postgres
+    kafka: false
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+    pathPrefix: /api/geo
+
+  dashboard:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-dashboard
+    port: 8080
+    dbType: none
+    kafka: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    pathPrefix: /
+
+# ============================================================
+# Ingress
+# ============================================================
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: thewatch.example.com
+      paths: []  # Auto-generated from service pathPrefixes
+  tls:
+    - secretName: thewatch-tls
+      hosts:
+        - thewatch.example.com

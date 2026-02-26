@@ -22,6 +22,8 @@ using MfaVerifyRequest = TheWatch.P5.AuthSecurity.Auth.MfaVerifyRequest;
 using SmsMfaSendRequest = TheWatch.P5.AuthSecurity.Auth.SmsMfaSendRequest;
 using SmsMfaVerifyRequest = TheWatch.P5.AuthSecurity.Auth.SmsMfaVerifyRequest;
 using MagicLinkRequest = TheWatch.P5.AuthSecurity.Auth.MagicLinkRequest;
+using TheWatch.Shared.Gcp;
+using TheWatch.Shared.Cloudflare;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -29,6 +31,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.ConfigureWatchSerilog();
 builder.ConfigureWatchOpenApi();
 builder.ConfigureWatchNotifications();
+builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
+builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
 // CORS (SignalR compatible)
 builder.Services.AddCors(options =>

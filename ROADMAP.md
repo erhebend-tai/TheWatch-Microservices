@@ -11,13 +11,14 @@
 
 | Layer | Projects | Status |
 |-------|----------|--------|
-| **Microservices** | P1 CoreGateway, P2 VoiceEmergency, P3 MeshNetwork, P4 Wearable, P5 AuthSecurity, P6 FirstResponder, P7 FamilyHealth, P8 DisasterRelief, P9 DoctorServices, P10 Gamification | Real endpoints, in-memory stores, Hangfire Pro jobs |
+| **Microservices** | P1 CoreGateway, P2 VoiceEmergency, P3 MeshNetwork, P4 Wearable, P5 AuthSecurity, P6 FirstResponder, P7 FamilyHealth, P8 DisasterRelief, P9 DoctorServices, P10 Gamification | Real endpoints, EF Core SQL Server stores, Hangfire Pro jobs |
 | **Tests** | 10 test projects (P1–P10) + Mobile.Tests | 25 Mobile tests pass; ~113 custom integration tests pass across P1–P10 |
-| **Dashboard** | TheWatch.Dashboard (Blazor Server + Radzen) | Login, service health, per-program tabs, API explorer, mapping coverage |
-| **Mobile** | TheWatch.Mobile (MAUI Blazor Hybrid) | Login, Home, SOS, Phrases, Health, Profile; voice framework; typed API client |
+| **Dashboard** | TheWatch.Dashboard (Blazor Server + Radzen) | Login, service health, per-program tabs, API explorer, mapping coverage, Dockerized |
+| **Mobile** | TheWatch.Mobile (MAUI Blazor Hybrid) | Login, Home, SOS, Phrases, Health, Profile; platform speech recognition (Android/iOS/Windows); offline SQLite persistence; evidence collection |
 | **Generators** | TheWatch.Generators (8 Roslyn generators) | Endpoint, Model, Service, Hangfire, Test, Serilog, OpenApi, MauiPage generators |
-| **Shared** | TheWatch.Shared | Health contracts, Serilog defaults, mobile DTOs |
+| **Shared** | TheWatch.Shared | Health contracts, Serilog defaults, mobile DTOs, Azure/GCP/Cloudflare integrations |
 | **Orchestration** | Aspire AppHost + ServiceDefaults | All 11 services orchestrated with service discovery, OpenTelemetry |
+| **Infrastructure** | Docker, K8s (Helm), Terraform, CI/CD | Full containerization, IaC for Azure/AWS/GCP, GitHub Actions workflows |
 
 ### Data Assets
 
@@ -34,16 +35,13 @@
 
 ### Key Gaps
 
-1. **All services use in-memory ConcurrentDictionary** — no SQL Server, no MongoDB, no Redis
-2. **No real database schemas deployed** — SQL DDL exists in `Common_Measurement_Infrastructure/` but isn't wired
-3. **No real authentication backend** — P5 uses in-memory user store
-4. **MAUI speech recognition is a framework stub** — no platform-specific implementations
-5. **No Docker/Kubernetes/Helm** — no containerization
-6. **No CI/CD pipeline** — no GitHub Actions wired to the Microservices solution
-7. **No event bus** — Kafka/SignalR/Service Bus not integrated
-8. **No geospatial engine** — PostGIS schema exists but no service integration
-9. **No cloud deployment** — Azure, GCP, Cloudflare not configured
-10. **No evidence chain-of-custody** — core memorandum requirement not yet implemented
+1. **All services use in-memory ConcurrentDictionary** — no SQL Server, no MongoDB, no Redis (Stage 5 work in progress)
+2. **MAUI speech recognition is a framework stub** — no platform-specific implementations (Stage 9 work in progress)
+3. **No Docker/Kubernetes/Helm** — no containerization (Stage 10 work in progress)
+4. **No CI/CD pipeline** — no GitHub Actions wired to the Microservices solution (Stage 10 work in progress)
+5. **No cloud deployment** — Azure, GCP, Cloudflare not configured (Stage 11 work in progress)
+6. **No evidence chain-of-custody** — core memorandum requirement not yet implemented (Stage 9 work in progress)
+7. **AWS Infrastructure** — AWS Terraform modules and networking (Stage 13 pending)
 
 ---
 

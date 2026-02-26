@@ -1,0 +1,403 @@
+# TheWatch — Full Local Development Stack
+# Usage: docker compose up -d
+# Build:  docker compose build
+# Logs:   docker compose logs -f [service-name]
+
+services:
+  # ============================================================
+  # Infrastructure
+  # ============================================================
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: thewatch-sql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!}"
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+      - ./docker/sql/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$${MSSQL_SA_PASSWORD}" -Q "SELECT 1" -C -N || exit 1
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: thewatch-postgis
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-Watch@Geo2024!}"
+      POSTGRES_DB: WatchGeospatialDB
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U postgres
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.7.0
+    container_name: thewatch-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      CLUSTER_ID: "TheWatch-Kafka-Cluster-01"
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: thewatch-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: redis-cli ping | grep PONG
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================
+  # SQL Server Database Initialization
+  # ============================================================
+
+  sql-init:
+    image: mcr.microsoft.com/mssql-tools:latest
+    container_name: thewatch-sql-init
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      SA_PASSWORD: "${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!}"
+    entrypoint: >
+      /bin/bash -c "
+      /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P $$SA_PASSWORD -C -N -Q '
+        IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchCoreGatewayDB'\'') CREATE DATABASE WatchCoreGatewayDB;
+        IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchVoiceEmergencyDB'\'') CREATE DATABASE WatchVoiceEmergencyDB;
+        IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchMeshNetworkDB'\'') CREATE DATABASE WatchMeshNetworkDB;
+        IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchWearableDB'\'') CREATE DATABASE WatchWearableDB;
+        IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchAuthSecurityDB'\'') CREATE DATABASE WatchAuthSecurityDB;
+        IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchFirstResponderDB'\'') CREATE DATABASE WatchFirstResponderDB;
+        IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchFamilyHealthDB'\'') CREATE DATABASE WatchFamilyHealthDB;
+        IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchDisasterReliefDB'\'') CREATE DATABASE WatchDisasterReliefDB;
+        IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchDoctorServicesDB'\'') CREATE DATABASE WatchDoctorServicesDB;
+        IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchGamificationDB'\'') CREATE DATABASE WatchGamificationDB;
+      '
+      echo 'All 10 databases created successfully.'
+      "
+    restart: "no"
+
+  # ============================================================
+  # Microservices (P1-P10)
+  # ============================================================
+
+  p1-coregateway:
+    build:
+      context: .
+      dockerfile: TheWatch.P1.CoreGateway/Dockerfile
+    container_name: thewatch-p1
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__WatchCoreGatewayDB: "Server=sqlserver;Database=WatchCoreGatewayDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      Jwt__Issuer: "thewatch-auth"
+      Jwt__Audience: "thewatch-services"
+      Kafka__BootstrapServers: "kafka:29092"
+    ports:
+      - "5101:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      sql-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  p2-voiceemergency:
+    build:
+      context: .
+      dockerfile: TheWatch.P2.VoiceEmergency/Dockerfile
+    container_name: thewatch-p2
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__WatchVoiceEmergencyDB: "Server=sqlserver;Database=WatchVoiceEmergencyDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      Jwt__Issuer: "thewatch-auth"
+      Jwt__Audience: "thewatch-services"
+      Kafka__BootstrapServers: "kafka:29092"
+    ports:
+      - "5102:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      sql-init:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  p3-meshnetwork:
+    build:
+      context: .
+      dockerfile: TheWatch.P3.MeshNetwork/Dockerfile
+    container_name: thewatch-p3
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__WatchMeshNetworkDB: "Server=sqlserver;Database=WatchMeshNetworkDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      Jwt__Issuer: "thewatch-auth"
+      Jwt__Audience: "thewatch-services"
+      Kafka__BootstrapServers: "kafka:29092"
+    ports:
+      - "5103:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      sql-init:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  p4-wearable:
+    build:
+      context: .
+      dockerfile: TheWatch.P4.Wearable/Dockerfile
+    container_name: thewatch-p4
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__WatchWearableDB: "Server=sqlserver;Database=WatchWearableDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      Jwt__Issuer: "thewatch-auth"
+      Jwt__Audience: "thewatch-services"
+    ports:
+      - "5104:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      sql-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  p5-authsecurity:
+    build:
+      context: .
+      dockerfile: TheWatch.P5.AuthSecurity/Dockerfile
+    container_name: thewatch-p5
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__WatchAuthSecurityDB: "Server=sqlserver;Database=WatchAuthSecurityDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      Jwt__Issuer: "thewatch-auth"
+      Jwt__Audience: "thewatch-services"
+    ports:
+      - "5105:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      sql-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  p6-firstresponder:
+    build:
+      context: .
+      dockerfile: TheWatch.P6.FirstResponder/Dockerfile
+    container_name: thewatch-p6
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__WatchFirstResponderDB: "Server=sqlserver;Database=WatchFirstResponderDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      Jwt__Issuer: "thewatch-auth"
+      Jwt__Audience: "thewatch-services"
+      Kafka__BootstrapServers: "kafka:29092"
+    ports:
+      - "5106:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      sql-init:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  p7-familyhealth:
+    build:
+      context: .
+      dockerfile: TheWatch.P7.FamilyHealth/Dockerfile
+    container_name: thewatch-p7
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__WatchFamilyHealthDB: "Server=sqlserver;Database=WatchFamilyHealthDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      Jwt__Issuer: "thewatch-auth"
+      Jwt__Audience: "thewatch-services"
+    ports:
+      - "5107:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      sql-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  p8-disasterrelief:
+    build:
+      context: .
+      dockerfile: TheWatch.P8.DisasterRelief/Dockerfile
+    container_name: thewatch-p8
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__WatchDisasterReliefDB: "Server=sqlserver;Database=WatchDisasterReliefDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      Jwt__Issuer: "thewatch-auth"
+      Jwt__Audience: "thewatch-services"
+    ports:
+      - "5108:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      sql-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  p9-doctorservices:
+    build:
+      context: .
+      dockerfile: TheWatch.P9.DoctorServices/Dockerfile
+    container_name: thewatch-p9
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__WatchDoctorServicesDB: "Server=sqlserver;Database=WatchDoctorServicesDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      Jwt__Issuer: "thewatch-auth"
+      Jwt__Audience: "thewatch-services"
+    ports:
+      - "5109:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      sql-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  p10-gamification:
+    build:
+      context: .
+      dockerfile: TheWatch.P10.Gamification/Dockerfile
+    container_name: thewatch-p10
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__WatchGamificationDB: "Server=sqlserver;Database=WatchGamificationDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      Jwt__Issuer: "thewatch-auth"
+      Jwt__Audience: "thewatch-services"
+    ports:
+      - "5110:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      sql-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ============================================================
+  # Geospatial (PostgreSQL/PostGIS)
+  # ============================================================
+
+  geospatial:
+    build:
+      context: .
+      dockerfile: TheWatch.Geospatial/Dockerfile
+    container_name: thewatch-geo
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__WatchGeospatialDB: "Host=postgres;Port=5432;Database=WatchGeospatialDB;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-Watch@Geo2024!}"
+      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      Jwt__Issuer: "thewatch-auth"
+      Jwt__Audience: "thewatch-services"
+    ports:
+      - "5111:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================
+  # Dashboard (Blazor Server)
+  # ============================================================
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: TheWatch.Dashboard/Dockerfile
+    container_name: thewatch-dashboard
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      services__p1-coregateway__http__0: "http://p1-coregateway:8080"
+      services__p2-voiceemergency__http__0: "http://p2-voiceemergency:8080"
+      services__p3-meshnetwork__http__0: "http://p3-meshnetwork:8080"
+      services__p4-wearable__http__0: "http://p4-wearable:8080"
+      services__p5-authsecurity__http__0: "http://p5-authsecurity:8080"
+      services__p6-firstresponder__http__0: "http://p6-firstresponder:8080"
+      services__p7-familyhealth__http__0: "http://p7-familyhealth:8080"
+      services__p8-disasterrelief__http__0: "http://p8-disasterrelief:8080"
+      services__p9-doctorservices__http__0: "http://p9-doctorservices:8080"
+      services__p10-gamification__http__0: "http://p10-gamification:8080"
+      services__geospatial__http__0: "http://geospatial:8080"
+      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      Jwt__Issuer: "thewatch-auth"
+      Jwt__Audience: "thewatch-services"
+    ports:
+      - "5100:8080"
+    depends_on:
+      - p1-coregateway
+      - p2-voiceemergency
+      - p5-authsecurity
+    restart: unless-stopped
+
+# ============================================================
+# Volumes
+# ============================================================
+
+volumes:
+  sqlserver-data:
+    driver: local
+  postgres-data:
+    driver: local
+  kafka-data:
+    driver: local
+  redis-data:
+    driver: local

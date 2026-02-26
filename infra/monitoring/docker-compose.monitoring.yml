@@ -1,0 +1,164 @@
+# TheWatch — Monitoring Stack
+# Usage: docker compose -f docker-compose.yml -f infra/monitoring/docker-compose.monitoring.yml up -d
+# Adds: Prometheus, Grafana, Alertmanager, and infrastructure exporters
+
+services:
+  # ============================================================
+  # Prometheus — Metrics collection and alerting engine
+  # ============================================================
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: thewatch-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: wget -q --spider http://localhost:9090/-/healthy || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - default
+
+  # ============================================================
+  # Grafana — Dashboards and visualization
+  # ============================================================
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: thewatch-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-WatchAdmin2024!}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "${GRAFANA_ROOT_URL:-http://localhost:3000}"
+      GF_INSTALL_PLUGINS: "grafana-piechart-panel,grafana-clock-panel"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: wget -q --spider http://localhost:3000/api/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - default
+
+  # ============================================================
+  # Alertmanager — Alert routing and notification
+  # ============================================================
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: thewatch-alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    environment:
+      SLACK_WEBHOOK_URL: "${SLACK_WEBHOOK_URL:-https://hooks.slack.com/services/placeholder}"
+      PAGERDUTY_EMERGENCY_KEY: "${PAGERDUTY_EMERGENCY_KEY:-placeholder-emergency-key}"
+      PAGERDUTY_CRITICAL_KEY: "${PAGERDUTY_CRITICAL_KEY:-placeholder-critical-key}"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "9093:9093"
+    healthcheck:
+      test: wget -q --spider http://localhost:9093/-/healthy || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - default
+
+  # ============================================================
+  # Infrastructure Exporters
+  # ============================================================
+
+  # SQL Server exporter
+  sql-exporter:
+    image: burningalchemist/sql_exporter:0.14
+    container_name: thewatch-sql-exporter
+    environment:
+      SQLSERVER_DSN: "sqlserver://sa:${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!}@sqlserver:1433"
+    ports:
+      - "9399:9399"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - default
+
+  # PostgreSQL exporter
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: thewatch-postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-Watch@Geo2024!}@postgres:5432/WatchGeospatialDB?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - default
+
+  # Kafka exporter
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.7.0
+    container_name: thewatch-kafka-exporter
+    command:
+      - "--kafka.server=kafka:29092"
+      - "--topic.filter=thewatch.*"
+    ports:
+      - "9308:9308"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - default
+
+  # Redis exporter
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.58.0
+    container_name: thewatch-redis-exporter
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+    ports:
+      - "9121:9121"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - default
+
+# ============================================================
+# Volumes
+# ============================================================
+volumes:
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  alertmanager-data:
+    driver: local

@@ -5,6 +5,10 @@
 @inject NavigationManager Nav
 @inject NotificationService Notification
 @inject SpeechListenerService SpeechService
+@inject HapticService Haptics
+@inject EmergencyLocationService EmergencyLocation
+@inject IOfflineQueueService OfflineQueue
+@inject IConnectivityMonitorService Connectivity
 
 <div class="page-content" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh;">
 
@@ -123,10 +127,10 @@
     {
         _activating = true;
 
-        // Get location
+        // Get high-accuracy location via EmergencyLocationService
         try
         {
-            var loc = await Geolocation.GetLastKnownLocationAsync();
+            var loc = await EmergencyLocation.GetHighAccuracyLocationAsync();
             if (loc is not null)
                 _location = (loc.Latitude, loc.Longitude);
         }
@@ -146,8 +150,11 @@
         {
             await Api.CreateIncidentAsync(request);
 
-            // Vibrate for haptic feedback
-            try { Vibration.Vibrate(TimeSpan.FromMilliseconds(500)); } catch { }
+            // Activate continuous emergency GPS tracking
+            await EmergencyLocation.ActivateAsync();
+
+            // Named haptic pattern for SOS confirmation
+            _ = Haptics.SOSConfirmAsync();
 
             _incidentCreated = true;
             Notification.Notify(NotificationSeverity.Warning, "SOS Sent",
@@ -155,7 +162,20 @@
         }
         catch (Exception ex)
         {
-            Notification.Notify(NotificationSeverity.Error, "SOS Failed", ex.Message);
+            // If offline, queue the request for later
+            if (!Connectivity.IsOnline)
+            {
+                await OfflineQueue.EnqueueEmergencyAsync("POST", "api/incidents",
+                    System.Text.Json.JsonSerializer.Serialize(request));
+                _ = Haptics.SOSConfirmAsync();
+                _incidentCreated = true;
+                Notification.Notify(NotificationSeverity.Warning, "SOS Queued",
+                    "You're offline. SOS will be sent when connectivity is restored.");
+            }
+            else
+            {
+                Notification.Notify(NotificationSeverity.Error, "SOS Failed", ex.Message);
+            }
         }
 
         _activating = false;

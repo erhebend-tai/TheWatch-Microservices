@@ -1,0 +1,53 @@
+**/.vs
+**/.vscode
+**/.idea
+**/bin
+**/obj
+**/node_modules
+**/out
+**/.git
+**/.gitignore
+**/.DS_Store
+**/Thumbs.db
+
+# Test projects (not needed in production images)
+**/*.Tests
+**/TheWatch.Mobile
+**/TheWatch.Mobile.Tests
+**/TheWatch.Aspire.AppHost
+**/TheWatch.Aspire.ServiceDefaults
+
+# Build artifacts
+**/publish
+**/artifacts
+
+# IDE and tooling
+**/*.user
+**/*.suo
+**/*.sln.docuser
+**/.vs/**
+**/launchSettings.json
+
+# Data files (used by generators at build time, included via COPY)
+# Models.json, Interfaces.json, _mapping.json are needed — do not exclude
+
+# Scripts and docs
+**/generate_projects.py
+**/map_specs_to_code.py
+**/resume-work.bat
+**/run-parallel-todos.bat
+**/start-workflows.bat
+**/stop-workflows.bat
+**/workflow-settings.json
+**/parallel-build
+**/ROADMAP.md
+**/TODO.md
+
+# Docker files themselves
+**/docker-compose*.yml
+**/Dockerfile*
+**/.dockerignore
+**/helm
+
+# Local NuGet cache (Hangfire Pro packages are restored inside build)
+**/*.nupkg

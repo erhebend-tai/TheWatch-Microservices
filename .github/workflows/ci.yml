@@ -1,0 +1,212 @@
+name: CI — Build & Test
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "helm/**"
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "helm/**"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  DOTNET_QUALITY: "preview"
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  # ===========================================================
+  # Build all projects (per-project to avoid OOM — see D017)
+  # ===========================================================
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          dotnet-quality: ${{ env.DOTNET_QUALITY }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      # Copy Hangfire Pro packages to local source path expected by nuget.config
+      - name: Setup Hangfire Pro local source
+        run: |
+          mkdir -p /tmp/hangfire-local
+          echo "Hangfire Pro packages must be cached in CI. Skipping if not available."
+        continue-on-error: true
+
+      - name: Restore dependencies
+        run: dotnet restore TheWatch.sln
+
+      # Build per-project to avoid MSBuild OOM (D017)
+      - name: Build Shared + Generators
+        run: |
+          dotnet build TheWatch.Shared/TheWatch.Shared.csproj -c Release --no-restore
+          dotnet build TheWatch.Generators/TheWatch.Generators.csproj -c Release --no-restore
+
+      - name: Build microservices
+        run: |
+          for project in \
+            TheWatch.P1.CoreGateway \
+            TheWatch.P2.VoiceEmergency \
+            TheWatch.P3.MeshNetwork \
+            TheWatch.P4.Wearable \
+            TheWatch.P5.AuthSecurity \
+            TheWatch.P6.FirstResponder \
+            TheWatch.P7.FamilyHealth \
+            TheWatch.P8.DisasterRelief \
+            TheWatch.P9.DoctorServices \
+            TheWatch.P10.Gamification \
+            TheWatch.Geospatial \
+            TheWatch.Dashboard; do
+            echo "::group::Building $project"
+            dotnet build "$project/$project.csproj" -c Release --no-restore
+            echo "::endgroup::"
+          done
+
+      - name: Build test projects
+        run: |
+          for project in \
+            TheWatch.P1.CoreGateway.Tests \
+            TheWatch.P2.VoiceEmergency.Tests \
+            TheWatch.P3.MeshNetwork.Tests \
+            TheWatch.P4.Wearable.Tests \
+            TheWatch.P5.AuthSecurity.Tests \
+            TheWatch.P6.FirstResponder.Tests \
+            TheWatch.P7.FamilyHealth.Tests \
+            TheWatch.P8.DisasterRelief.Tests \
+            TheWatch.P9.DoctorServices.Tests \
+            TheWatch.P10.Gamification.Tests \
+            TheWatch.Geospatial.Tests \
+            TheWatch.Mobile.Tests; do
+            echo "::group::Building $project"
+            dotnet build "$project/$project.csproj" -c Release --no-restore
+            echo "::endgroup::"
+          done
+
+      # Upload build output for test job
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            **/bin/Release/
+            **/obj/Release/
+          retention-days: 1
+
+  # ===========================================================
+  # Run tests (matrix strategy for parallelism)
+  # ===========================================================
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - TheWatch.P1.CoreGateway.Tests
+          - TheWatch.P2.VoiceEmergency.Tests
+          - TheWatch.P3.MeshNetwork.Tests
+          - TheWatch.P4.Wearable.Tests
+          - TheWatch.P5.AuthSecurity.Tests
+          - TheWatch.P6.FirstResponder.Tests
+          - TheWatch.P7.FamilyHealth.Tests
+          - TheWatch.P8.DisasterRelief.Tests
+          - TheWatch.P9.DoctorServices.Tests
+          - TheWatch.P10.Gamification.Tests
+          - TheWatch.Geospatial.Tests
+          - TheWatch.Mobile.Tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          dotnet-quality: ${{ env.DOTNET_QUALITY }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+
+      - name: Run tests — ${{ matrix.project }}
+        run: |
+          dotnet test ${{ matrix.project }}/${{ matrix.project }}.csproj \
+            --configuration Release \
+            --no-build \
+            --verbosity normal \
+            --logger "trx;LogFileName=test-results.trx" \
+            --collect:"XPlat Code Coverage"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.project }}
+          path: |
+            **/test-results.trx
+            **/coverage.cobertura.xml
+          retention-days: 7
+
+  # ===========================================================
+  # Format check
+  # ===========================================================
+  format:
+    name: Code Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          dotnet-quality: ${{ env.DOTNET_QUALITY }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore TheWatch.sln
+
+      - name: Check formatting
+        run: dotnet format TheWatch.sln --verify-no-changes --verbosity diagnostic

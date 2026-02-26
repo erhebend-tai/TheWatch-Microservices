@@ -1,0 +1,307 @@
+{{/*
+  Ingress Controller with TLS termination and path-based routing.
+  Routes external traffic to the appropriate microservice based on URL path.
+*/}}
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "thewatch.fullname" . }}-ingress
+  labels:
+    {{- include "thewatch.labels" . | nindent 4 }}
+  annotations:
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    # WebSocket support for SignalR hubs
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+    # Rate limiting at ingress level
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+    # Request body size (evidence uploads)
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+spec:
+  ingressClassName: {{ .Values.ingress.className | default "nginx" }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- range .Values.ingress.tls }}
+    - secretName: {{ .secretName }}
+      hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          # Dashboard — catch-all for frontend (lowest priority, must be last)
+          {{- if (index $.Values.services "dashboard").enabled }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dashboard
+                port:
+                  number: 8080
+          {{- end }}
+
+          # P1 CoreGateway — /api/profiles, /api/config, /api/services, /api/devices
+          {{- if (index $.Values.services "p1-coregateway").enabled }}
+          - path: /api/profiles
+            pathType: Prefix
+            backend:
+              service:
+                name: p1-coregateway
+                port:
+                  number: 8080
+          - path: /api/config
+            pathType: Prefix
+            backend:
+              service:
+                name: p1-coregateway
+                port:
+                  number: 8080
+          - path: /api/services
+            pathType: Prefix
+            backend:
+              service:
+                name: p1-coregateway
+                port:
+                  number: 8080
+          - path: /api/devices
+            pathType: Prefix
+            backend:
+              service:
+                name: p1-coregateway
+                port:
+                  number: 8080
+          {{- end }}
+
+          # P2 VoiceEmergency — /api/incidents, /api/dispatch, /hubs/incidents, /hubs/dispatches
+          {{- if (index $.Values.services "p2-voiceemergency").enabled }}
+          - path: /api/incidents
+            pathType: Prefix
+            backend:
+              service:
+                name: p2-voiceemergency
+                port:
+                  number: 8080
+          - path: /api/dispatch
+            pathType: Prefix
+            backend:
+              service:
+                name: p2-voiceemergency
+                port:
+                  number: 8080
+          - path: /hubs/incidents
+            pathType: Prefix
+            backend:
+              service:
+                name: p2-voiceemergency
+                port:
+                  number: 8080
+          - path: /hubs/dispatches
+            pathType: Prefix
+            backend:
+              service:
+                name: p2-voiceemergency
+                port:
+                  number: 8080
+          {{- end }}
+
+          # P3 MeshNetwork — /api/nodes, /api/messages, /api/channels, /api/topology
+          {{- if (index $.Values.services "p3-meshnetwork").enabled }}
+          - path: /api/nodes
+            pathType: Prefix
+            backend:
+              service:
+                name: p3-meshnetwork
+                port:
+                  number: 8080
+          - path: /api/messages
+            pathType: Prefix
+            backend:
+              service:
+                name: p3-meshnetwork
+                port:
+                  number: 8080
+          - path: /api/channels
+            pathType: Prefix
+            backend:
+              service:
+                name: p3-meshnetwork
+                port:
+                  number: 8080
+          - path: /api/topology
+            pathType: Prefix
+            backend:
+              service:
+                name: p3-meshnetwork
+                port:
+                  number: 8080
+          {{- end }}
+
+          # P4 Wearable — /api/wearable
+          {{- if (index $.Values.services "p4-wearable").enabled }}
+          - path: /api/wearable
+            pathType: Prefix
+            backend:
+              service:
+                name: p4-wearable
+                port:
+                  number: 8080
+          {{- end }}
+
+          # P5 AuthSecurity — /api/auth, /api/eula, /api/onboarding, /api/security
+          {{- if (index $.Values.services "p5-authsecurity").enabled }}
+          - path: /api/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: p5-authsecurity
+                port:
+                  number: 8080
+          - path: /api/eula
+            pathType: Prefix
+            backend:
+              service:
+                name: p5-authsecurity
+                port:
+                  number: 8080
+          - path: /api/onboarding
+            pathType: Prefix
+            backend:
+              service:
+                name: p5-authsecurity
+                port:
+                  number: 8080
+          - path: /api/security
+            pathType: Prefix
+            backend:
+              service:
+                name: p5-authsecurity
+                port:
+                  number: 8080
+          {{- end }}
+
+          # P6 FirstResponder — /api/responders, /hubs/responders, /hubs/checkins
+          {{- if (index $.Values.services "p6-firstresponder").enabled }}
+          - path: /api/responders
+            pathType: Prefix
+            backend:
+              service:
+                name: p6-firstresponder
+                port:
+                  number: 8080
+          - path: /hubs/responders
+            pathType: Prefix
+            backend:
+              service:
+                name: p6-firstresponder
+                port:
+                  number: 8080
+          - path: /hubs/checkins
+            pathType: Prefix
+            backend:
+              service:
+                name: p6-firstresponder
+                port:
+                  number: 8080
+          {{- end }}
+
+          # P7 FamilyHealth — /api/family
+          {{- if (index $.Values.services "p7-familyhealth").enabled }}
+          - path: /api/family
+            pathType: Prefix
+            backend:
+              service:
+                name: p7-familyhealth
+                port:
+                  number: 8080
+          {{- end }}
+
+          # P8 DisasterRelief — /api/disasters, /api/shelters, /api/resources, /api/evacuation
+          {{- if (index $.Values.services "p8-disasterrelief").enabled }}
+          - path: /api/disasters
+            pathType: Prefix
+            backend:
+              service:
+                name: p8-disasterrelief
+                port:
+                  number: 8080
+          - path: /api/shelters
+            pathType: Prefix
+            backend:
+              service:
+                name: p8-disasterrelief
+                port:
+                  number: 8080
+          - path: /api/resources
+            pathType: Prefix
+            backend:
+              service:
+                name: p8-disasterrelief
+                port:
+                  number: 8080
+          - path: /api/evacuation
+            pathType: Prefix
+            backend:
+              service:
+                name: p8-disasterrelief
+                port:
+                  number: 8080
+          {{- end }}
+
+          # P9 DoctorServices — /api/doctors, /api/appointments, /api/telehealth
+          {{- if (index $.Values.services "p9-doctorservices").enabled }}
+          - path: /api/doctors
+            pathType: Prefix
+            backend:
+              service:
+                name: p9-doctorservices
+                port:
+                  number: 8080
+          - path: /api/appointments
+            pathType: Prefix
+            backend:
+              service:
+                name: p9-doctorservices
+                port:
+                  number: 8080
+          - path: /api/telehealth
+            pathType: Prefix
+            backend:
+              service:
+                name: p9-doctorservices
+                port:
+                  number: 8080
+          {{- end }}
+
+          # P10 Gamification — /api/gamification
+          {{- if (index $.Values.services "p10-gamification").enabled }}
+          - path: /api/gamification
+            pathType: Prefix
+            backend:
+              service:
+                name: p10-gamification
+                port:
+                  number: 8080
+          {{- end }}
+
+          # Geospatial — /api/geo
+          {{- if (index $.Values.services "geospatial").enabled }}
+          - path: /api/geo
+            pathType: Prefix
+            backend:
+              service:
+                name: geospatial
+                port:
+                  number: 8080
+          {{- end }}
+    {{- end }}
+{{- end }}

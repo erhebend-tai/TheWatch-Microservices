@@ -5,6 +5,9 @@ using TheWatch.P4.Wearable;
 using TheWatch.P4.Wearable.Devices;
 using TheWatch.P4.Wearable.Services;
 using TheWatch.Shared.Contracts;
+using TheWatch.P4.Wearable.Data.Seeders;
+using TheWatch.Shared.Gcp;
+using TheWatch.Shared.Cloudflare;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -13,6 +16,8 @@ builder.ConfigureWatchSerilog();
 builder.ConfigureWatchOpenApi();
 builder.AddWatchPersistenceAspire();
 builder.ConfigureWatchNotifications();
+builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
+builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
 builder.Services.AddCors(options =>
 {
@@ -26,8 +31,10 @@ builder.Services.AddHangfireServer();
 
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.AddWatchSecurity();
+builder.Services.AddScoped<IWatchDataSeeder, WearableSeeder>();
 
 var app = builder.Build();
+await app.UseWatchMigrations();
 
 app.UseCors();
 app.UseWatchSecurity();

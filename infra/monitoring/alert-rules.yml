@@ -1,0 +1,251 @@
+# TheWatch — Prometheus Alerting Rules
+# Critical alerts for emergency response platform reliability
+
+groups:
+  # ============================================================
+  # Service Health
+  # ============================================================
+  - name: service_health
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Service {{ $labels.job }} is DOWN"
+          description: "{{ $labels.job }} has been unreachable for more than 1 minute. Instance: {{ $labels.instance }}"
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(thewatch_http_requests_total{status_class="5xx"}[5m])) by (service)
+            /
+            sum(rate(thewatch_http_requests_total[5m])) by (service)
+          ) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High error rate on {{ $labels.service }}"
+          description: "{{ $labels.service }} has >5% error rate (current: {{ $value | humanizePercentage }})"
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(thewatch_http_request_duration_ms_bucket[5m])) by (service, le)
+          ) > 2000
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High latency on {{ $labels.service }}"
+          description: "{{ $labels.service }} P95 latency >2s (current: {{ $value | humanizeDuration }})"
+
+      - alert: HealthCheckFailing
+        expr: |
+          probe_success == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Health check failing for {{ $labels.job }}"
+          description: "Health check has been failing for >2 minutes"
+
+  # ============================================================
+  # Emergency Services (P2 + P6) — Higher priority
+  # ============================================================
+  - name: emergency_services
+    interval: 15s
+    rules:
+      - alert: EmergencyServiceDown
+        expr: up{service=~"P2-VoiceEmergency|P6-FirstResponder"} == 0
+        for: 30s
+        labels:
+          severity: page
+          team: emergency
+        annotations:
+          summary: "CRITICAL: Emergency service {{ $labels.service }} is DOWN"
+          description: "Emergency service {{ $labels.service }} is unreachable. Lives may depend on immediate response."
+
+      - alert: HighIncidentRate
+        expr: |
+          sum(rate(thewatch_incidents_total[5m])) > 10
+        for: 2m
+        labels:
+          severity: warning
+          team: emergency
+        annotations:
+          summary: "Unusual incident volume detected"
+          description: "Incident creation rate >10/min. Possible mass-casualty or coordinated event."
+
+      - alert: SlowDispatchResponse
+        expr: |
+          histogram_quantile(0.90,
+            sum(rate(thewatch_dispatch_response_time_min_bucket[10m])) by (le)
+          ) > 15
+        for: 5m
+        labels:
+          severity: critical
+          team: emergency
+        annotations:
+          summary: "Dispatch response times degraded"
+          description: "P90 dispatch response time >15 minutes"
+
+      - alert: DispatchQueueBacklog
+        expr: |
+          sum(rate(thewatch_dispatches_total[5m])) == 0
+            and sum(rate(thewatch_incidents_total[5m])) > 0
+        for: 3m
+        labels:
+          severity: critical
+          team: emergency
+        annotations:
+          summary: "Dispatch system may be stalled"
+          description: "Incidents are being created but no dispatches are happening"
+
+  # ============================================================
+  # Health Services (P7 + P9) — Clinical urgency
+  # ============================================================
+  - name: health_services
+    interval: 30s
+    rules:
+      - alert: HealthServiceDown
+        expr: up{service=~"P7-FamilyHealth|P9-DoctorServices"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: health
+        annotations:
+          summary: "Health service {{ $labels.service }} is DOWN"
+          description: "Health service is unavailable — vital monitoring may be interrupted"
+
+      - alert: VitalReadingsDrop
+        expr: |
+          sum(rate(thewatch_health_readings_total[10m])) < 1
+            and sum(rate(thewatch_health_readings_total[1h] offset 1h)) > 10
+        for: 10m
+        labels:
+          severity: warning
+          team: health
+        annotations:
+          summary: "Vital readings volume dropped significantly"
+          description: "Health data ingestion has dropped to near zero after being active"
+
+  # ============================================================
+  # Infrastructure
+  # ============================================================
+  - name: infrastructure
+    interval: 30s
+    rules:
+      - alert: KafkaConsumerLag
+        expr: |
+          kafka_consumergroup_lag > 10000
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Kafka consumer lag high for {{ $labels.consumergroup }}"
+          description: "Consumer group {{ $labels.consumergroup }} has >10k message lag on topic {{ $labels.topic }}"
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          thewatch_db_operation_duration_ms{quantile="0.99"} > 5000
+        for: 3m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Database operations critically slow on {{ $labels.service }}"
+          description: "P99 DB operation latency >5s — possible connection pool exhaustion"
+
+      - alert: HighMemoryUsage
+        expr: |
+          process_resident_memory_bytes / (1024 * 1024 * 1024) > 2
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High memory usage on {{ $labels.job }}"
+          description: "{{ $labels.job }} is using >2GB of memory"
+
+  # ============================================================
+  # Compliance & Security
+  # ============================================================
+  - name: compliance_security
+    interval: 60s
+    rules:
+      - alert: HighAuthFailureRate
+        expr: |
+          (
+            sum(rate(thewatch_auth_events_total{success="false"}[5m])) by (service)
+            /
+            sum(rate(thewatch_auth_events_total[5m])) by (service)
+          ) > 0.30
+        for: 3m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "High authentication failure rate on {{ $labels.service }}"
+          description: "{{ $labels.service }} has >30% auth failure rate — possible brute-force attack"
+
+      - alert: GdprErasureFailure
+        expr: |
+          sum(rate(thewatch_compliance_events_total{framework="GDPR",action="erasure_failed"}[1h])) > 0
+        for: 1m
+        labels:
+          severity: warning
+          team: compliance
+        annotations:
+          summary: "GDPR erasure failure detected"
+          description: "A right-to-erasure request has failed — regulatory SLA at risk"
+
+      - alert: SoxAuditChainBreak
+        expr: |
+          sum(rate(thewatch_compliance_events_total{framework="SOX",action="chain_break"}[1h])) > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: compliance
+        annotations:
+          summary: "SOX audit chain integrity broken"
+          description: "Tamper-evident audit chain has a broken link — investigate immediately"
+
+  # ============================================================
+  # Mesh Network (P3)
+  # ============================================================
+  - name: mesh_network
+    interval: 30s
+    rules:
+      - alert: MeshNetworkPartition
+        expr: |
+          sum(rate(thewatch_mesh_messages_total[5m])) == 0
+            and sum(thewatch_active_connections{service="P3-MeshNetwork"}) > 0
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Mesh network may be partitioned"
+          description: "No mesh messages flowing despite active connections"
+
+      - alert: HighMeshHopCount
+        expr: |
+          histogram_quantile(0.90,
+            sum(rate(thewatch_mesh_hop_count_bucket[10m])) by (le)
+          ) > 4
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High mesh hop count detected"
+          description: "P90 mesh hop count >4 — network topology may be degraded"

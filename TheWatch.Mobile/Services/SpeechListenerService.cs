@@ -10,6 +10,7 @@ namespace TheWatch.Mobile.Services;
 public class SpeechListenerService : IDisposable
 {
     private readonly PhraseService _phraseService;
+    private readonly BatteryMonitorService _batteryMonitor;
     private CancellationTokenSource? _cts;
     private bool _isListening;
 
@@ -17,17 +18,19 @@ public class SpeechListenerService : IDisposable
     public event Action<string>? OnSpeechRecognized;
     public event Action<string, PhraseAction>? OnPhraseMatched;
 
-    public SpeechListenerService(PhraseService phraseService)
+    public SpeechListenerService(PhraseService phraseService, BatteryMonitorService batteryMonitor)
     {
         _phraseService = phraseService;
+        _batteryMonitor = batteryMonitor;
     }
 
     public async Task StartListeningAsync()
     {
         if (_isListening) return;
 
-        var status = await Permissions.RequestAsync<Permissions.Microphone>();
-        if (status != PermissionStatus.Granted)
+        // Request all required permissions using the unified helper
+        var permissionsGranted = await Helpers.PermissionHelper.RequestSpeechPermissionsAsync();
+        if (!permissionsGranted)
             return;
 
         _isListening = true;
@@ -60,26 +63,62 @@ public class SpeechListenerService : IDisposable
 
     private async Task ListenLoopAsync(CancellationToken ct)
     {
-        // Platform speech recognition loop.
-        // On Android: SpeechRecognizer with RECOGNIZE_SPEECH intent
-        // On iOS: SFSpeechRecognizer with continuous recognition
-        // On Windows: Windows.Media.SpeechRecognition.SpeechRecognizer
-        //
-        // For now, this loop awaits platform implementations.
-        // The ProcessTranscript method is the entry point for recognized text.
-        while (!ct.IsCancellationRequested && _isListening)
+        // Get platform-specific speech recognizer
+        var speechEngine = GetPlatformSpeechEngine();
+        if (speechEngine == null)
         {
-            try
+            return;
+        }
+
+        // Wire up events
+        speechEngine.OnResult += ProcessTranscript;
+        speechEngine.OnError += (error) => 
+        {
+            // Log error and attempt restart
+            _ = Task.Run(async () =>
             {
-                // Polling interval — platform implementations will replace this
-                // with event-driven recognition callbacks
-                await Task.Delay(2000, ct);
-            }
-            catch (OperationCanceledException)
+                await Task.Delay(1000, ct);
+                if (_isListening && !ct.IsCancellationRequested)
+                {
+                    await speechEngine.StartAsync();
+                }
+            });
+        };
+
+        // Start platform recognition
+        var started = await speechEngine.StartAsync();
+        if (!started)
+        {
+            return;
+        }
+
+        try
+        {
+            // Keep the service alive while listening
+            while (!ct.IsCancellationRequested && _isListening)
             {
-                break;
+                await Task.Delay(1000, ct);
             }
         }
+        finally
+        {
+            await speechEngine.StopAsync();
+            speechEngine.OnResult -= ProcessTranscript;
+            speechEngine.Dispose();
+        }
+    }
+
+    private ISpeechRecognitionEngine? GetPlatformSpeechEngine()
+    {
+#if ANDROID
+        return new Platforms.Android.Services.AndroidSpeechRecognizer();
+#elif IOS
+        return new Platforms.iOS.Services.IosSpeechRecognizer();
+#elif WINDOWS
+        return new Platforms.Windows.Services.WindowsSpeechRecognizer();
+#else
+        return null;
+#endif
     }
 
     public void Dispose()

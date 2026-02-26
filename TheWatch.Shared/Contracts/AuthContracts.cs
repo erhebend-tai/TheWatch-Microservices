@@ -34,3 +34,11 @@ public record UserInfoDto(
     string? Phone,
     string[] Roles,
     DateTime CreatedAt);
+
+public record ForgotPasswordRequest(
+    string Email);
+
+public record ResetPasswordRequest(
+    string Email,
+    string Token,
+    string NewPassword);

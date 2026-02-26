@@ -3,6 +3,9 @@
 @inject WatchApiClient Api
 @inject NavigationManager Nav
 @inject WatchAuthService AuthService
+@inject IConnectivityMonitorService Connectivity
+@inject MeshFallbackService Mesh
+@inject IOfflineQueueService OfflineQueue
 
 <div class="page-content">
     <RadzenStack Gap="1rem">
@@ -13,6 +16,34 @@
             </RadzenText>
             <StatusBadge Text="@_overallStatus" StatusClass="@_overallStatusClass" />
         </RadzenStack>
+
+        <!-- Connectivity / Mesh indicators -->
+        @if (!Connectivity.IsOnline)
+        {
+            <div class="watch-card" style="border-color: rgba(245, 158, 11, 0.3);">
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                    <span class="material-symbols-outlined" style="color: var(--watch-warning);">cloud_off</span>
+                    <RadzenStack>
+                        <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--watch-warning);">
+                            @if (Mesh.IsActive)
+                            {
+                                <text>Mesh mode active — BLE fallback enabled</text>
+                            }
+                            else
+                            {
+                                <text>Offline — data will sync when reconnected</text>
+                            }
+                        </RadzenText>
+                        @if (_pendingQueueCount > 0)
+                        {
+                            <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                                @_pendingQueueCount queued request(s) pending
+                            </RadzenText>
+                        }
+                    </RadzenStack>
+                </RadzenStack>
+            </div>
+        }
 
         <!-- Quick Actions -->
         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
@@ -69,6 +100,7 @@
     private string _overallStatusClass = "status-safe";
     private List<ServiceInfo> _services = [];
     private List<IncidentDto> _recentIncidents = [];
+    private int _pendingQueueCount;
 
     protected override async Task OnInitializedAsync()
     {
@@ -91,6 +123,9 @@
 
     private async Task LoadDataAsync()
     {
+        // Load offline queue count
+        try { _pendingQueueCount = await OfflineQueue.GetPendingCountAsync(); } catch { }
+
         // Load recent incidents
         try
         {
