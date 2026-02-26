@@ -1,0 +1,118 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    container_name: thewatch-sqlserver
+    hostname: thewatch-sql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "TheWatch!Dev2025"
+      MSSQL_PID: Developer
+      MSSQL_AGENT_ENABLED: "true"
+    ports:
+      - "1434:1433"
+    volumes:
+      - sqldata:/var/opt/mssql
+      - sqlbackups:/var/opt/mssql/backups
+    user: root
+    entrypoint: ["/bin/bash", "-c", "chown -R mssql:mssql /var/opt/mssql/backups && exec su -s /bin/bash mssql -c /opt/mssql/bin/sqlservr"]
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "TheWatch!Dev2025" -C -Q "SELECT 1" -b
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  sql-init:
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    container_name: thewatch-sql-init
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        echo "=== TheWatch Database Initialization ==="
+        sleep 5
+        SQLCMD="/opt/mssql-tools18/bin/sqlcmd -S thewatch-sql -U sa -P TheWatch!Dev2025 -C -b"
+        for DB in WatchCoreGatewayDB WatchVoiceEmergencyDB WatchMeshNetworkDB WatchWearableDB WatchAuthSecurityDB WatchFirstResponderDB WatchFamilyHealthDB WatchDisasterReliefDB WatchDoctorServicesDB WatchGamificationDB; do
+          echo "Creating database: $${DB}"
+          $$SQLCMD -Q "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = '$${DB}') BEGIN CREATE DATABASE [$${DB}]; PRINT 'Created $${DB}'; END ELSE PRINT '$${DB} already exists';"
+          $$SQLCMD -Q "ALTER DATABASE [$${DB}] SET RECOVERY FULL;"
+        done
+        echo "=== All 10 TheWatch databases initialized ==="
+        $$SQLCMD -Q "SELECT name, state_desc, recovery_model_desc FROM sys.databases WHERE name LIKE 'Watch%' ORDER BY name;"
+
+  sql-backup:
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    container_name: thewatch-sql-backup
+    depends_on:
+      sql-init:
+        condition: service_completed_successfully
+    volumes:
+      - sqlbackups:/var/opt/mssql/backups
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        SQLCMD="/opt/mssql-tools18/bin/sqlcmd -S thewatch-sql -U sa -P TheWatch!Dev2025 -C -b"
+        BACKUP_DIR="/var/opt/mssql/backups"
+        INTERVAL=$${BACKUP_INTERVAL_HOURS:-6}
+        INTERVAL_SECONDS=$$((INTERVAL * 3600))
+        RETENTION_DAYS=7
+        DBS="WatchCoreGatewayDB WatchVoiceEmergencyDB WatchMeshNetworkDB WatchWearableDB WatchAuthSecurityDB WatchFirstResponderDB WatchFamilyHealthDB WatchDisasterReliefDB WatchDoctorServicesDB WatchGamificationDB"
+
+        run_backup() {
+          TS=$$(date +%Y%m%d_%H%M%S)
+          echo "=========================================="
+          echo "  FULL BACKUP - $$TS"
+          echo "=========================================="
+          for DB in $$DBS; do
+            BFILE="$$BACKUP_DIR/$${DB}_FULL_$$TS.bak"
+            echo "[$$(date +%H:%M:%S)] Backing up $$DB..."
+            $$SQLCMD -Q "BACKUP DATABASE [$$DB] TO DISK = '$$BFILE' WITH FORMAT, INIT, NAME = '$$DB Full Backup $$TS', COMPRESSION, CHECKSUM, STATS = 25;"
+            if [ $$? -eq 0 ]; then
+              SIZE=$$(du -h "$$BFILE" 2>/dev/null | cut -f1)
+              echo "[$$(date +%H:%M:%S)] OK: $$DB -> $$BFILE ($$SIZE)"
+            else
+              echo "[$$(date +%H:%M:%S)] FAILED: $$DB"
+            fi
+          done
+          echo "--- Verifying backups ---"
+          for DB in $$DBS; do
+            $$SQLCMD -Q "RESTORE VERIFYONLY FROM DISK = '$$BACKUP_DIR/$${DB}_FULL_$$TS.bak' WITH CHECKSUM;" && echo "  VERIFIED: $$DB" || echo "  VERIFY FAILED: $$DB"
+          done
+          echo "Full backup complete at $$(date)"
+        }
+
+        cleanup() {
+          echo "--- Cleaning up backups older than $$RETENTION_DAYS days ---"
+          COUNT=$$(find "$$BACKUP_DIR" -name "*.bak" -mtime +$$RETENTION_DAYS 2>/dev/null | wc -l)
+          if [ "$$COUNT" -gt 0 ]; then
+            find "$$BACKUP_DIR" -name "*.bak" -mtime +$$RETENTION_DAYS -delete
+            echo "Removed $$COUNT old backup files"
+          else
+            echo "No old backups to clean up"
+          fi
+        }
+
+        echo "=== TheWatch SQL Server Backup Scheduler ==="
+        echo "Interval: every $$INTERVAL hours | Retention: $$RETENTION_DAYS days"
+        run_backup
+        cleanup
+        while true; do
+          echo "Next backup in $$INTERVAL hours..."
+          sleep $$INTERVAL_SECONDS
+          run_backup
+          cleanup
+        done
+    environment:
+      BACKUP_INTERVAL_HOURS: "6"
+    restart: unless-stopped
+
+volumes:
+  sqldata:
+    name: thewatch-sqldata
+  sqlbackups:
+    name: thewatch-sqlbackups

@@ -1,0 +1,50 @@
+name: Docker Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-images:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service:
+          - { name: "p1-coregateway", project: "TheWatch.P1.CoreGateway" }
+          - { name: "p2-voiceemergency", project: "TheWatch.P2.VoiceEmergency" }
+          - { name: "p3-meshnetwork", project: "TheWatch.P3.MeshNetwork" }
+          - { name: "p4-wearable", project: "TheWatch.P4.Wearable" }
+          - { name: "p5-authsecurity", project: "TheWatch.P5.AuthSecurity" }
+          - { name: "p6-firstresponder", project: "TheWatch.P6.FirstResponder" }
+          - { name: "p7-familyhealth", project: "TheWatch.P7.FamilyHealth" }
+          - { name: "p8-disasterrelief", project: "TheWatch.P8.DisasterRelief" }
+          - { name: "p9-doctorservices", project: "TheWatch.P9.DoctorServices" }
+          - { name: "p10-gamification", project: "TheWatch.P10.Gamification" }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Publish ${{ matrix.service.name }}
+        run: |
+          dotnet publish ${{ matrix.service.project }}/${{ matrix.service.project }}.csproj \
+            --configuration Release \
+            --output ./publish/${{ matrix.service.name }}
+
+      - name: Build Docker image
+        run: |
+          cat > ./publish/${{ matrix.service.name }}/Dockerfile <<'DOCKERFILE'
+          FROM mcr.microsoft.com/dotnet/aspnet:9.0
+          WORKDIR /app
+          COPY . .
+          ENTRYPOINT ["dotnet", "${{ matrix.service.project }}.dll"]
+          DOCKERFILE
+          docker build -t thewatch/${{ matrix.service.name }}:${{ github.sha }} ./publish/${{ matrix.service.name }}
+          docker tag thewatch/${{ matrix.service.name }}:${{ github.sha }} thewatch/${{ matrix.service.name }}:latest
+
+      - name: Verify image
+        run: docker images thewatch/${{ matrix.service.name }}

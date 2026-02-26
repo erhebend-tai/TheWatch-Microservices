@@ -11,13 +11,20 @@ SerilogSetup.BootstrapSerilog();
 var builder = WebApplication.CreateBuilder(args);
 builder.ConfigureWatchSerilog();
 builder.ConfigureWatchOpenApi();
+builder.AddWatchPersistenceAspire();
+builder.ConfigureWatchNotifications();
+builder.AddWatchKafka();
+builder.AddWatchKafkaConsumer<IncidentCreatedConsumer>();
 
-// CORS
+// CORS (configured for SignalR — requires AllowCredentials)
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
-        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+        policy.SetIsOriginAllowed(_ => true).AllowAnyMethod().AllowAnyHeader().AllowCredentials());
 });
+
+// SignalR real-time hubs (ResponderHub, CheckInHub)
+builder.Services.AddWatchSignalR();
 
 // Hangfire with InMemory storage
 builder.Services.AddHangfire(config =>
@@ -84,15 +91,25 @@ app.MapGet("/api/responders/{id:guid}", async (Guid id, IResponderService svc) =
     return responder is not null ? Results.Ok(responder) : Results.NotFound();
 });
 
-app.MapPut("/api/responders/{id:guid}/location", async (Guid id, UpdateLocationRequest request, IResponderService svc) =>
+app.MapPut("/api/responders/{id:guid}/location", async (Guid id, UpdateLocationRequest request, IResponderService svc, IResponderBroadcaster hub) =>
 {
     var responder = await svc.UpdateLocationAsync(id, request);
+    if (responder is not null)
+    {
+        // Broadcast live GPS update to SignalR clients (ResponderLocationHub)
+        await hub.BroadcastUpdatedAsync(responder);
+    }
     return responder is not null ? Results.Ok(responder) : Results.NotFound();
 });
 
-app.MapPut("/api/responders/{id:guid}/status", async (Guid id, UpdateStatusRequest request, IResponderService svc) =>
+app.MapPut("/api/responders/{id:guid}/status", async (Guid id, UpdateStatusRequest request, IResponderService svc, IResponderBroadcaster hub) =>
 {
     var responder = await svc.UpdateStatusAsync(id, request);
+    if (responder is not null)
+    {
+        // Broadcast responder status change in real-time
+        await hub.BroadcastUpdatedAsync(responder);
+    }
     return responder is not null ? Results.Ok(responder) : Results.NotFound();
 });
 
@@ -119,9 +136,11 @@ app.MapGet("/api/responders/nearby", async (
 
 // === Check-In Endpoints ===
 
-app.MapPost("/api/responders/{responderId:guid}/checkins", async (Guid responderId, CreateCheckInRequest request, ICheckInService svc) =>
+app.MapPost("/api/responders/{responderId:guid}/checkins", async (Guid responderId, CreateCheckInRequest request, ICheckInService svc, ICheckInBroadcaster checkInHub) =>
 {
     var checkIn = await svc.CreateAsync(responderId, request);
+    // Broadcast check-in to clients watching this incident
+    await checkInHub.BroadcastCreatedAsync(checkIn, checkIn.IncidentId.ToString());
     return Results.Created($"/api/responders/{responderId}/checkins/{checkIn.Id}", checkIn);
 });
 
@@ -136,6 +155,9 @@ app.MapGet("/api/incidents/{incidentId:guid}/checkins", async (Guid incidentId, 
     var checkIns = await svc.GetForIncidentAsync(incidentId);
     return Results.Ok(checkIns);
 });
+
+// SignalR hub endpoints (/hubs/responders, /hubs/checkins)
+app.MapWatchHubs();
 
 app.Run();
 

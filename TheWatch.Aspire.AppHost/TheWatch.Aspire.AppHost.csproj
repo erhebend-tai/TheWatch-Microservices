@@ -11,6 +11,9 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" Version="9.2.0" />
+    <PackageReference Include="Aspire.Hosting.Kafka" Version="9.2.*" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="9.2.*" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" Version="9.2.*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,6 +27,7 @@
     <ProjectReference Include="..\TheWatch.P8.DisasterRelief\TheWatch.P8.DisasterRelief.csproj" />
     <ProjectReference Include="..\TheWatch.P9.DoctorServices\TheWatch.P9.DoctorServices.csproj" />
     <ProjectReference Include="..\TheWatch.P10.Gamification\TheWatch.P10.Gamification.csproj" />
+    <ProjectReference Include="..\TheWatch.Geospatial\TheWatch.Geospatial.csproj" />
     <ProjectReference Include="..\TheWatch.Dashboard\TheWatch.Dashboard.csproj" />
   </ItemGroup>
 

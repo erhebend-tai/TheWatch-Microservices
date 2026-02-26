@@ -1,0 +1,383 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
+
+namespace TheWatch.Generators;
+
+[Generator]
+public class SignalRGenerator : IIncrementalGenerator
+{
+    public void Initialize(IncrementalGeneratorInitializationContext context)
+    {
+        var projectInfo = context.AnalyzerConfigOptionsProvider
+            .Select((opts, _) =>
+            {
+                opts.GlobalOptions.TryGetValue("build_property.RootNamespace", out var ns);
+                opts.GlobalOptions.TryGetValue("build_property.UseMaui", out var useMaui);
+                return new ProjectMeta(ns ?? "TheWatch", useMaui ?? "");
+            });
+
+        var entities = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                predicate: static (node, _) => node is ClassDeclarationSyntax cds &&
+                    cds.Modifiers.Any(SyntaxKind.PublicKeyword) &&
+                    !cds.Modifiers.Any(SyntaxKind.StaticKeyword) &&
+                    !cds.Modifiers.Any(SyntaxKind.AbstractKeyword),
+                transform: static (ctx, ct) => ExtractEntityInfo(ctx, ct))
+            .Where(static e => e != null)
+            .Select(static (e, _) => e!.Value)
+            .Collect();
+
+        var combined = projectInfo.Combine(entities);
+        context.RegisterSourceOutput(combined, static (spc, data) =>
+        {
+            var (meta, entityList) = data;
+            Generate(spc, meta, entityList);
+        });
+    }
+
+    private static EntityInfo? ExtractEntityInfo(GeneratorSyntaxContext ctx, CancellationToken ct)
+    {
+        var filePath = ctx.Node.SyntaxTree.FilePath ?? "";
+        if (filePath.Replace('/', '\\').Contains("\\obj\\"))
+            return null;
+
+        var cds = (ClassDeclarationSyntax)ctx.Node;
+        if (ctx.SemanticModel.GetDeclaredSymbol(cds, ct) is not INamedTypeSymbol symbol)
+            return null;
+
+        var ns = symbol.ContainingNamespace.ToDisplayString();
+        if (ns.EndsWith(".Models"))
+            return null;
+
+        var allProps = symbol.GetMembers()
+            .OfType<IPropertySymbol>()
+            .Where(p => p.DeclaredAccessibility == Accessibility.Public &&
+                        !p.IsStatic && p.GetMethod != null && p.SetMethod != null)
+            .ToList();
+
+        var hasGuidId = allProps.Any(p => p.Name == "Id" &&
+            p.Type.Name == "Guid" && p.Type.ContainingNamespace is { Name: "System" });
+        if (!hasGuidId) return null;
+
+        // Collect property names for hub client method generation
+        var propNames = allProps
+            .Where(p => p.Name != "Id")
+            .Select(p => p.Name)
+            .ToArray();
+
+        return new EntityInfo(symbol.Name, ns, propNames);
+    }
+
+    private static void Generate(SourceProductionContext spc, ProjectMeta meta,
+        ImmutableArray<EntityInfo> entities)
+    {
+        var rootNs = meta.Namespace;
+        // Skip non-service projects
+        if (rootNs.Contains(".Tests") || rootNs.Contains(".Generators") ||
+            rootNs.Contains(".Shared") || rootNs.Contains(".AppHost") ||
+            rootNs.Contains(".ServiceDefaults") || rootNs.Contains(".Dashboard"))
+            return;
+        if (meta.UseMaui.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+            rootNs.Contains(".Mobile"))
+            return;
+
+        var program = GeneratorHelpers.DetectProgram(rootNs);
+        if (program == null) return;
+        if (entities.Length == 0) return;
+
+        var seen = new HashSet<string>();
+        var unique = new List<EntityInfo>();
+        foreach (var e in entities)
+            if (seen.Add(e.Name)) unique.Add(e);
+
+        if (unique.Count == 0) return;
+
+        var parts = rootNs.Split('.');
+        var shortName = parts.Length >= 3 ? parts[parts.Length - 1] : program;
+        var entityNamespaces = unique.Select(e => e.Namespace).Distinct().ToList();
+
+        var sb = new StringBuilder(8192);
+        WriteHeader(sb);
+        WriteUsings(sb, rootNs, entityNamespaces);
+        sb.AppendLine($"namespace {rootNs};");
+        sb.AppendLine();
+
+        // Generate hub client interface, hub class, and broadcaster for each entity
+        foreach (var entity in unique)
+        {
+            WriteHubClientInterface(sb, entity);
+            WriteHub(sb, entity);
+            WriteBroadcaster(sb, entity);
+        }
+
+        // Generate the setup class
+        WriteSignalRSetup(sb, unique, rootNs, shortName);
+
+        spc.AddSource("SignalRSetup.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
+    }
+
+    // ─── Code Emitters ───
+
+    private static void WriteHeader(StringBuilder sb)
+    {
+        sb.AppendLine("// <auto-generated/>");
+        sb.AppendLine("// SignalR hub infrastructure generated by TheWatch.Generators.SignalRGenerator");
+        sb.AppendLine("#nullable enable");
+        sb.AppendLine();
+    }
+
+    private static void WriteUsings(StringBuilder sb, string rootNs, List<string> entityNs)
+    {
+        sb.AppendLine("using System;");
+        sb.AppendLine("using System.Threading.Tasks;");
+        sb.AppendLine("using Microsoft.AspNetCore.Builder;");
+        sb.AppendLine("using Microsoft.AspNetCore.SignalR;");
+        sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
+        sb.AppendLine("using Microsoft.Extensions.Logging;");
+        foreach (var ns in entityNs.Where(n => n != rootNs).OrderBy(n => n))
+            sb.AppendLine($"using {ns};");
+        sb.AppendLine();
+    }
+
+    private static void WriteHubClientInterface(StringBuilder sb, EntityInfo entity)
+    {
+        var name = entity.Name;
+        sb.AppendLine($"/// <summary>");
+        sb.AppendLine($"/// Typed SignalR client interface for {name} real-time events.");
+        sb.AppendLine($"/// </summary>");
+        sb.AppendLine($"public interface I{name}HubClient");
+        sb.AppendLine("{");
+        sb.AppendLine($"    Task On{name}Created({name} entity);");
+        sb.AppendLine($"    Task On{name}Updated({name} entity);");
+        sb.AppendLine($"    Task On{name}Deleted(Guid id);");
+        sb.AppendLine("}");
+        sb.AppendLine();
+    }
+
+    private static void WriteHub(StringBuilder sb, EntityInfo entity)
+    {
+        var name = entity.Name;
+        var lower = name.ToLowerInvariant();
+        sb.AppendLine($"/// <summary>");
+        sb.AppendLine($"/// SignalR hub for real-time {name} events.");
+        sb.AppendLine($"/// Clients join groups to receive targeted updates.");
+        sb.AppendLine($"/// </summary>");
+        sb.AppendLine($"public class {name}Hub : Hub<I{name}HubClient>");
+        sb.AppendLine("{");
+        sb.AppendLine($"    private readonly ILogger<{name}Hub> _logger;");
+        sb.AppendLine();
+        sb.AppendLine($"    public {name}Hub(ILogger<{name}Hub> logger) => _logger = logger;");
+        sb.AppendLine();
+
+        // JoinGroup - for subscribing to a specific entity instance or category
+        sb.AppendLine($"    /// <summary>");
+        sb.AppendLine($"    /// Join a {name} group to receive targeted updates (e.g., by entity ID or category).");
+        sb.AppendLine($"    /// </summary>");
+        sb.AppendLine($"    public async Task Join{name}Group(string groupId)");
+        sb.AppendLine("    {");
+        sb.AppendLine($"        await Groups.AddToGroupAsync(Context.ConnectionId, groupId);");
+        sb.AppendLine($"        _logger.LogInformation(\"Client {{ConnectionId}} joined {name} group {{GroupId}}\", Context.ConnectionId, groupId);");
+        sb.AppendLine("    }");
+        sb.AppendLine();
+
+        // LeaveGroup
+        sb.AppendLine($"    /// <summary>");
+        sb.AppendLine($"    /// Leave a {name} group to stop receiving updates.");
+        sb.AppendLine($"    /// </summary>");
+        sb.AppendLine($"    public async Task Leave{name}Group(string groupId)");
+        sb.AppendLine("    {");
+        sb.AppendLine($"        await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupId);");
+        sb.AppendLine($"        _logger.LogInformation(\"Client {{ConnectionId}} left {name} group {{GroupId}}\", Context.ConnectionId, groupId);");
+        sb.AppendLine("    }");
+        sb.AppendLine();
+
+        // OnConnectedAsync
+        sb.AppendLine("    public override async Task OnConnectedAsync()");
+        sb.AppendLine("    {");
+        sb.AppendLine($"        _logger.LogInformation(\"Client {{ConnectionId}} connected to {name}Hub\", Context.ConnectionId);");
+        sb.AppendLine("        await base.OnConnectedAsync();");
+        sb.AppendLine("    }");
+        sb.AppendLine();
+
+        // OnDisconnectedAsync
+        sb.AppendLine("    public override async Task OnDisconnectedAsync(Exception? exception)");
+        sb.AppendLine("    {");
+        sb.AppendLine($"        _logger.LogInformation(\"Client {{ConnectionId}} disconnected from {name}Hub\", Context.ConnectionId);");
+        sb.AppendLine("        await base.OnDisconnectedAsync(exception);");
+        sb.AppendLine("    }");
+
+        sb.AppendLine("}");
+        sb.AppendLine();
+    }
+
+    private static void WriteBroadcaster(StringBuilder sb, EntityInfo entity)
+    {
+        var name = entity.Name;
+
+        // Interface
+        sb.AppendLine($"/// <summary>");
+        sb.AppendLine($"/// Broadcasts {name} events to connected SignalR clients.");
+        sb.AppendLine($"/// Inject this into service classes to push real-time updates.");
+        sb.AppendLine($"/// </summary>");
+        sb.AppendLine($"public interface I{name}Broadcaster");
+        sb.AppendLine("{");
+        sb.AppendLine($"    Task BroadcastCreatedAsync({name} entity, string? groupId = null);");
+        sb.AppendLine($"    Task BroadcastUpdatedAsync({name} entity, string? groupId = null);");
+        sb.AppendLine($"    Task BroadcastDeletedAsync(Guid id, string? groupId = null);");
+        sb.AppendLine("}");
+        sb.AppendLine();
+
+        // Implementation
+        sb.AppendLine($"public class {name}Broadcaster : I{name}Broadcaster");
+        sb.AppendLine("{");
+        sb.AppendLine($"    private readonly IHubContext<{name}Hub, I{name}HubClient> _hubContext;");
+        sb.AppendLine($"    private readonly ILogger<{name}Broadcaster> _logger;");
+        sb.AppendLine();
+        sb.AppendLine($"    public {name}Broadcaster(");
+        sb.AppendLine($"        IHubContext<{name}Hub, I{name}HubClient> hubContext,");
+        sb.AppendLine($"        ILogger<{name}Broadcaster> logger)");
+        sb.AppendLine("    {");
+        sb.AppendLine("        _hubContext = hubContext;");
+        sb.AppendLine("        _logger = logger;");
+        sb.AppendLine("    }");
+        sb.AppendLine();
+
+        // BroadcastCreated
+        sb.AppendLine($"    public async Task BroadcastCreatedAsync({name} entity, string? groupId = null)");
+        sb.AppendLine("    {");
+        sb.AppendLine($"        _logger.LogDebug(\"Broadcasting {name} created to {{Target}}\", groupId ?? \"all\");");
+        sb.AppendLine("        var target = groupId != null ? _hubContext.Clients.Group(groupId) : _hubContext.Clients.All;");
+        sb.AppendLine($"        await target.On{name}Created(entity);");
+        sb.AppendLine("    }");
+        sb.AppendLine();
+
+        // BroadcastUpdated
+        sb.AppendLine($"    public async Task BroadcastUpdatedAsync({name} entity, string? groupId = null)");
+        sb.AppendLine("    {");
+        sb.AppendLine($"        _logger.LogDebug(\"Broadcasting {name} updated to {{Target}}\", groupId ?? \"all\");");
+        sb.AppendLine("        var target = groupId != null ? _hubContext.Clients.Group(groupId) : _hubContext.Clients.All;");
+        sb.AppendLine($"        await target.On{name}Updated(entity);");
+        sb.AppendLine("    }");
+        sb.AppendLine();
+
+        // BroadcastDeleted
+        sb.AppendLine($"    public async Task BroadcastDeletedAsync(Guid id, string? groupId = null)");
+        sb.AppendLine("    {");
+        sb.AppendLine($"        _logger.LogDebug(\"Broadcasting {name} deleted {{Id}} to {{Target}}\", id, groupId ?? \"all\");");
+        sb.AppendLine("        var target = groupId != null ? _hubContext.Clients.Group(groupId) : _hubContext.Clients.All;");
+        sb.AppendLine($"        await target.On{name}Deleted(id);");
+        sb.AppendLine("    }");
+
+        sb.AppendLine("}");
+        sb.AppendLine();
+    }
+
+    private static void WriteSignalRSetup(StringBuilder sb, List<EntityInfo> entities,
+        string rootNs, string shortName)
+    {
+        sb.AppendLine("/// <summary>");
+        sb.AppendLine($"/// Auto-generated SignalR setup for {rootNs}.");
+        sb.AppendLine("/// </summary>");
+        sb.AppendLine("public static class SignalRSetup");
+        sb.AppendLine("{");
+
+        // AddWatchSignalR
+        sb.AppendLine("    /// <summary>");
+        sb.AppendLine("    /// Registers SignalR services and all entity broadcaster services.");
+        sb.AppendLine("    /// </summary>");
+        sb.AppendLine("    public static IServiceCollection AddWatchSignalR(this IServiceCollection services)");
+        sb.AppendLine("    {");
+        sb.AppendLine("        services.AddSignalR();");
+        foreach (var entity in entities)
+        {
+            sb.AppendLine($"        services.AddSingleton<I{entity.Name}Broadcaster, {entity.Name}Broadcaster>();");
+        }
+        sb.AppendLine("        return services;");
+        sb.AppendLine("    }");
+        sb.AppendLine();
+
+        // MapWatchHubs
+        sb.AppendLine("    /// <summary>");
+        sb.AppendLine("    /// Maps all SignalR hub endpoints for this service.");
+        sb.AppendLine("    /// </summary>");
+        sb.AppendLine("    public static WebApplication MapWatchHubs(this WebApplication app)");
+        sb.AppendLine("    {");
+        foreach (var entity in entities)
+        {
+            var hubPath = "/hubs/" + Pluralize(entity.Name).ToLowerInvariant();
+            sb.AppendLine($"        app.MapHub<{entity.Name}Hub>(\"{hubPath}\");");
+        }
+        sb.AppendLine("        return app;");
+        sb.AppendLine("    }");
+
+        sb.AppendLine("}");
+    }
+
+    // ─── Helpers ───
+
+    private static string Pluralize(string name)
+    {
+        if (name.EndsWith("s", StringComparison.Ordinal) ||
+            name.EndsWith("x", StringComparison.Ordinal) ||
+            name.EndsWith("z", StringComparison.Ordinal) ||
+            name.EndsWith("ch", StringComparison.Ordinal) ||
+            name.EndsWith("sh", StringComparison.Ordinal))
+            return name + "es";
+        if (name.EndsWith("y", StringComparison.Ordinal) && name.Length > 1 &&
+            !"aeiouAEIOU".Contains(name[name.Length - 2]))
+            return name.Substring(0, name.Length - 1) + "ies";
+        return name + "s";
+    }
+
+    // ─── Pipeline Data Types ───
+
+    private struct ProjectMeta : IEquatable<ProjectMeta>
+    {
+        public string Namespace;
+        public string UseMaui;
+        public ProjectMeta(string ns, string useMaui) { Namespace = ns; UseMaui = useMaui; }
+        public bool Equals(ProjectMeta other) => Namespace == other.Namespace && UseMaui == other.UseMaui;
+        public override bool Equals(object? obj) => obj is ProjectMeta o && Equals(o);
+        public override int GetHashCode() => (Namespace?.GetHashCode() ?? 0) ^ (UseMaui?.GetHashCode() ?? 0);
+    }
+
+    private struct EntityInfo : IEquatable<EntityInfo>
+    {
+        public string Name;
+        public string Namespace;
+        public string[] PropertyNames;
+
+        public EntityInfo(string name, string ns, string[] propNames)
+        {
+            Name = name; Namespace = ns; PropertyNames = propNames;
+        }
+
+        public bool Equals(EntityInfo other)
+        {
+            if (Name != other.Name || Namespace != other.Namespace) return false;
+            if (PropertyNames == null && other.PropertyNames == null) return true;
+            if (PropertyNames == null || other.PropertyNames == null) return false;
+            if (PropertyNames.Length != other.PropertyNames.Length) return false;
+            for (int i = 0; i < PropertyNames.Length; i++)
+                if (PropertyNames[i] != other.PropertyNames[i]) return false;
+            return true;
+        }
+
+        public override bool Equals(object? obj) => obj is EntityInfo o && Equals(o);
+        public override int GetHashCode()
+        {
+            int h = (Name?.GetHashCode() ?? 0) ^ (Namespace?.GetHashCode() ?? 0);
+            if (PropertyNames != null)
+                foreach (var p in PropertyNames) h = h * 31 + (p?.GetHashCode() ?? 0);
+            return h;
+        }
+    }
+}

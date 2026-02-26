@@ -5,12 +5,15 @@ using TheWatch.P1.CoreGateway;
 using TheWatch.P1.CoreGateway.Core;
 using TheWatch.P1.CoreGateway.Services;
 using TheWatch.Shared.Contracts;
+using TheWatch.Shared.Notifications;
 
 SerilogSetup.BootstrapSerilog();
 
 var builder = WebApplication.CreateBuilder(args);
 builder.ConfigureWatchSerilog();
 builder.ConfigureWatchOpenApi();
+builder.AddWatchPersistenceAspire();
+builder.ConfigureWatchNotifications();
 
 builder.Services.AddCors(options =>
 {
@@ -111,6 +114,74 @@ app.MapGet("/api/services/health", async (IConfigService svc, IHttpClientFactory
     var client = httpFactory.CreateClient("services");
     var summary = await svc.CheckAllServicesAsync(client);
     return Results.Ok(summary);
+});
+
+// === Device Registration Endpoints (Push Notifications) ===
+
+var deviceRegistrations = new System.Collections.Concurrent.ConcurrentDictionary<Guid, DeviceRegistration>();
+
+app.MapPost("/api/devices/register", async (DeviceRegistration registration, INotificationService notifications) =>
+{
+    // Deactivate any existing registration for this user + platform
+    foreach (var existing in deviceRegistrations.Values
+        .Where(d => d.UserId == registration.UserId && d.Platform == registration.Platform && d.IsActive))
+    {
+        existing.IsActive = false;
+    }
+
+    registration.RegisteredAt = DateTime.UtcNow;
+    registration.LastActiveAt = DateTime.UtcNow;
+    registration.IsActive = true;
+    deviceRegistrations[registration.Id] = registration;
+
+    // Subscribe to default topics
+    foreach (var topic in registration.SubscribedTopics)
+    {
+        await notifications.SubscribeToTopicAsync(registration.DeviceToken, topic);
+    }
+
+    return Results.Created($"/api/devices/{registration.Id}", registration);
+});
+
+app.MapGet("/api/devices/user/{userId:guid}", (Guid userId) =>
+{
+    var devices = deviceRegistrations.Values
+        .Where(d => d.UserId == userId && d.IsActive)
+        .ToList();
+    return Results.Ok(devices);
+});
+
+app.MapDelete("/api/devices/{id:guid}", (Guid id) =>
+{
+    if (deviceRegistrations.TryGetValue(id, out var reg))
+    {
+        reg.IsActive = false;
+        return Results.NoContent();
+    }
+    return Results.NotFound();
+});
+
+app.MapPost("/api/devices/{id:guid}/topics/{topic}", async (Guid id, string topic, INotificationService notifications) =>
+{
+    if (!deviceRegistrations.TryGetValue(id, out var reg) || !reg.IsActive)
+        return Results.NotFound();
+
+    await notifications.SubscribeToTopicAsync(reg.DeviceToken, topic);
+    if (!reg.SubscribedTopics.Contains(topic))
+        reg.SubscribedTopics.Add(topic);
+
+    return Results.Ok(reg);
+});
+
+app.MapDelete("/api/devices/{id:guid}/topics/{topic}", async (Guid id, string topic, INotificationService notifications) =>
+{
+    if (!deviceRegistrations.TryGetValue(id, out var reg) || !reg.IsActive)
+        return Results.NotFound();
+
+    await notifications.UnsubscribeFromTopicAsync(reg.DeviceToken, topic);
+    reg.SubscribedTopics.Remove(topic);
+
+    return Results.Ok(reg);
 });
 
 app.Run();

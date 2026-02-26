@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using TheWatch.Shared.Contracts.Mobile;
+using TheWatch.Shared.Notifications;
 
 namespace TheWatch.Mobile.Services;
 
@@ -127,6 +128,40 @@ public class WatchApiClient
             return await _http.GetFromJsonAsync<UserInfoDto>($"{P5}/api/auth/me");
         }
         catch { return null; }
+    }
+
+    // === P1 Device Registration (Push Notifications) ===
+
+    public async Task<DeviceRegistration?> RegisterDeviceAsync(DeviceRegistration registration)
+    {
+        var response = await _http.PostAsJsonAsync($"{P1}/api/devices/register", registration);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<DeviceRegistration>();
+    }
+
+    public async Task<List<DeviceRegistration>> GetUserDevicesAsync(Guid userId)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<List<DeviceRegistration>>(
+                $"{P1}/api/devices/user/{userId}") ?? [];
+        }
+        catch { return []; }
+    }
+
+    public async Task UnregisterDeviceAsync(Guid registrationId)
+    {
+        await _http.DeleteAsync($"{P1}/api/devices/{registrationId}");
+    }
+
+    public async Task SubscribeToTopicAsync(Guid registrationId, string topic)
+    {
+        await _http.PostAsync($"{P1}/api/devices/{registrationId}/topics/{topic}", null);
+    }
+
+    public async Task UnsubscribeFromTopicAsync(Guid registrationId, string topic)
+    {
+        await _http.DeleteAsync($"{P1}/api/devices/{registrationId}/topics/{topic}");
     }
 
     // Local DTO for vital history response

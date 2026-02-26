@@ -6,6 +6,12 @@ namespace TheWatch.Generators;
 
 internal static class GeneratorHelpers
 {
+    // Known non-P# service names that the generators should recognize
+    private static readonly HashSet<string> KnownServiceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "Geospatial"
+    };
+
     internal static string? DetectProgram(string projectName)
     {
         // Extract P1-P10 from project name like TheWatch.P2.VoiceEmergency
@@ -16,6 +22,8 @@ internal static class GeneratorHelpers
                 if (part.Length == 2 || (part.Length == 3 && char.IsDigit(part[2])))
                     return part;
             }
+            if (KnownServiceNames.Contains(part))
+                return part;
         }
         return null;
     }

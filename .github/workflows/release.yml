@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore TheWatch.sln
+
+      - name: Build solution
+        run: dotnet build TheWatch.sln --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test TheWatch.sln --configuration Release --no-build --verbosity normal
+
+      - name: Publish artifacts
+        run: dotnet publish TheWatch.sln --configuration Release --output ./artifacts
+
+      - name: Create release archive
+        run: |
+          cd artifacts
+          tar -czf ../TheWatch-v${{ inputs.version }}.tar.gz .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: TheWatch v${{ inputs.version }}
+          generate_release_notes: true
+          files: TheWatch-v${{ inputs.version }}.tar.gz

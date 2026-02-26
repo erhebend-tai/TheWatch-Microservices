@@ -21,7 +21,8 @@ public class DbContextGenerator : IIncrementalGenerator
             {
                 opts.GlobalOptions.TryGetValue("build_property.RootNamespace", out var ns);
                 opts.GlobalOptions.TryGetValue("build_property.UseMaui", out var useMaui);
-                return new ProjectMeta(ns ?? "TheWatch", useMaui ?? "");
+                opts.GlobalOptions.TryGetValue("build_property.WatchDbProvider", out var dbProvider);
+                return new ProjectMeta(ns ?? "TheWatch", useMaui ?? "", dbProvider ?? "SqlServer");
             });
 
         var entities = context.SyntaxProvider
@@ -36,12 +37,16 @@ public class DbContextGenerator : IIncrementalGenerator
             .Collect();
 
         var combined = projectInfo.Combine(entities);
-        context.RegisterSourceOutput(combined, static (spc, data) =>
+        context.RegisterSourceOutput(combined, (spc, data) =>
         {
-            var (meta, entityList) = data;
+            var meta = data.Left;
+            var entityList = data.Right;
             Generate(spc, meta, entityList);
         });
     }
+
+    private static bool IsPostgres(ProjectMeta meta)
+        => meta.DbProvider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase);
 
     private static EntityInfo? ExtractEntityInfo(GeneratorSyntaxContext ctx, CancellationToken ct)
     {
@@ -125,6 +130,10 @@ public class DbContextGenerator : IIncrementalGenerator
                 return PropKind.Dictionary;
         }
 
+        // NetTopologySuite geometry types (Point, LineString, Polygon, MultiPoint, etc.)
+        if (type.ContainingNamespace?.ToDisplayString() == "NetTopologySuite.Geometries")
+            return PropKind.Geometry;
+
         if (type is INamedTypeSymbol candidate && candidate.TypeKind == TypeKind.Class)
         {
             if (candidate.DeclaringSyntaxReferences.Length > 0)
@@ -154,6 +163,7 @@ public class DbContextGenerator : IIncrementalGenerator
 
         var program = GeneratorHelpers.DetectProgram(rootNs);
         if (program == null) return;
+
         if (entities.Length == 0) return;
 
         var seen = new HashSet<string>();
@@ -168,14 +178,17 @@ public class DbContextGenerator : IIncrementalGenerator
         var contextName = shortName + "DbContext";
         var entityNamespaces = unique.Select(e => e.Namespace).Distinct().ToList();
 
+        var isPostgres = IsPostgres(meta);
+        var hasGeometry = unique.Any(e => e.Properties.Any(p => p.Kind == PropKind.Geometry));
+
         var sb = new StringBuilder(8192);
         WriteHeader(sb);
-        WriteUsings(sb, rootNs, entityNamespaces);
+        WriteUsings(sb, rootNs, entityNamespaces, hasGeometry);
         sb.AppendLine($"namespace {rootNs};");
         sb.AppendLine();
-        WriteDbContext(sb, contextName, unique);
+        WriteDbContext(sb, contextName, unique, isPostgres);
         WriteRepository(sb, contextName);
-        WritePersistenceSetup(sb, contextName, rootNs, shortName);
+        WritePersistenceSetup(sb, contextName, rootNs, shortName, isPostgres);
 
         spc.AddSource("PersistenceSetup.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
     }
@@ -190,7 +203,7 @@ public class DbContextGenerator : IIncrementalGenerator
         sb.AppendLine();
     }
 
-    private static void WriteUsings(StringBuilder sb, string rootNs, List<string> entityNs)
+    private static void WriteUsings(StringBuilder sb, string rootNs, List<string> entityNs, bool hasGeometry)
     {
         sb.AppendLine("using System;");
         sb.AppendLine("using System.Collections.Generic;");
@@ -200,12 +213,15 @@ public class DbContextGenerator : IIncrementalGenerator
         sb.AppendLine("using Microsoft.EntityFrameworkCore;");
         sb.AppendLine("using Microsoft.EntityFrameworkCore.Metadata.Builders;");
         sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
+        sb.AppendLine("using Microsoft.AspNetCore.Builder;");
+        if (hasGeometry)
+            sb.AppendLine("using NetTopologySuite.Geometries;");
         foreach (var ns in entityNs.Where(n => n != rootNs).OrderBy(n => n))
             sb.AppendLine($"using {ns};");
         sb.AppendLine();
     }
 
-    private static void WriteDbContext(StringBuilder sb, string ctxName, List<EntityInfo> entities)
+    private static void WriteDbContext(StringBuilder sb, string ctxName, List<EntityInfo> entities, bool isPostgres)
     {
         sb.AppendLine($"public class {ctxName} : DbContext");
         sb.AppendLine("{");
@@ -221,6 +237,9 @@ public class DbContextGenerator : IIncrementalGenerator
 
         sb.AppendLine("    protected override void OnModelCreating(ModelBuilder modelBuilder)");
         sb.AppendLine("    {");
+
+        if (isPostgres)
+            sb.AppendLine("        modelBuilder.HasPostgresExtension(\"postgis\");");
 
         foreach (var e in entities)
         {
@@ -255,7 +274,15 @@ public class DbContextGenerator : IIncrementalGenerator
                         break;
 
                     case PropKind.Dictionary:
-                        sb.AppendLine($"            entity.Property(e => e.{p.Name}).HasColumnType(\"nvarchar(max)\");");
+                        if (isPostgres)
+                            sb.AppendLine($"            entity.Property(e => e.{p.Name}).HasColumnType(\"jsonb\");");
+                        else
+                            sb.AppendLine($"            entity.Property(e => e.{p.Name}).HasConversion(v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null), v => System.Text.Json.JsonSerializer.Deserialize<{p.TypeName}>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new()).HasColumnType(\"nvarchar(max)\");");
+                        break;
+
+                    case PropKind.Geometry:
+                        sb.AppendLine($"            entity.Property(e => e.{p.Name}).HasColumnType(\"{MapGeometryColumnType(bt)}\");");
+                        sb.AppendLine($"            entity.HasIndex(e => e.{p.Name}).HasMethod(\"gist\");");
                         break;
 
                     case PropKind.PrimitiveCollection:
@@ -271,6 +298,21 @@ public class DbContextGenerator : IIncrementalGenerator
         sb.AppendLine("    }");
         sb.AppendLine("}");
         sb.AppendLine();
+    }
+
+    private static string MapGeometryColumnType(string typeName)
+    {
+        switch (typeName)
+        {
+            case "Point": return "geometry (Point, 4326)";
+            case "LineString": return "geometry (LineString, 4326)";
+            case "Polygon": return "geometry (Polygon, 4326)";
+            case "MultiPoint": return "geometry (MultiPoint, 4326)";
+            case "MultiLineString": return "geometry (MultiLineString, 4326)";
+            case "MultiPolygon": return "geometry (MultiPolygon, 4326)";
+            case "GeometryCollection": return "geometry (GeometryCollection, 4326)";
+            default: return "geometry (Geometry, 4326)";
+        }
     }
 
     private static void WriteRepository(StringBuilder sb, string ctxName)
@@ -332,10 +374,11 @@ public class DbContextGenerator : IIncrementalGenerator
         sb.AppendLine();
     }
 
-    private static void WritePersistenceSetup(StringBuilder sb, string ctxName, string rootNs, string shortName)
+    private static void WritePersistenceSetup(StringBuilder sb, string ctxName, string rootNs, string shortName, bool isPostgres)
     {
+        var providerLabel = isPostgres ? "PostgreSQL + PostGIS" : "SQL Server";
         sb.AppendLine("/// <summary>");
-        sb.AppendLine($"/// Auto-generated persistence setup for {rootNs}.");
+        sb.AppendLine($"/// Auto-generated persistence setup for {rootNs} ({providerLabel}).");
         sb.AppendLine("/// </summary>");
         sb.AppendLine("public static class PersistenceSetup");
         sb.AppendLine("{");
@@ -343,13 +386,16 @@ public class DbContextGenerator : IIncrementalGenerator
         sb.AppendLine();
 
         sb.AppendLine("    /// <summary>");
-        sb.AppendLine("    /// Registers EF Core DbContext + generic repository with a SQL Server connection string.");
+        sb.AppendLine($"    /// Registers EF Core DbContext + generic repository with a {providerLabel} connection string.");
         sb.AppendLine("    /// </summary>");
         sb.AppendLine("    public static IServiceCollection AddWatchPersistence(");
         sb.AppendLine("        this IServiceCollection services, string connectionString)");
         sb.AppendLine("    {");
         sb.AppendLine($"        services.AddDbContext<{ctxName}>(options =>");
-        sb.AppendLine("            options.UseSqlServer(connectionString));");
+        if (isPostgres)
+            sb.AppendLine("            options.UseNpgsql(connectionString, o => o.UseNetTopologySuite()));");
+        else
+            sb.AppendLine("            options.UseSqlServer(connectionString));");
         sb.AppendLine($"        services.AddScoped(typeof(IWatchRepository<>), typeof(EfRepository<>));");
         sb.AppendLine("        return services;");
         sb.AppendLine("    }");
@@ -365,7 +411,57 @@ public class DbContextGenerator : IIncrementalGenerator
         sb.AppendLine($"        services.AddScoped(typeof(IWatchRepository<>), typeof(EfRepository<>));");
         sb.AppendLine("        return services;");
         sb.AppendLine("    }");
+        sb.AppendLine();
 
+        sb.AppendLine("    /// <summary>");
+        sb.AppendLine($"    /// Registers EF Core DbContext + generic repository via .NET Aspire service discovery.");
+        sb.AppendLine($"    /// Uses the Aspire {providerLabel} integration to resolve connection strings automatically.");
+        sb.AppendLine("    /// </summary>");
+        sb.AppendLine("    public static WebApplicationBuilder AddWatchPersistenceAspire(this WebApplicationBuilder builder)");
+        sb.AppendLine("    {");
+        if (isPostgres)
+        {
+            sb.AppendLine($"        builder.AddNpgsqlDbContext<{ctxName}>(DatabaseName,");
+            sb.AppendLine("            configureDbContextOptions: options => options.UseNpgsql(o => o.UseNetTopologySuite()));");
+        }
+        else
+        {
+            sb.AppendLine($"        builder.AddSqlServerDbContext<{ctxName}>(DatabaseName);");
+        }
+        sb.AppendLine($"        builder.Services.AddScoped(typeof(IWatchRepository<>), typeof(EfRepository<>));");
+        sb.AppendLine("        return builder;");
+        sb.AppendLine("    }");
+
+        sb.AppendLine("}");
+        sb.AppendLine();
+
+        WriteDesignTimeFactory(sb, ctxName, rootNs, shortName, isPostgres);
+    }
+
+    private static void WriteDesignTimeFactory(StringBuilder sb, string ctxName, string rootNs, string shortName, bool isPostgres)
+    {
+        sb.AppendLine("/// <summary>");
+        sb.AppendLine($"/// Design-time factory for {ctxName} — used by dotnet ef migrations tooling.");
+        sb.AppendLine("/// </summary>");
+        sb.AppendLine($"public class {ctxName}DesignTimeFactory : Microsoft.EntityFrameworkCore.Design.IDesignTimeDbContextFactory<{ctxName}>");
+        sb.AppendLine("{");
+        sb.AppendLine($"    public {ctxName} CreateDbContext(string[] args)");
+        sb.AppendLine("    {");
+        sb.AppendLine($"        var optionsBuilder = new DbContextOptionsBuilder<{ctxName}>();");
+        if (isPostgres)
+        {
+            sb.AppendLine("        var conn = Environment.GetEnvironmentVariable(\"WATCH_POSTGRES_CONN\")");
+            sb.AppendLine($"            ?? \"Host=localhost;Database=Watch{shortName}DB;Username=postgres;Password=postgres\";");
+            sb.AppendLine("        optionsBuilder.UseNpgsql(conn, o => o.UseNetTopologySuite());");
+        }
+        else
+        {
+            sb.AppendLine("        var conn = Environment.GetEnvironmentVariable(\"WATCH_SQL_CONN\")");
+            sb.AppendLine($"            ?? \"Server=localhost;Database=Watch{shortName}DB;Trusted_Connection=true;TrustServerCertificate=true\";");
+            sb.AppendLine("        optionsBuilder.UseSqlServer(conn);");
+        }
+        sb.AppendLine("        return new " + ctxName + "(optionsBuilder.Options);");
+        sb.AppendLine("    }");
         sb.AppendLine("}");
     }
 
@@ -407,10 +503,11 @@ public class DbContextGenerator : IIncrementalGenerator
     {
         public string Namespace;
         public string UseMaui;
-        public ProjectMeta(string ns, string useMaui) { Namespace = ns; UseMaui = useMaui; }
-        public bool Equals(ProjectMeta other) => Namespace == other.Namespace && UseMaui == other.UseMaui;
+        public string DbProvider;
+        public ProjectMeta(string ns, string useMaui, string dbProvider) { Namespace = ns; UseMaui = useMaui; DbProvider = dbProvider; }
+        public bool Equals(ProjectMeta other) => Namespace == other.Namespace && UseMaui == other.UseMaui && DbProvider == other.DbProvider;
         public override bool Equals(object? obj) => obj is ProjectMeta o && Equals(o);
-        public override int GetHashCode() => (Namespace?.GetHashCode() ?? 0) ^ (UseMaui?.GetHashCode() ?? 0);
+        public override int GetHashCode() => (Namespace?.GetHashCode() ?? 0) ^ (UseMaui?.GetHashCode() ?? 0) ^ (DbProvider?.GetHashCode() ?? 0);
     }
 
     private struct EntityInfo : IEquatable<EntityInfo>
@@ -470,6 +567,7 @@ public class DbContextGenerator : IIncrementalGenerator
         OwnedType,
         PrimitiveCollection,
         Dictionary,
+        Geometry,
         Skip
     }
 }

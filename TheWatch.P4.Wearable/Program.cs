@@ -11,6 +11,8 @@ SerilogSetup.BootstrapSerilog();
 var builder = WebApplication.CreateBuilder(args);
 builder.ConfigureWatchSerilog();
 builder.ConfigureWatchOpenApi();
+builder.AddWatchPersistenceAspire();
+builder.ConfigureWatchNotifications();
 
 builder.Services.AddCors(options =>
 {

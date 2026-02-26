@@ -11,13 +11,18 @@ SerilogSetup.BootstrapSerilog();
 var builder = WebApplication.CreateBuilder(args);
 builder.ConfigureWatchSerilog();
 builder.ConfigureWatchOpenApi();
+builder.AddWatchPersistenceAspire();
+builder.ConfigureWatchNotifications();
 
-// CORS
+// CORS (configured for SignalR — requires AllowCredentials)
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
-        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+        policy.SetIsOriginAllowed(_ => true).AllowAnyMethod().AllowAnyHeader().AllowCredentials());
 });
+
+// SignalR real-time hubs (CheckInHub, VitalReadingHub, MedicalAlertHub, etc.)
+builder.Services.AddWatchSignalR();
 
 // Hangfire with InMemory storage
 builder.Services.AddHangfire(config =>
@@ -100,9 +105,11 @@ app.MapDelete("/api/members/{memberId:guid}", async (Guid memberId, IFamilyServi
 
 // === Check-In Endpoints ===
 
-app.MapPost("/api/members/{memberId:guid}/checkins", async (Guid memberId, CreateCheckInRequest request, ICheckInService svc) =>
+app.MapPost("/api/members/{memberId:guid}/checkins", async (Guid memberId, CreateCheckInRequest request, ICheckInService svc, ICheckInBroadcaster checkInHub) =>
 {
     var checkIn = await svc.CreateAsync(memberId, request);
+    // Broadcast check-in notification to family members watching this member
+    await checkInHub.BroadcastCreatedAsync(checkIn, checkIn.MemberId.ToString());
     return Results.Created($"/api/members/{memberId}/checkins/{checkIn.Id}", checkIn);
 });
 
@@ -114,9 +121,11 @@ app.MapGet("/api/members/{memberId:guid}/checkins", async (Guid memberId, ICheck
 
 // === Vital Endpoints ===
 
-app.MapPost("/api/members/{memberId:guid}/vitals", async (Guid memberId, RecordVitalRequest request, IVitalService svc) =>
+app.MapPost("/api/members/{memberId:guid}/vitals", async (Guid memberId, RecordVitalRequest request, IVitalService svc, IVitalReadingBroadcaster vitalHub) =>
 {
     var reading = await svc.RecordAsync(memberId, request);
+    // Broadcast vital reading in real-time to family dashboard
+    await vitalHub.BroadcastCreatedAsync(reading, reading.MemberId.ToString());
     return Results.Created($"/api/members/{memberId}/vitals/{reading.Id}", reading);
 });
 
@@ -132,11 +141,19 @@ app.MapGet("/api/members/{memberId:guid}/alerts", async (Guid memberId, IVitalSe
     return Results.Ok(alerts);
 });
 
-app.MapPut("/api/alerts/{alertId:guid}/acknowledge", async (Guid alertId, IVitalService svc) =>
+app.MapPut("/api/alerts/{alertId:guid}/acknowledge", async (Guid alertId, IVitalService svc, IMedicalAlertBroadcaster alertHub) =>
 {
     var alert = await svc.AcknowledgeAlertAsync(alertId);
+    if (alert is not null)
+    {
+        // Broadcast alert acknowledgement to family members
+        await alertHub.BroadcastUpdatedAsync(alert, alert.MemberId.ToString());
+    }
     return alert is not null ? Results.Ok(alert) : Results.NotFound();
 });
+
+// SignalR hub endpoints (/hubs/checkins, /hubs/vitalreadings, /hubs/medicalalerts, etc.)
+app.MapWatchHubs();
 
 app.Run();
 

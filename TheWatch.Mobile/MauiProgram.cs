@@ -51,6 +51,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<SpeechListenerService>();
         builder.Services.AddSingleton<PhraseService>();
 
+        // Push notifications
+        builder.Services.AddSingleton<WatchPushNotificationService>();
+
         return builder.Build();
     }
 }

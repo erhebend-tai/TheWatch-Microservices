@@ -8,19 +8,19 @@
 ## Stage 5: Database Layer (Items 1–25)
 
 ### 5A. Entity Framework Core Integration
-- [ ] 1. Add `Microsoft.EntityFrameworkCore.SqlServer` to all 10 service .csproj files
-- [ ] 2. Add `Microsoft.EntityFrameworkCore.Tools` for migrations CLI
-- [ ] 3. Create `WatchCoreDbContext` for P1 CoreGateway with UserProfile + PlatformConfig entities
-- [ ] 4. Create `VoiceEmergencyDbContext` for P2 with Incident + Dispatch entities
-- [ ] 5. Create `MeshNetworkDbContext` for P3 with MeshNode + Message + Channel entities
-- [ ] 6. Create `WearableDbContext` for P4 with Device + HeartbeatRecord entities
-- [ ] 7. Create `AuthSecurityDbContext` for P5 with User + RefreshToken + Role entities
-- [ ] 8. Create `FirstResponderDbContext` for P6 with Responder + CheckIn entities
-- [ ] 9. Create `FamilyHealthDbContext` for P7 with FamilyGroup + Member + CheckIn + Vital + Alert entities
-- [ ] 10. Create `DisasterReliefDbContext` for P8 with DisasterEvent + Shelter + Resource + EvacRoute entities
-- [ ] 11. Create `DoctorServicesDbContext` for P9 with DoctorProfile + Appointment + TelehealthSession entities
-- [ ] 12. Create `GamificationDbContext` for P10 with Player + Badge + Challenge + Leaderboard entities
-- [ ] 13. Add `IEntityTypeConfiguration<T>` for all entities (indexes, constraints, value converters)
+- [x] 1. Add `Microsoft.EntityFrameworkCore.SqlServer` to all 10 service .csproj files
+- [x] 2. Add `Microsoft.EntityFrameworkCore.Tools` for migrations CLI
+- [x] 3. Create `WatchCoreDbContext` for P1 CoreGateway with UserProfile + PlatformConfig entities
+- [x] 4. Create `VoiceEmergencyDbContext` for P2 with Incident + Dispatch entities
+- [x] 5. Create `MeshNetworkDbContext` for P3 with MeshNode + Message + Channel entities
+- [x] 6. Create `WearableDbContext` for P4 with Device + HeartbeatRecord entities
+- [x] 7. Create `AuthSecurityDbContext` for P5 with User + RefreshToken + Role entities
+- [x] 8. Create `FirstResponderDbContext` for P6 with Responder + CheckIn entities
+- [x] 9. Create `FamilyHealthDbContext` for P7 with FamilyGroup + Member + CheckIn + Vital + Alert entities
+- [x] 10. Create `DisasterReliefDbContext` for P8 with DisasterEvent + Shelter + Resource + EvacRoute entities
+- [x] 11. Create `DoctorServicesDbContext` for P9 with DoctorProfile + Appointment + TelehealthSession entities
+- [x] 12. Create `GamificationDbContext` for P10 with Player + Badge + Challenge + Leaderboard entities
+- [x] 13. Add `IEntityTypeConfiguration<T>` for all entities (indexes, constraints, value converters)
 - [ ] 14. Create initial EF migration per service (`dotnet ef migrations add InitialCreate`)
 
 ### 5B. SQL Server Schema
@@ -33,59 +33,59 @@
 - [ ] 21. Create seed data scripts for development (test users, sample incidents, demo families)
 
 ### 5C. Repository Pattern + Aspire
-- [ ] 22. Extract `IRepository<T>` generic interface from existing service interfaces
-- [ ] 23. Implement EF-backed repository classes for all 10 services
-- [ ] 24. Add SQL Server container resource to Aspire AppHost (`AddSqlServer`)
-- [ ] 25. Configure connection strings via Aspire service discovery for all services
+- [x] 22. Extract `IRepository<T>` generic interface from existing service interfaces
+- [x] 23. Implement EF-backed repository classes for all 10 services
+- [x] 24. Add SQL Server container resource to Aspire AppHost (`AddSqlServer`)
+- [x] 25. Configure connection strings via Aspire service discovery for all services
 
 ---
 
 ## Stage 6: Real-Time & Events (Items 26–45)
 
 ### 6A. SignalR
-- [ ] 26. Add `Microsoft.AspNetCore.SignalR` to P2, P6, P7 services
-- [ ] 27. Create `IncidentHub` in P2 — real-time incident status feed
-- [ ] 28. Create `DispatchHub` in P2 — responder dispatch status streaming
-- [ ] 29. Create `ResponderLocationHub` in P6 — live responder GPS streaming
-- [ ] 30. Create `FamilyCheckInHub` in P7 — check-in notifications to family members
+- [x] 26. Add `Microsoft.AspNetCore.SignalR` to P2, P6, P7 services (built into ASP.NET Core; CORS updated for SignalR)
+- [x] 27. Create `IncidentHub` in P2 — real-time incident status feed (via SignalRGenerator)
+- [x] 28. Create `DispatchHub` in P2 — responder dispatch status streaming (via SignalRGenerator)
+- [x] 29. Create `ResponderHub` in P6 — live responder GPS streaming (via SignalRGenerator)
+- [x] 30. Create `CheckInHub` in P7 — check-in notifications to family members (via SignalRGenerator)
 - [ ] 31. Add SignalR client to MAUI app (`HubConnectionBuilder`)
 - [ ] 32. Add SignalR client to Dashboard for live incident/health updates
 - [ ] 33. Implement reconnection logic with exponential backoff in both clients
 
 ### 6B. Kafka Event Bus
-- [ ] 34. Add Kafka container to Aspire AppHost
-- [ ] 35. Create `IEventPublisher` interface in TheWatch.Shared
-- [ ] 36. Implement Kafka publisher with `Confluent.Kafka` producer
-- [ ] 37. Publish `IncidentCreated` event from P2 on incident creation
-- [ ] 38. Publish `DispatchRequested` event from P2 on dispatch creation
-- [ ] 39. Consume `IncidentCreated` in P6 to auto-query nearby responders
-- [ ] 40. Consume `DispatchRequested` in P3 to broadcast mesh alert
-- [ ] 41. Implement dead letter queue for failed event processing
-- [ ] 42. Add event sourcing audit log for all domain events
+- [x] 34. Add Kafka container to Aspire AppHost
+- [x] 35. Create `IEventPublisher` interface in TheWatch.Shared
+- [x] 36. Implement Kafka publisher with `Confluent.Kafka` producer
+- [x] 37. Publish `IncidentCreated` event from P2 on incident creation
+- [x] 38. Publish `DispatchRequested` event from P2 on dispatch creation
+- [x] 39. Consume `IncidentCreated` in P6 to auto-query nearby responders
+- [x] 40. Consume `DispatchRequested` in P3 to broadcast mesh alert
+- [x] 41. Implement dead letter queue for failed event processing
+- [x] 42. Add event sourcing audit log for all domain events
 
 ### 6C. Push Notifications
-- [ ] 43. Add Firebase Admin SDK to P2 for FCM push notifications
-- [ ] 44. Create `NotificationService` in TheWatch.Shared for cross-service notifications
-- [ ] 45. Implement MAUI push notification handlers (Android `FirebaseMessagingService`, iOS delegate)
+- [x] 43. Add Firebase Admin SDK to P2 for FCM push notifications
+- [x] 44. Create `NotificationService` in TheWatch.Shared for cross-service notifications
+- [x] 45. Implement MAUI push notification handlers (Android `FirebaseMessagingService`, iOS delegate)
 
 ---
 
 ## Stage 7: Geospatial Engine (Items 46–60)
 
 ### 7A. PostGIS
-- [ ] 46. Add PostgreSQL + PostGIS container to Aspire AppHost
-- [ ] 47. Deploy `11_Geospatial.sql` schema (28 tables, 5 schemas, 12 spatial functions)
-- [ ] 48. Create `GeospatialDbContext` with Npgsql + NetTopologySuite for geometry types
-- [ ] 49. Create `IGeospatialService` interface (nearest-N, within-radius, route calculation)
-- [ ] 50. Implement `PostGisGeospatialService` with `ST_DWithin`, `ST_Distance`, `ST_MakePoint`
+- [x] 46. Add PostgreSQL + PostGIS container to Aspire AppHost
+- [x] 47. Deploy `11_Geospatial.sql` schema (28 tables, 5 schemas, 12 spatial functions)
+- [x] 48. Create `GeospatialDbContext` with Npgsql + NetTopologySuite for geometry types
+- [x] 49. Create `IGeospatialService` interface (nearest-N, within-radius, route calculation)
+- [x] 50. Implement `PostGisGeospatialService` with `ST_DWithin`, `ST_Distance`, `ST_MakePoint`
 
 ### 7B. Mapping Service
-- [ ] 51. Create `TheWatch.Geospatial` microservice project (new project in solution)
-- [ ] 52. Implement nearest-N responder query with expanding radius algorithm
-- [ ] 53. Implement incident zone polygon creation and querying
-- [ ] 54. Implement evacuation route calculation for P8 disaster scenarios
-- [ ] 55. Implement geofencing for P7 family check-in zones
-- [ ] 56. Add geospatial service to Aspire AppHost orchestration
+- [x] 51. Create `TheWatch.Geospatial` microservice project (new project in solution)
+- [x] 52. Implement nearest-N responder query with expanding radius algorithm
+- [x] 53. Implement incident zone polygon creation and querying
+- [x] 54. Implement evacuation route calculation for P8 disaster scenarios
+- [x] 55. Implement geofencing for P7 family check-in zones
+- [x] 56. Add geospatial service to Aspire AppHost orchestration
 
 ### 7C. Client Maps
 - [ ] 57. Add `Microsoft.Maui.Controls.Maps` to MAUI project
@@ -254,4 +254,4 @@
 
 ---
 
-*Last updated: 2026-02-25 (Session 7)*
+*Last updated: 2026-02-26 (Session 9)*

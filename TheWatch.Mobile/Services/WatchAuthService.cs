@@ -21,6 +21,11 @@ public class WatchAuthService
     public bool IsAuthenticated => !string.IsNullOrEmpty(_accessToken) && _expiresAt > DateTime.UtcNow;
     public UserInfoDto? CurrentUser => _currentUser;
 
+    public Task<Guid?> GetCurrentUserIdAsync()
+    {
+        return Task.FromResult(_currentUser?.Id);
+    }
+
     public async Task InitializeAsync()
     {
         try

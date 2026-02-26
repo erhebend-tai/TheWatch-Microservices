@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using TheWatch.P2.VoiceEmergency.Emergency;
+using TheWatch.Shared.Notifications;
 
 namespace TheWatch.P2.VoiceEmergency.Services;
 
@@ -15,8 +17,16 @@ public interface IEmergencyService
 public class EmergencyService : IEmergencyService
 {
     private readonly ConcurrentDictionary<Guid, Incident> _incidents = new();
+    private readonly INotificationService _notifications;
+    private readonly ILogger<EmergencyService> _logger;
 
-    public Task<Incident> CreateIncidentAsync(CreateIncidentRequest request)
+    public EmergencyService(INotificationService notifications, ILogger<EmergencyService> logger)
+    {
+        _notifications = notifications;
+        _logger = logger;
+    }
+
+    public async Task<Incident> CreateIncidentAsync(CreateIncidentRequest request)
     {
         var incident = new Incident
         {
@@ -33,7 +43,31 @@ public class EmergencyService : IEmergencyService
         if (!_incidents.TryAdd(incident.Id, incident))
             throw new InvalidOperationException("Failed to create incident.");
 
-        return Task.FromResult(incident);
+        // Push notification to emergency topic
+        var priority = incident.Severity >= 4 ? NotificationPriority.Critical : NotificationPriority.High;
+        var notification = NotificationSetup.CreateNotification(
+            $"🚨 {incident.Type} Reported",
+            incident.Description.Length > 100
+                ? incident.Description[..100] + "..."
+                : incident.Description,
+            priority,
+            new Dictionary<string, string>
+            {
+                ["incidentId"] = incident.Id.ToString(),
+                ["type"] = incident.Type.ToString(),
+                ["severity"] = incident.Severity.ToString(),
+                ["lat"] = incident.Location.Latitude.ToString("F6"),
+                ["lon"] = incident.Location.Longitude.ToString("F6")
+            });
+
+        _ = _notifications.SendToTopicAsync(NotificationSetup.DefaultTopic, notification)
+            .ContinueWith(t =>
+            {
+                if (!t.Result.Success)
+                    _logger.LogWarning("Failed to send incident notification: {Error}", t.Result.Error);
+            }, TaskContinuationOptions.OnlyOnRanToCompletion);
+
+        return incident;
     }
 
     public Task<Incident?> GetIncidentAsync(Guid id)

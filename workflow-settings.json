@@ -1,0 +1,10 @@
+{
+  "workflows": {
+    "build": true,
+    "test": true,
+    "code-quality": false,
+    "security-scan": false,
+    "docker-build": false,
+    "release": false
+  }
+}
