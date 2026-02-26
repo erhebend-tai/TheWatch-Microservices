@@ -1,0 +1,77 @@
+using System.Collections.Concurrent;
+using TheWatch.P2.VoiceEmergency.Emergency;
+
+namespace TheWatch.P2.VoiceEmergency.Services;
+
+public interface IDispatchService
+{
+    Task<Dispatch> CreateDispatchAsync(CreateDispatchRequest request);
+    Task<Dispatch?> GetDispatchAsync(Guid id);
+    Task<Dispatch?> ExpandRadiusAsync(Guid id, ExpandRadiusRequest request);
+    Task<List<Dispatch>> GetDispatchesForIncidentAsync(Guid incidentId);
+    Task<int> EscalateUnacknowledgedAsync(TimeSpan timeout);
+}
+
+public class DispatchService : IDispatchService
+{
+    private readonly ConcurrentDictionary<Guid, Dispatch> _dispatches = new();
+
+    public Task<Dispatch> CreateDispatchAsync(CreateDispatchRequest request)
+    {
+        var dispatch = new Dispatch
+        {
+            IncidentId = request.IncidentId,
+            RadiusKm = request.RadiusKm,
+            RespondersRequested = request.RespondersRequested
+        };
+
+        if (!_dispatches.TryAdd(dispatch.Id, dispatch))
+            throw new InvalidOperationException("Failed to create dispatch.");
+
+        return Task.FromResult(dispatch);
+    }
+
+    public Task<Dispatch?> GetDispatchAsync(Guid id)
+    {
+        _dispatches.TryGetValue(id, out var dispatch);
+        return Task.FromResult(dispatch);
+    }
+
+    public Task<Dispatch?> ExpandRadiusAsync(Guid id, ExpandRadiusRequest request)
+    {
+        if (!_dispatches.TryGetValue(id, out var dispatch))
+            return Task.FromResult<Dispatch?>(null);
+
+        dispatch.RadiusKm += request.AdditionalKm;
+        dispatch.UpdatedAt = DateTime.UtcNow;
+
+        return Task.FromResult<Dispatch?>(dispatch);
+    }
+
+    public Task<List<Dispatch>> GetDispatchesForIncidentAsync(Guid incidentId)
+    {
+        var dispatches = _dispatches.Values
+            .Where(d => d.IncidentId == incidentId)
+            .OrderByDescending(d => d.CreatedAt)
+            .ToList();
+
+        return Task.FromResult(dispatches);
+    }
+
+    public Task<int> EscalateUnacknowledgedAsync(TimeSpan timeout)
+    {
+        var cutoff = DateTime.UtcNow - timeout;
+        var toEscalate = _dispatches.Values
+            .Where(d => d.Status == DispatchStatus.Pending && d.CreatedAt < cutoff)
+            .ToList();
+
+        foreach (var dispatch in toEscalate)
+        {
+            dispatch.Status = DispatchStatus.Escalated;
+            dispatch.EscalationCount++;
+            dispatch.UpdatedAt = DateTime.UtcNow;
+        }
+
+        return Task.FromResult(toEscalate.Count);
+    }
+}

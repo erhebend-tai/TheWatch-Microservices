@@ -1,0 +1,161 @@
+using Hangfire;
+using Hangfire.InMemory;
+using Serilog;
+using TheWatch.P8.DisasterRelief;
+using TheWatch.P8.DisasterRelief.Relief;
+using TheWatch.P8.DisasterRelief.Services;
+using TheWatch.Shared.Contracts;
+
+SerilogSetup.BootstrapSerilog();
+
+var builder = WebApplication.CreateBuilder(args);
+builder.ConfigureWatchSerilog();
+builder.ConfigureWatchOpenApi();
+
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+});
+
+// Hangfire with InMemory storage
+builder.Services.AddHangfire(config =>
+    config.UseInMemoryStorage());
+builder.Services.AddHangfireServer();
+
+// Services
+builder.Services.AddSingleton<IDisasterEventService, DisasterEventService>();
+builder.Services.AddSingleton<IShelterService, ShelterService>();
+builder.Services.AddSingleton<IResourceService, ResourceService>();
+
+var app = builder.Build();
+
+app.UseCors();
+app.UseWatchSerilogRequestLogging();
+app.UseWatchOpenApi();
+app.UseHangfireDashboard("/hangfire");
+
+// Recurring Hangfire jobs
+RecurringJob.AddOrUpdate<IResourceService>(
+    "resource-matching",
+    svc => svc.MatchRequestsToResourcesAsync(100.0),
+    "*/5 * * * *"); // Every 5 minutes
+
+RecurringJob.AddOrUpdate<IDisasterEventService>(
+    "event-archival",
+    svc => svc.ArchiveResolvedEventsAsync(TimeSpan.FromDays(30)),
+    "0 4 * * *"); // Daily at 4 AM
+
+// Health endpoint
+app.MapGet("/health", () => new HealthResponse(
+    "TheWatch.P8.DisasterRelief",
+    "P8",
+    "Healthy",
+    DateTime.UtcNow));
+
+// Service info
+app.MapGet("/info", () => new
+{
+    Service = "TheWatch.P8.DisasterRelief",
+    Program = "P8",
+    Name = "DisasterRelief",
+    Description = "Evacuation, resource matching, shelters",
+    Icon = "cloud_sync",
+    Version = "0.2.0"
+});
+
+// === Disaster Event Endpoints ===
+
+app.MapPost("/api/events", async (CreateDisasterEventRequest request, IDisasterEventService svc) =>
+{
+    var evt = await svc.CreateAsync(request);
+    return Results.Created($"/api/events/{evt.Id}", evt);
+});
+
+app.MapGet("/api/events", async (IDisasterEventService svc, int? page, int? pageSize, EventStatus? status) =>
+{
+    var result = await svc.ListAsync(page ?? 1, pageSize ?? 20, status);
+    return Results.Ok(result);
+});
+
+app.MapGet("/api/events/{id:guid}", async (Guid id, IDisasterEventService svc) =>
+{
+    var evt = await svc.GetByIdAsync(id);
+    return evt is not null ? Results.Ok(evt) : Results.NotFound();
+});
+
+app.MapPut("/api/events/{id:guid}/status", async (Guid id, UpdateEventStatusRequest request, IDisasterEventService svc) =>
+{
+    var evt = await svc.UpdateStatusAsync(id, request);
+    return evt is not null ? Results.Ok(evt) : Results.NotFound();
+});
+
+app.MapGet("/api/events/{id:guid}/routes", async (Guid id, IDisasterEventService svc) =>
+{
+    var routes = await svc.GetRoutesAsync(id);
+    return Results.Ok(routes);
+});
+
+app.MapPost("/api/events/{id:guid}/routes", async (Guid id, CreateEvacuationRouteRequest request, IDisasterEventService svc) =>
+{
+    var route = await svc.AddRouteAsync(request with { DisasterEventId = id });
+    return Results.Created($"/api/events/{id}/routes/{route.Id}", route);
+});
+
+// === Shelter Endpoints ===
+
+app.MapPost("/api/shelters", async (CreateShelterRequest request, IShelterService svc) =>
+{
+    var shelter = await svc.CreateAsync(request);
+    return Results.Created($"/api/shelters/{shelter.Id}", shelter);
+});
+
+app.MapGet("/api/shelters", async (IShelterService svc, Guid? disasterEventId, ShelterStatus? status) =>
+{
+    var result = await svc.ListAsync(disasterEventId, status);
+    return Results.Ok(result);
+});
+
+app.MapGet("/api/shelters/nearby", async (IShelterService svc, double lat, double lon, double? radiusKm) =>
+{
+    var shelters = await svc.FindNearbyAsync(lat, lon, radiusKm ?? 50.0);
+    return Results.Ok(shelters);
+});
+
+app.MapPut("/api/shelters/{id:guid}/occupancy", async (Guid id, UpdateOccupancyRequest request, IShelterService svc) =>
+{
+    var shelter = await svc.UpdateOccupancyAsync(id, request);
+    return shelter is not null ? Results.Ok(shelter) : Results.NotFound();
+});
+
+// === Resource Endpoints ===
+
+app.MapPost("/api/resources/donate", async (DonateResourceRequest request, IResourceService svc) =>
+{
+    var item = await svc.DonateAsync(request);
+    return Results.Created($"/api/resources/{item.Id}", item);
+});
+
+app.MapPost("/api/resources/request", async (CreateResourceRequestRecord request, IResourceService svc) =>
+{
+    var req = await svc.RequestAsync(request);
+    return Results.Created($"/api/resources/requests/{req.Id}", req);
+});
+
+app.MapGet("/api/resources", async (IResourceService svc, ResourceCategory? category, Guid? disasterEventId) =>
+{
+    var result = await svc.ListResourcesAsync(category, disasterEventId);
+    return Results.Ok(result);
+});
+
+app.MapGet("/api/resources/requests", async (IResourceService svc, RequestStatus? status, Guid? disasterEventId) =>
+{
+    var requests = await svc.ListRequestsAsync(status, disasterEventId);
+    return Results.Ok(requests);
+});
+
+app.Run();
+
+// Needed for WebApplicationFactory in tests
+public partial class Program { }

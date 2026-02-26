@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TheWatch - Service Explorer</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        :root { --bg: #0d1117; --card-bg: #161b22; --border: #30363d; --text: #e6edf3;
+                --text-dim: #8b949e; --accent: #58a6ff; --success: #3fb950; --warn: #d29922; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
+        .header { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .header .badge { background: var(--accent); color: var(--bg); padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .breadcrumb { padding: 12px 24px; font-size: 14px; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+        .breadcrumb a { color: var(--accent); text-decoration: none; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; padding: 24px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; cursor: pointer; transition: all 0.15s; display: flex; gap: 16px; align-items: flex-start; }
+        .card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .card .icon { font-size: 32px; color: var(--accent); flex-shrink: 0; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: rgba(88,166,255,0.1); border-radius: 8px; }
+        .card .info { flex: 1; min-width: 0; }
+        .card .info h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+        .card .info .program { font-size: 12px; color: var(--accent); font-weight: 600; margin-bottom: 4px; }
+        .card .info p { font-size: 13px; color: var(--text-dim); line-height: 1.4; }
+        .card .info .links { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .card .info .links a { font-size: 12px; color: var(--accent); text-decoration: none; padding: 2px 8px; border: 1px solid var(--border); border-radius: 4px; }
+        .card .info .links a:hover { background: rgba(88,166,255,0.1); }
+        .status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--success); margin-right: 4px; }
+        .footer { padding: 24px; text-align: center; color: var(--text-dim); font-size: 13px; border-top: 1px solid var(--border); }
+        .search { padding: 16px 24px; }
+        .search input { width: 100%; padding: 8px 12px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; }
+        .search input:focus { outline: none; border-color: var(--accent); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <i class="bi bi-shield-check" style="font-size:24px;color:var(--accent)"></i>
+        <h1>TheWatch Service Explorer</h1>
+        <span class="badge">10 Services</span>
+    </div>
+    <div class="breadcrumb">
+        <a href="#">TheWatch</a> / <a href="#">Microservices</a> / All Programs
+    </div>
+    <div class="search">
+        <input type="text" id="search" placeholder="Search services... (Ctrl+K)" oninput="filterCards(this.value)">
+    </div>
+    <div class="grid" id="grid">
+
+        <div class="card" data-name="coregateway p1 api gateway, user profiles, platform config" onclick="window.open('https://localhost:5101/scalar/v1','_blank')">
+            <div class="icon"><i class="bi bi-house-door"></i></div>
+            <div class="info">
+                <span class="program">P1</span>
+                <h3><span class="status"></span>CoreGateway</h3>
+                <p>API Gateway, user profiles, platform config</p>
+                <div class="links">
+                    <a href="https://localhost:5101/scalar/v1" target="_blank">API Docs</a>
+                    <a href="https://localhost:5101/health" target="_blank">Health</a>
+                    <a href="https://localhost:5101/hangfire" target="_blank">Hangfire</a>
+                    <a href="https://localhost:5101/info" target="_blank">Info</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" data-name="voiceemergency p2 emergency reporting, dispatch, voice sos" onclick="window.open('https://localhost:5102/scalar/v1','_blank')">
+            <div class="icon"><i class="bi bi-exclamation-triangle"></i></div>
+            <div class="info">
+                <span class="program">P2</span>
+                <h3><span class="status"></span>VoiceEmergency</h3>
+                <p>Emergency reporting, dispatch, voice SOS</p>
+                <div class="links">
+                    <a href="https://localhost:5102/scalar/v1" target="_blank">API Docs</a>
+                    <a href="https://localhost:5102/health" target="_blank">Health</a>
+                    <a href="https://localhost:5102/hangfire" target="_blank">Hangfire</a>
+                    <a href="https://localhost:5102/info" target="_blank">Info</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" data-name="meshnetwork p3 messaging, notifications, mesh relay" onclick="window.open('https://localhost:5103/scalar/v1','_blank')">
+            <div class="icon"><i class="bi bi-broadcast"></i></div>
+            <div class="info">
+                <span class="program">P3</span>
+                <h3><span class="status"></span>MeshNetwork</h3>
+                <p>Messaging, notifications, mesh relay</p>
+                <div class="links">
+                    <a href="https://localhost:5103/scalar/v1" target="_blank">API Docs</a>
+                    <a href="https://localhost:5103/health" target="_blank">Health</a>
+                    <a href="https://localhost:5103/hangfire" target="_blank">Hangfire</a>
+                    <a href="https://localhost:5103/info" target="_blank">Info</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" data-name="wearable p4 device sync, heartbeat, offline queue" onclick="window.open('https://localhost:5104/scalar/v1','_blank')">
+            <div class="icon"><i class="bi bi-smartwatch"></i></div>
+            <div class="info">
+                <span class="program">P4</span>
+                <h3><span class="status"></span>Wearable</h3>
+                <p>Device sync, heartbeat, offline queue</p>
+                <div class="links">
+                    <a href="https://localhost:5104/scalar/v1" target="_blank">API Docs</a>
+                    <a href="https://localhost:5104/health" target="_blank">Health</a>
+                    <a href="https://localhost:5104/hangfire" target="_blank">Hangfire</a>
+                    <a href="https://localhost:5104/info" target="_blank">Info</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" data-name="authsecurity p5 authentication, mfa, jwt, security" onclick="window.open('https://localhost:5105/scalar/v1','_blank')">
+            <div class="icon"><i class="bi bi-shield-lock"></i></div>
+            <div class="info">
+                <span class="program">P5</span>
+                <h3><span class="status"></span>AuthSecurity</h3>
+                <p>Authentication, MFA, JWT, security</p>
+                <div class="links">
+                    <a href="https://localhost:5105/scalar/v1" target="_blank">API Docs</a>
+                    <a href="https://localhost:5105/health" target="_blank">Health</a>
+                    <a href="https://localhost:5105/hangfire" target="_blank">Hangfire</a>
+                    <a href="https://localhost:5105/info" target="_blank">Info</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" data-name="firstresponder p6 responder registration, dispatch, check-in" onclick="window.open('https://localhost:5106/scalar/v1','_blank')">
+            <div class="icon"><i class="bi bi-person-badge"></i></div>
+            <div class="info">
+                <span class="program">P6</span>
+                <h3><span class="status"></span>FirstResponder</h3>
+                <p>Responder registration, dispatch, check-in</p>
+                <div class="links">
+                    <a href="https://localhost:5106/scalar/v1" target="_blank">API Docs</a>
+                    <a href="https://localhost:5106/health" target="_blank">Health</a>
+                    <a href="https://localhost:5106/hangfire" target="_blank">Hangfire</a>
+                    <a href="https://localhost:5106/info" target="_blank">Info</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" data-name="familyhealth p7 child check-in, vitals, medical alerts" onclick="window.open('https://localhost:5107/scalar/v1','_blank')">
+            <div class="icon"><i class="bi bi-heart-pulse"></i></div>
+            <div class="info">
+                <span class="program">P7</span>
+                <h3><span class="status"></span>FamilyHealth</h3>
+                <p>Child check-in, vitals, medical alerts</p>
+                <div class="links">
+                    <a href="https://localhost:5107/scalar/v1" target="_blank">API Docs</a>
+                    <a href="https://localhost:5107/health" target="_blank">Health</a>
+                    <a href="https://localhost:5107/hangfire" target="_blank">Hangfire</a>
+                    <a href="https://localhost:5107/info" target="_blank">Info</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" data-name="disasterrelief p8 evacuation, resource matching, shelters" onclick="window.open('https://localhost:5108/scalar/v1','_blank')">
+            <div class="icon"><i class="bi bi-cloud-lightning"></i></div>
+            <div class="info">
+                <span class="program">P8</span>
+                <h3><span class="status"></span>DisasterRelief</h3>
+                <p>Evacuation, resource matching, shelters</p>
+                <div class="links">
+                    <a href="https://localhost:5108/scalar/v1" target="_blank">API Docs</a>
+                    <a href="https://localhost:5108/health" target="_blank">Health</a>
+                    <a href="https://localhost:5108/hangfire" target="_blank">Hangfire</a>
+                    <a href="https://localhost:5108/info" target="_blank">Info</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" data-name="doctorservices p9 marketplace, appointments, telehealth" onclick="window.open('https://localhost:5109/scalar/v1','_blank')">
+            <div class="icon"><i class="bi bi-hospital"></i></div>
+            <div class="info">
+                <span class="program">P9</span>
+                <h3><span class="status"></span>DoctorServices</h3>
+                <p>Marketplace, appointments, telehealth</p>
+                <div class="links">
+                    <a href="https://localhost:5109/scalar/v1" target="_blank">API Docs</a>
+                    <a href="https://localhost:5109/health" target="_blank">Health</a>
+                    <a href="https://localhost:5109/hangfire" target="_blank">Hangfire</a>
+                    <a href="https://localhost:5109/info" target="_blank">Info</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" data-name="gamification p10 rewards, challenges, leaderboards" onclick="window.open('https://localhost:5110/scalar/v1','_blank')">
+            <div class="icon"><i class="bi bi-trophy"></i></div>
+            <div class="info">
+                <span class="program">P10</span>
+                <h3><span class="status"></span>Gamification</h3>
+                <p>Rewards, challenges, leaderboards</p>
+                <div class="links">
+                    <a href="https://localhost:5110/scalar/v1" target="_blank">API Docs</a>
+                    <a href="https://localhost:5110/health" target="_blank">Health</a>
+                    <a href="https://localhost:5110/hangfire" target="_blank">Hangfire</a>
+                    <a href="https://localhost:5110/info" target="_blank">Info</a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <div class="footer">
+        TheWatch Platform &mdash; 10 Programs, 2,902 API Operations &mdash; .NET 10 + Hangfire Pro + Aspire
+    </div>
+    <script>
+        function filterCards(q) {
+            q = q.toLowerCase();
+            document.querySelectorAll('.card').forEach(c => {
+                c.style.display = c.dataset.name.includes(q) ? '' : 'none';
+            });
+        }
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                document.getElementById('search').focus();
+            }
+        });
+        // Auto-check health on load
+        document.querySelectorAll('.card').forEach(card => {
+            const healthLink = card.querySelector('a[href*="health"]');
+            if (healthLink) {
+                fetch(healthLink.href, {mode:'no-cors'}).catch(() => {
+                    const dot = card.querySelector('.status');
+                    if (dot) { dot.style.background = '#d29922'; }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

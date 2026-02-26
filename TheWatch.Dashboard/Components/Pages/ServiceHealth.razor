@@ -1,0 +1,88 @@
+@page "/health"
+@inject MicroserviceClient Client
+@implements IDisposable
+
+<PageTitle>TheWatch — Service Health</PageTitle>
+
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.H4" class="rz-mb-0">Service Health</RadzenText>
+    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@($"Auto-refresh: {(_autoRefresh ? "15s" : "Off")}")" />
+    <RadzenButton Text="Refresh Now" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                  Size="ButtonSize.Small" Click="@RefreshHealth" />
+</RadzenStack>
+
+<RadzenDataGrid Data="@_services" TItem="ProgramInfo"
+                AllowSorting="true"
+                Style="min-height: 500px;">
+    <Columns>
+        <RadzenDataGridColumn Property="Id" Title="Program" Width="100px">
+            <Template Context="svc">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="@svc.Icon" />
+                    <RadzenText>@svc.Id</RadzenText>
+                </RadzenStack>
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn Property="Name" Title="Service Name" Width="200px" />
+        <RadzenDataGridColumn Property="Status" Title="Status" Width="120px">
+            <Template Context="svc">
+                <RadzenBadge BadgeStyle="@GetBadgeStyle(svc.Status)" Text="@(svc.Status ?? "Checking...")" />
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn Property="ResponseTimeMs" Title="Response Time" Width="140px">
+            <Template Context="svc">
+                @if (svc.ResponseTimeMs.HasValue)
+                {
+                    <RadzenText>@(svc.ResponseTimeMs)ms</RadzenText>
+                }
+                else
+                {
+                    <RadzenText style="opacity: 0.5;">—</RadzenText>
+                }
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn Property="BaseUrl" Title="Endpoint" />
+        <RadzenDataGridColumn Property="LastCheck" Title="Last Check" Width="140px">
+            <Template Context="svc">
+                <RadzenText>@(svc.LastCheck?.ToString("HH:mm:ss") ?? "—")</RadzenText>
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    private List<ProgramInfo> _services = [];
+    private bool _autoRefresh = true;
+    private System.Threading.Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshHealth();
+        _timer = new System.Threading.Timer(async _ =>
+        {
+            if (!_autoRefresh) return;
+            await RefreshHealth();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
+    }
+
+    private async Task RefreshHealth()
+    {
+        try
+        {
+            var results = await Client.CheckAllHealthAsync();
+            _services = results.Values.OrderBy(s => s.Id).ToList();
+        }
+        catch { /* swallow on dashboard */ }
+    }
+
+    private static BadgeStyle GetBadgeStyle(string? status) => status switch
+    {
+        "Healthy" => BadgeStyle.Success,
+        "Unhealthy" => BadgeStyle.Warning,
+        "Offline" => BadgeStyle.Danger,
+        _ => BadgeStyle.Light
+    };
+
+    public void Dispose() => _timer?.Dispose();
+}

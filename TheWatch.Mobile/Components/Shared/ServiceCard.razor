@@ -1,0 +1,29 @@
+@* Reusable service status card *@
+<div class="watch-card">
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                 AlignItems="AlignItems.Center">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem" AlignItems="AlignItems.Center">
+            <span class="material-symbols-outlined" style="color: var(--rz-primary);">@Icon</span>
+            <RadzenStack>
+                <RadzenText TextStyle="TextStyle.Body1">@Name</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">@Program</RadzenText>
+            </RadzenStack>
+        </RadzenStack>
+        <StatusBadge Text="@Status" StatusClass="@GetStatusClass()" />
+    </RadzenStack>
+</div>
+
+@code {
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public string Program { get; set; } = "";
+    [Parameter] public string Icon { get; set; } = "circle";
+    [Parameter] public string Status { get; set; } = "Unknown";
+
+    private string GetStatusClass() => Status switch
+    {
+        "Healthy" => "status-safe",
+        "Unhealthy" => "status-warning",
+        "Offline" => "status-danger",
+        _ => "status-offline"
+    };
+}

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TheWatch.P1.CoreGateway</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" Version="9.2.0" Condition="false" />
+    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.*" />
+    <PackageReference Include="Hangfire.InMemory" Version="0.6.0" />
+    <PackageReference Include="Hangfire.Pro" Version="3.0.4" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.*-*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.*-*" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.*" />
+    <PackageReference Include="Serilog.AspNetCore" Version="9.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TheWatch.Shared\TheWatch.Shared.csproj" />
+    <ProjectReference Include="..\TheWatch.Generators\TheWatch.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="..\Models.json" Link="Data\Models.json" />
+    <AdditionalFiles Include="..\Interfaces.json" Link="Data\Interfaces.json" />
+    <AdditionalFiles Include="..\_mapping.json" Link="Data\_mapping.json" />
+  </ItemGroup>
+</Project>

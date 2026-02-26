@@ -1,0 +1,49 @@
+@inject WatchAuthStateProvider AuthState
+@inject NavigationManager Nav
+
+<RadzenPanelMenu>
+    <RadzenPanelMenuItem Text="Home" Icon="home" Path="/" />
+
+    <RadzenPanelMenuItem Text="Programs" Icon="apps">
+        <RadzenPanelMenuItem Text="P1 — Core Gateway" Icon="dns" Path="/program/P1" />
+        <RadzenPanelMenuItem Text="P2 — Voice Emergency" Icon="emergency" Path="/program/P2" />
+        <RadzenPanelMenuItem Text="P3 — Mesh Network" Icon="cell_tower" Path="/program/P3" />
+        <RadzenPanelMenuItem Text="P4 — Wearable" Icon="watch" Path="/program/P4" />
+        <RadzenPanelMenuItem Text="P5 — Auth & Security" Icon="shield" Path="/program/P5" />
+        <RadzenPanelMenuItem Text="P6 — First Responder" Icon="local_police" Path="/program/P6" />
+        <RadzenPanelMenuItem Text="P7 — Family Health" Icon="favorite" Path="/program/P7" />
+        <RadzenPanelMenuItem Text="P8 — Disaster Relief" Icon="flood" Path="/program/P8" />
+        <RadzenPanelMenuItem Text="P9 — Doctor Services" Icon="medical_services" Path="/program/P9" />
+        <RadzenPanelMenuItem Text="P10 — Gamification" Icon="trophy" Path="/program/P10" />
+    </RadzenPanelMenuItem>
+
+    <RadzenPanelMenuItem Text="API Explorer" Icon="api" Path="/api-explorer" />
+    <RadzenPanelMenuItem Text="Coverage" Icon="pie_chart" Path="/coverage" />
+    <RadzenPanelMenuItem Text="Service Health" Icon="monitor_heart" Path="/health" />
+</RadzenPanelMenu>
+
+<div class="rz-p-3" style="position: absolute; bottom: 0; width: 100%;">
+    <AuthorizeView>
+        <Authorized>
+            <RadzenStack Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6;">Signed in as</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2">@context.User.FindFirst("email")?.Value</RadzenText>
+                <RadzenButton Text="Logout" Icon="logout" ButtonStyle="ButtonStyle.Light"
+                              Size="ButtonSize.Small" Click="@OnLogout" Style="width: 100%;" />
+            </RadzenStack>
+        </Authorized>
+        <NotAuthorized>
+            <RadzenButton Text="Login" Icon="login" ButtonStyle="ButtonStyle.Primary"
+                          Size="ButtonSize.Small" Click="@(() => Nav.NavigateTo("/login"))"
+                          Style="width: 100%;" />
+        </NotAuthorized>
+    </AuthorizeView>
+</div>
+
+@code {
+    private async Task OnLogout()
+    {
+        await AuthState.LogoutAsync();
+        Nav.NavigateTo("/login");
+    }
+}

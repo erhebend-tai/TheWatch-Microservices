@@ -1,0 +1,39 @@
+@inject NavigationManager Nav
+
+<nav class="bottom-nav">
+    <a href="/" class="@NavClass("/")" @onclick="@(() => Navigate("/"))">
+        <span class="material-symbols-outlined">home</span>
+        <span>Home</span>
+    </a>
+    <a href="/sos" class="@NavClass("/sos")" @onclick="@(() => Navigate("/sos"))">
+        <span class="material-symbols-outlined">emergency</span>
+        <span>SOS</span>
+    </a>
+    <a href="/health" class="@NavClass("/health")" @onclick="@(() => Navigate("/health"))">
+        <span class="material-symbols-outlined">favorite</span>
+        <span>Health</span>
+    </a>
+    <a href="/profile" class="@NavClass("/profile")" @onclick="@(() => Navigate("/profile"))">
+        <span class="material-symbols-outlined">person</span>
+        <span>Profile</span>
+    </a>
+</nav>
+
+@code {
+    private string _currentUri = "/";
+
+    protected override void OnInitialized()
+    {
+        _currentUri = new Uri(Nav.Uri).AbsolutePath;
+        Nav.LocationChanged += (_, e) =>
+        {
+            _currentUri = new Uri(e.Location).AbsolutePath;
+            StateHasChanged();
+        };
+    }
+
+    private string NavClass(string path) =>
+        _currentUri == path || (_currentUri.StartsWith(path) && path != "/") ? "active" : "";
+
+    private void Navigate(string path) => Nav.NavigateTo(path);
+}

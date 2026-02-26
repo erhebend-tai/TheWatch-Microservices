@@ -1,0 +1,698 @@
+@page "/program/{Id}"
+@inject MicroserviceClient Client
+@inject MappingDataService MappingService
+@inject IConfiguration Config
+@inject IHttpClientFactory HttpClientFactory
+@inject NotificationService Notification
+
+<PageTitle>TheWatch — @Id</PageTitle>
+
+@if (_program is not null)
+{
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mb-4">
+        <RadzenIcon Icon="@_program.Icon" style="font-size: 2.5rem; color: var(--rz-primary);" />
+        <div>
+            <RadzenText TextStyle="TextStyle.H4" class="rz-mb-0">@Id — @_program.Name</RadzenText>
+            <RadzenText TextStyle="TextStyle.Subtitle1" style="opacity: 0.7;">@_program.Description</RadzenText>
+        </div>
+        @if (_program.Status is not null)
+        {
+            <RadzenBadge BadgeStyle="@GetBadgeStyle(_program.Status)" Text="@_program.Status" class="rz-ml-auto" />
+        }
+    </RadzenStack>
+
+    <RadzenTabs>
+        <Tabs>
+            @* === P2 Voice Emergency: Live Incidents Tab === *@
+            @if (Id == "P2")
+            {
+                <RadzenTabsItem Text="Incidents" Icon="emergency">
+                    <RadzenCard class="rz-mt-2 rz-p-4 rz-mb-4">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Report New Incident</RadzenText>
+                        <RadzenTemplateForm TItem="IncidentForm" Data="@_incidentForm" Submit="@OnCreateIncident">
+                            <RadzenRow Gap="1rem">
+                                <RadzenColumn Size="12" SizeMD="4">
+                                    <RadzenFormField Text="Emergency Type" Style="width: 100%;">
+                                        <RadzenDropDown @bind-Value="_incidentForm.Type" Data="@_emergencyTypes"
+                                                        TextProperty="Text" ValueProperty="Value" Name="Type" Style="width: 100%;" />
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="6" SizeMD="2">
+                                    <RadzenFormField Text="Latitude" Style="width: 100%;">
+                                        <RadzenNumeric @bind-Value="_incidentForm.Latitude" />
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="6" SizeMD="2">
+                                    <RadzenFormField Text="Longitude" Style="width: 100%;">
+                                        <RadzenNumeric @bind-Value="_incidentForm.Longitude" />
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="2">
+                                    <RadzenFormField Text="Severity (1-5)" Style="width: 100%;">
+                                        <RadzenNumeric @bind-Value="_incidentForm.Severity" Min="1" Max="5" />
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="2">
+                                    <RadzenButton Text="Report" Icon="send" ButtonType="ButtonType.Submit"
+                                                  ButtonStyle="ButtonStyle.Danger" Style="width: 100%; margin-top: 1.5rem;" IsBusy="@_submitting" />
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenRow class="rz-mt-2">
+                                <RadzenColumn Size="12">
+                                    <RadzenFormField Text="Description" Style="width: 100%;">
+                                        <RadzenTextArea @bind-Value="_incidentForm.Description" Rows="2" Name="Description" />
+                                        <RadzenRequiredValidator Component="Description" Text="Required" />
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                            </RadzenRow>
+                        </RadzenTemplateForm>
+                    </RadzenCard>
+
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Live Incidents (@_incidents.Count)</RadzenText>
+                    <RadzenDataGrid Data="@_incidents" TItem="IncidentDto"
+                                    AllowSorting="true" AllowPaging="true" PageSize="20"
+                                    Style="min-height: 300px;">
+                        <Columns>
+                            <RadzenDataGridColumn Property="Type" Title="Type" Width="140px" />
+                            <RadzenDataGridColumn Property="Description" Title="Description" />
+                            <RadzenDataGridColumn Property="Severity" Title="Sev" Width="60px" />
+                            <RadzenDataGridColumn Property="Status" Title="Status" Width="120px">
+                                <Template Context="inc">
+                                    <RadzenBadge BadgeStyle="@GetIncidentBadge(inc.Status)" Text="@inc.Status" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn Property="CreatedAt" Title="Reported" Width="160px">
+                                <Template Context="inc">
+                                    @inc.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenTabsItem>
+            }
+
+            @* === P5 Auth Security: Users Tab === *@
+            @if (Id == "P5")
+            {
+                <RadzenTabsItem Text="Users" Icon="people">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mt-2 rz-mb-2">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Registered Users (@_users.Count)</RadzenText>
+                        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                                      Size="ButtonSize.Small" Click="@LoadUsers" />
+                    </RadzenStack>
+                    <RadzenDataGrid Data="@_users" TItem="UserDto"
+                                    AllowSorting="true" AllowPaging="true" PageSize="20"
+                                    Style="min-height: 300px;">
+                        <Columns>
+                            <RadzenDataGridColumn Property="DisplayName" Title="Name" Width="200px" />
+                            <RadzenDataGridColumn Property="Email" Title="Email" Width="250px" />
+                            <RadzenDataGridColumn Property="Phone" Title="Phone" Width="150px" />
+                            <RadzenDataGridColumn Property="CreatedAt" Title="Registered" Width="160px">
+                                <Template Context="user">
+                                    @user.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenTabsItem>
+            }
+
+            @* === P6 First Responder: Responders Tab === *@
+            @if (Id == "P6")
+            {
+                <RadzenTabsItem Text="Responders" Icon="local_police">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mt-2 rz-mb-2">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Registered Responders (@_responders.Count)</RadzenText>
+                        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                                      Size="ButtonSize.Small" Click="@LoadResponders" />
+                    </RadzenStack>
+                    <RadzenDataGrid Data="@_responders" TItem="ResponderDto"
+                                    AllowSorting="true" AllowPaging="true" PageSize="20"
+                                    Style="min-height: 300px;">
+                        <Columns>
+                            <RadzenDataGridColumn Property="Name" Title="Name" Width="180px" />
+                            <RadzenDataGridColumn Property="Type" Title="Type" Width="140px" />
+                            <RadzenDataGridColumn Property="BadgeNumber" Title="Badge" Width="100px" />
+                            <RadzenDataGridColumn Property="Status" Title="Status" Width="120px">
+                                <Template Context="r">
+                                    <RadzenBadge BadgeStyle="@GetResponderBadge(r.Status)" Text="@r.Status" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn Property="Phone" Title="Phone" Width="130px" />
+                            <RadzenDataGridColumn Property="CreatedAt" Title="Registered" Width="160px">
+                                <Template Context="r">
+                                    @r.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenTabsItem>
+            }
+
+            @* === P1 Core Gateway: Profiles Tab === *@
+            @if (Id == "P1")
+            {
+                <RadzenTabsItem Text="Profiles" Icon="hub">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mt-2 rz-mb-2">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">User Profiles (@_profiles.Count)</RadzenText>
+                        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                                      Size="ButtonSize.Small" Click="@LoadProfiles" />
+                    </RadzenStack>
+                    <RadzenDataGrid Data="@_profiles" TItem="ProfileDto"
+                                    AllowSorting="true" AllowPaging="true" PageSize="20"
+                                    Style="min-height: 300px;">
+                        <Columns>
+                            <RadzenDataGridColumn Property="DisplayName" Title="Name" Width="200px" />
+                            <RadzenDataGridColumn Property="Email" Title="Email" Width="250px" />
+                            <RadzenDataGridColumn Property="Phone" Title="Phone" Width="150px" />
+                            <RadzenDataGridColumn Property="CreatedAt" Title="Created" Width="160px">
+                                <Template Context="p">
+                                    @p.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenTabsItem>
+            }
+
+            @* === P3 Mesh Network: Nodes Tab === *@
+            @if (Id == "P3")
+            {
+                <RadzenTabsItem Text="Nodes" Icon="cell_tower">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mt-2 rz-mb-2">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Mesh Nodes (@_meshNodes.Count)</RadzenText>
+                        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                                      Size="ButtonSize.Small" Click="@LoadMeshNodes" />
+                    </RadzenStack>
+                    <RadzenDataGrid Data="@_meshNodes" TItem="MeshNodeDto"
+                                    AllowSorting="true" AllowPaging="true" PageSize="20"
+                                    Style="min-height: 300px;">
+                        <Columns>
+                            <RadzenDataGridColumn Property="Name" Title="Name" Width="200px" />
+                            <RadzenDataGridColumn Property="Status" Title="Status" Width="120px">
+                                <Template Context="n">
+                                    <RadzenBadge BadgeStyle="@GetNodeBadge(n.Status)" Text="@n.Status" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn Property="BatteryPercent" Title="Battery" Width="100px" />
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenTabsItem>
+            }
+
+            @* === P4 Wearable: Devices Tab === *@
+            @if (Id == "P4")
+            {
+                <RadzenTabsItem Text="Devices" Icon="watch">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mt-2 rz-mb-2">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Wearable Devices (@_devices.Count)</RadzenText>
+                        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                                      Size="ButtonSize.Small" Click="@LoadDevices" />
+                    </RadzenStack>
+                    <RadzenDataGrid Data="@_devices" TItem="DeviceDto"
+                                    AllowSorting="true" AllowPaging="true" PageSize="20"
+                                    Style="min-height: 300px;">
+                        <Columns>
+                            <RadzenDataGridColumn Property="Name" Title="Name" Width="200px" />
+                            <RadzenDataGridColumn Property="Platform" Title="Platform" Width="140px" />
+                            <RadzenDataGridColumn Property="Status" Title="Status" Width="120px">
+                                <Template Context="d">
+                                    <RadzenBadge BadgeStyle="@GetDeviceBadge(d.Status)" Text="@d.Status" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn Property="BatteryPercent" Title="Battery" Width="100px" />
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenTabsItem>
+            }
+
+            @* === P7 Family Health: Families Tab === *@
+            @if (Id == "P7")
+            {
+                <RadzenTabsItem Text="Families" Icon="favorite">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mt-2 rz-mb-2">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Family Groups (@_families.Count)</RadzenText>
+                        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                                      Size="ButtonSize.Small" Click="@LoadFamilies" />
+                    </RadzenStack>
+                    <RadzenDataGrid Data="@_families" TItem="FamilyGroupDto"
+                                    AllowSorting="true" AllowPaging="true" PageSize="20"
+                                    Style="min-height: 300px;">
+                        <Columns>
+                            <RadzenDataGridColumn Property="Name" Title="Name" Width="250px" />
+                            <RadzenDataGridColumn Property="MemberCount" Title="Members" Width="100px" />
+                            <RadzenDataGridColumn Property="CreatedAt" Title="Created" Width="160px">
+                                <Template Context="f">
+                                    @f.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenTabsItem>
+            }
+
+            @* === P8 Disaster Relief: Events Tab === *@
+            @if (Id == "P8")
+            {
+                <RadzenTabsItem Text="Disaster Events" Icon="cloud_sync">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mt-2 rz-mb-2">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Disaster Events (@_disasterEvents.Count)</RadzenText>
+                        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                                      Size="ButtonSize.Small" Click="@LoadDisasterEvents" />
+                    </RadzenStack>
+                    <RadzenDataGrid Data="@_disasterEvents" TItem="DisasterEventDto"
+                                    AllowSorting="true" AllowPaging="true" PageSize="20"
+                                    Style="min-height: 300px;">
+                        <Columns>
+                            <RadzenDataGridColumn Property="Name" Title="Name" Width="200px" />
+                            <RadzenDataGridColumn Property="Type" Title="Type" Width="140px" />
+                            <RadzenDataGridColumn Property="Severity" Title="Sev" Width="60px" />
+                            <RadzenDataGridColumn Property="Status" Title="Status" Width="120px">
+                                <Template Context="e">
+                                    <RadzenBadge BadgeStyle="@GetDisasterBadge(e.Status)" Text="@e.Status" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn Property="CreatedAt" Title="Declared" Width="160px">
+                                <Template Context="e">
+                                    @e.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenTabsItem>
+            }
+
+            @* === P9 Doctor Services: Doctors Tab === *@
+            @if (Id == "P9")
+            {
+                <RadzenTabsItem Text="Doctors" Icon="local_hospital">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mt-2 rz-mb-2">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Registered Doctors (@_doctors.Count)</RadzenText>
+                        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                                      Size="ButtonSize.Small" Click="@LoadDoctors" />
+                    </RadzenStack>
+                    <RadzenDataGrid Data="@_doctors" TItem="DoctorDto"
+                                    AllowSorting="true" AllowPaging="true" PageSize="20"
+                                    Style="min-height: 300px;">
+                        <Columns>
+                            <RadzenDataGridColumn Property="Name" Title="Name" Width="200px" />
+                            <RadzenDataGridColumn Property="Specializations" Title="Specializations" Width="250px" />
+                            <RadzenDataGridColumn Property="Rating" Title="Rating" Width="80px" />
+                            <RadzenDataGridColumn Property="Phone" Title="Phone" Width="130px" />
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenTabsItem>
+            }
+
+            @* === P10 Gamification: Leaderboard Tab === *@
+            @if (Id == "P10")
+            {
+                <RadzenTabsItem Text="Leaderboard" Icon="emoji_events">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mt-2 rz-mb-2">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Top Players (@_leaderboard.Count)</RadzenText>
+                        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                                      Size="ButtonSize.Small" Click="@LoadLeaderboard" />
+                    </RadzenStack>
+                    <RadzenDataGrid Data="@_leaderboard" TItem="LeaderboardEntryDto"
+                                    AllowSorting="true" AllowPaging="true" PageSize="20"
+                                    Style="min-height: 300px;">
+                        <Columns>
+                            <RadzenDataGridColumn Property="Rank" Title="#" Width="60px" />
+                            <RadzenDataGridColumn Property="DisplayName" Title="Player" Width="200px" />
+                            <RadzenDataGridColumn Property="Points" Title="Points" Width="100px" />
+                            <RadzenDataGridColumn Property="Level" Title="Level" Width="80px" />
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenTabsItem>
+            }
+
+            <RadzenTabsItem Text="Operations">
+                <RadzenDataGrid Data="@_operations" TItem="MappingEntry"
+                                AllowFiltering="true" AllowSorting="true" AllowPaging="true"
+                                PageSize="30" FilterMode="FilterMode.Simple"
+                                class="rz-mt-2" Style="min-height: 400px;">
+                    <Columns>
+                        <RadzenDataGridColumn Property="Method" Title="Method" Width="80px" />
+                        <RadzenDataGridColumn Property="Path" Title="Path" Width="300px" />
+                        <RadzenDataGridColumn Property="OperationId" Title="Operation ID" Width="200px" />
+                        <RadzenDataGridColumn Property="Summary" Title="Summary" />
+                        <RadzenDataGridColumn Property="MatchStatus" Title="Status" Width="120px">
+                            <Template Context="entry">
+                                <RadzenBadge BadgeStyle="@(entry.MatchStatus == "Matched" ? BadgeStyle.Success : BadgeStyle.Warning)"
+                                             Text="@(entry.MatchStatus ?? "Stub")" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn Property="SourceSpec" Title="Source Spec" Width="180px" />
+                    </Columns>
+                </RadzenDataGrid>
+            </RadzenTabsItem>
+
+            <RadzenTabsItem Text="Models">
+                <RadzenDataGrid Data="@_models" TItem="ModelEntry"
+                                AllowFiltering="true" AllowSorting="true" AllowPaging="true"
+                                PageSize="30" class="rz-mt-2" Style="min-height: 400px;">
+                    <Columns>
+                        <RadzenDataGridColumn Property="Name" Title="Name" Width="200px" />
+                        <RadzenDataGridColumn Property="Kind" Title="Kind" Width="100px" />
+                        <RadzenDataGridColumn Property="PropertyCount" Title="Properties" Width="100px" />
+                        <RadzenDataGridColumn Property="MatchType" Title="Match Type" Width="120px">
+                            <Template Context="entry">
+                                <RadzenBadge BadgeStyle="@(entry.MatchType == "Matched" ? BadgeStyle.Success : BadgeStyle.Info)"
+                                             Text="@(entry.MatchType ?? "Unmatched")" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn Property="SchemaSource" Title="Schema Source" />
+                    </Columns>
+                </RadzenDataGrid>
+            </RadzenTabsItem>
+
+            <RadzenTabsItem Text="Health">
+                <RadzenCard class="rz-mt-2 rz-p-4">
+                    <RadzenText TextStyle="TextStyle.H6">Service Health</RadzenText>
+                    <RadzenStack Gap="0.5rem" class="rz-mt-2">
+                        <RadzenText><strong>Endpoint:</strong> @(_program.BaseUrl)/health</RadzenText>
+                        <RadzenText><strong>Status:</strong> @(_program.Status ?? "Unknown")</RadzenText>
+                        <RadzenText><strong>Response Time:</strong> @(_program.ResponseTimeMs?.ToString() ?? "—")ms</RadzenText>
+                        <RadzenText><strong>Last Check:</strong> @(_program.LastCheck?.ToString("HH:mm:ss") ?? "—")</RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenTabsItem>
+        </Tabs>
+    </RadzenTabs>
+}
+else
+{
+    <RadzenText TextStyle="TextStyle.H5">Program @Id not found.</RadzenText>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = string.Empty;
+
+    private ProgramInfo? _program;
+    private List<MappingEntry> _operations = [];
+    private List<ModelEntry> _models = [];
+
+    // P2 incident form
+    private IncidentForm _incidentForm = new();
+    private List<IncidentDto> _incidents = [];
+    private bool _submitting;
+    private static readonly List<object> _emergencyTypes = new[]
+    {
+        new { Text = "Medical Emergency", Value = "MedicalEmergency" },
+        new { Text = "Wildfire", Value = "Wildfire" },
+        new { Text = "Hurricane", Value = "Hurricane" },
+        new { Text = "Tornado", Value = "Tornado" },
+        new { Text = "Flood", Value = "Flood" },
+        new { Text = "Earthquake", Value = "Earthquake" },
+        new { Text = "Terrorist Threat", Value = "TerroristThreat" },
+        new { Text = "Chemical Hazard", Value = "ChemicalHazard" },
+        new { Text = "Active Shooter", Value = "ActiveShooter" },
+        new { Text = "Other", Value = "Other" }
+    }.Cast<object>().ToList();
+
+    // P5 users
+    private List<UserDto> _users = [];
+
+    // P6 responders
+    private List<ResponderDto> _responders = [];
+
+    // P1 profiles
+    private List<ProfileDto> _profiles = [];
+
+    // P3 mesh nodes
+    private List<MeshNodeDto> _meshNodes = [];
+
+    // P4 devices
+    private List<DeviceDto> _devices = [];
+
+    // P7 families
+    private List<FamilyGroupDto> _families = [];
+
+    // P8 disaster events
+    private List<DisasterEventDto> _disasterEvents = [];
+
+    // P9 doctors
+    private List<DoctorDto> _doctors = [];
+
+    // P10 leaderboard
+    private List<LeaderboardEntryDto> _leaderboard = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _program = Client.Programs.GetValueOrDefault(Id);
+        if (_program is not null)
+        {
+            _program = await Client.CheckHealthAsync(Id);
+
+            var mapping = await MappingService.GetMappingDataAsync();
+            _operations = mapping.Operations.Where(o => o.Program == Id).ToList();
+            _models = mapping.Models.Where(m => m.Program == Id).ToList();
+
+            if (Id == "P1") await LoadProfiles();
+            if (Id == "P2") await LoadIncidents();
+            if (Id == "P3") await LoadMeshNodes();
+            if (Id == "P4") await LoadDevices();
+            if (Id == "P5") await LoadUsers();
+            if (Id == "P6") await LoadResponders();
+            if (Id == "P7") await LoadFamilies();
+            if (Id == "P8") await LoadDisasterEvents();
+            if (Id == "P9") await LoadDoctors();
+            if (Id == "P10") await LoadLeaderboard();
+        }
+    }
+
+    private string GetServiceUrl() =>
+        Config[$"Services:{Id}:Url"] ?? $"http://localhost:500{Id[1..]}";
+
+    private async Task OnCreateIncident()
+    {
+        _submitting = true;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("microservices");
+            var response = await client.PostAsJsonAsync($"{GetServiceUrl()}/api/incidents", new
+            {
+                Type = _incidentForm.Type,
+                Description = _incidentForm.Description,
+                Location = new { Latitude = _incidentForm.Latitude, Longitude = _incidentForm.Longitude },
+                ReporterId = Guid.NewGuid(),
+                Severity = _incidentForm.Severity
+            });
+
+            if (response.IsSuccessStatusCode)
+            {
+                Notification.Notify(NotificationSeverity.Success, "Incident Reported", "Incident created successfully.");
+                _incidentForm = new();
+                await LoadIncidents();
+            }
+            else
+            {
+                Notification.Notify(NotificationSeverity.Error, "Error", "Failed to create incident.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Offline", $"P2 service unreachable: {ex.Message}");
+        }
+        _submitting = false;
+    }
+
+    private async Task LoadIncidents()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("microservices");
+            var response = await client.GetFromJsonAsync<IncidentListDto>($"{GetServiceUrl()}/api/incidents?page=1&pageSize=50");
+            _incidents = response?.Items ?? [];
+        }
+        catch { _incidents = []; }
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("microservices");
+            // Users endpoint doesn't require auth for now (dev mode)
+            var response = await client.GetAsync($"{GetServiceUrl()}/api/auth/users");
+            if (response.IsSuccessStatusCode)
+            {
+                _users = await response.Content.ReadFromJsonAsync<List<UserDto>>() ?? [];
+            }
+        }
+        catch { _users = []; }
+    }
+
+    private async Task LoadResponders()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("microservices");
+            var response = await client.GetFromJsonAsync<ResponderListDto>($"{GetServiceUrl()}/api/responders?page=1&pageSize=50");
+            _responders = response?.Items ?? [];
+        }
+        catch { _responders = []; }
+    }
+
+    private static BadgeStyle GetBadgeStyle(string? status) => status switch
+    {
+        "Healthy" => BadgeStyle.Success,
+        "Unhealthy" => BadgeStyle.Warning,
+        "Offline" => BadgeStyle.Danger,
+        _ => BadgeStyle.Light
+    };
+
+    private static BadgeStyle GetIncidentBadge(string? status) => status switch
+    {
+        "Reported" => BadgeStyle.Warning,
+        "Dispatched" => BadgeStyle.Info,
+        "InProgress" => BadgeStyle.Primary,
+        "Resolved" => BadgeStyle.Success,
+        "Archived" => BadgeStyle.Light,
+        _ => BadgeStyle.Light
+    };
+
+    private class IncidentForm
+    {
+        public string Type { get; set; } = "MedicalEmergency";
+        public string Description { get; set; } = string.Empty;
+        public double Latitude { get; set; } = 33.4484;
+        public double Longitude { get; set; } = -112.0740;
+        public int Severity { get; set; } = 3;
+    }
+
+    private async Task LoadProfiles()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("microservices");
+            var response = await client.GetFromJsonAsync<ProfileListDto>($"{GetServiceUrl()}/api/profiles?page=1&pageSize=50");
+            _profiles = response?.Items ?? [];
+        }
+        catch { _profiles = []; }
+    }
+
+    private async Task LoadMeshNodes()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("microservices");
+            var response = await client.GetFromJsonAsync<MeshNodeListDto>($"{GetServiceUrl()}/api/nodes");
+            _meshNodes = response?.Items ?? [];
+        }
+        catch { _meshNodes = []; }
+    }
+
+    private async Task LoadDevices()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("microservices");
+            var response = await client.GetFromJsonAsync<DeviceListDto>($"{GetServiceUrl()}/api/devices");
+            _devices = response?.Items ?? [];
+        }
+        catch { _devices = []; }
+    }
+
+    private async Task LoadFamilies()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("microservices");
+            _families = await client.GetFromJsonAsync<List<FamilyGroupDto>>($"{GetServiceUrl()}/api/families") ?? [];
+        }
+        catch { _families = []; }
+    }
+
+    private async Task LoadDisasterEvents()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("microservices");
+            var response = await client.GetFromJsonAsync<DisasterEventListDto>($"{GetServiceUrl()}/api/events");
+            _disasterEvents = response?.Items ?? [];
+        }
+        catch { _disasterEvents = []; }
+    }
+
+    private async Task LoadDoctors()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("microservices");
+            var response = await client.GetFromJsonAsync<DoctorListDto>($"{GetServiceUrl()}/api/doctors");
+            _doctors = response?.Items ?? [];
+        }
+        catch { _doctors = []; }
+    }
+
+    private async Task LoadLeaderboard()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("microservices");
+            var response = await client.GetFromJsonAsync<LeaderboardDto>($"{GetServiceUrl()}/api/leaderboard?top=50");
+            _leaderboard = response?.Entries ?? [];
+        }
+        catch { _leaderboard = []; }
+    }
+
+    // DTOs
+    private record IncidentDto(Guid Id, string Type, string Description, string Status, int Severity, DateTime CreatedAt);
+    private record IncidentListDto(List<IncidentDto> Items, int TotalCount, int Page, int PageSize);
+    private record UserDto(Guid Id, string Email, string DisplayName, string? Phone, DateTime CreatedAt);
+    private record ResponderDto(Guid Id, string Name, string Type, string? BadgeNumber, string Status, string? Phone, DateTime CreatedAt);
+    private record ResponderListDto(List<ResponderDto> Items, int TotalCount, int Page, int PageSize);
+    private record ProfileDto(Guid Id, string DisplayName, string Email, string? Phone, DateTime CreatedAt);
+    private record ProfileListDto(List<ProfileDto> Items, int TotalCount);
+    private record MeshNodeDto(Guid Id, string Name, string Status, int BatteryPercent);
+    private record MeshNodeListDto(List<MeshNodeDto> Items, int TotalCount);
+    private record DeviceDto(Guid Id, string Name, string Platform, string Status, int BatteryPercent);
+    private record DeviceListDto(List<DeviceDto> Items, int TotalCount);
+    private record FamilyGroupDto(Guid Id, string Name, int MemberCount, DateTime CreatedAt);
+    private record DisasterEventDto(Guid Id, string Name, string Type, int Severity, string Status, DateTime CreatedAt);
+    private record DisasterEventListDto(List<DisasterEventDto> Items, int TotalCount);
+    private record DoctorDto(Guid Id, string Name, string Specializations, double Rating, string? Phone);
+    private record DoctorListDto(List<DoctorDto> Items, int TotalCount);
+    private record LeaderboardEntryDto(Guid UserId, string DisplayName, int Points, int Level, int Rank);
+    private record LeaderboardDto(List<LeaderboardEntryDto> Entries, int TotalParticipants);
+
+    private static BadgeStyle GetResponderBadge(string? status) => status switch
+    {
+        "Available" => BadgeStyle.Success,
+        "EnRoute" => BadgeStyle.Info,
+        "OnScene" => BadgeStyle.Primary,
+        "Busy" => BadgeStyle.Warning,
+        "OffDuty" => BadgeStyle.Light,
+        _ => BadgeStyle.Light
+    };
+
+    private static BadgeStyle GetNodeBadge(string? status) => status switch
+    {
+        "Online" => BadgeStyle.Success,
+        "Relaying" => BadgeStyle.Info,
+        "LowBattery" => BadgeStyle.Warning,
+        "Offline" => BadgeStyle.Light,
+        _ => BadgeStyle.Light
+    };
+
+    private static BadgeStyle GetDeviceBadge(string? status) => status switch
+    {
+        "Connected" => BadgeStyle.Success,
+        "Syncing" => BadgeStyle.Info,
+        "LowBattery" => BadgeStyle.Warning,
+        "Offline" => BadgeStyle.Light,
+        "Error" => BadgeStyle.Danger,
+        _ => BadgeStyle.Light
+    };
+
+    private static BadgeStyle GetDisasterBadge(string? status) => status switch
+    {
+        "Declared" => BadgeStyle.Warning,
+        "Active" => BadgeStyle.Danger,
+        "Contained" => BadgeStyle.Info,
+        "Resolved" => BadgeStyle.Success,
+        "Archived" => BadgeStyle.Light,
+        _ => BadgeStyle.Light
+    };
+}

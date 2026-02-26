@@ -1,0 +1,15 @@
+@inherits LayoutComponentBase
+
+<RadzenLayout>
+    <RadzenBody>
+        <RadzenNotification />
+        <RadzenDialog />
+        @Body
+    </RadzenBody>
+</RadzenLayout>
+
+<AuthorizeView>
+    <Authorized>
+        <NavMenu />
+    </Authorized>
+</AuthorizeView>

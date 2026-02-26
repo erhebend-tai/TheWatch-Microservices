@@ -1,0 +1,114 @@
+@page "/coverage"
+@inject MappingDataService MappingService
+
+<PageTitle>TheWatch — Coverage</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">Mapping Coverage</RadzenText>
+
+@if (_loaded)
+{
+    <RadzenRow Gap="1rem" class="rz-mb-4">
+        <RadzenColumn Size="6" SizeMD="3">
+            <RadzenCard class="rz-p-4 rz-text-align-center">
+                <RadzenText TextStyle="TextStyle.H3" style="color: var(--rz-primary);">@_totalOps</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption">Total Operations</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="6" SizeMD="3">
+            <RadzenCard class="rz-p-4 rz-text-align-center">
+                <RadzenText TextStyle="TextStyle.H3" style="color: var(--rz-success);">@_matchedOps</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption">Matched Operations</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="6" SizeMD="3">
+            <RadzenCard class="rz-p-4 rz-text-align-center">
+                <RadzenText TextStyle="TextStyle.H3" style="color: var(--rz-primary);">@_totalModels</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption">Total Models</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="6" SizeMD="3">
+            <RadzenCard class="rz-p-4 rz-text-align-center">
+                <RadzenText TextStyle="TextStyle.H3" style="color: var(--rz-success);">@_matchedModels</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption">Matched Models</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow Gap="1rem">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-4">
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Operation Coverage</RadzenText>
+                <RadzenChart Style="height: 300px;">
+                    <RadzenDonutSeries Data="@_opCoverage" CategoryProperty="Label" ValueProperty="Count">
+                        <RadzenSeriesDataLabels Visible="true" />
+                    </RadzenDonutSeries>
+                </RadzenChart>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-4">
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Model Coverage</RadzenText>
+                <RadzenChart Style="height: 300px;">
+                    <RadzenDonutSeries Data="@_modelCoverage" CategoryProperty="Label" ValueProperty="Count">
+                        <RadzenSeriesDataLabels Visible="true" />
+                    </RadzenDonutSeries>
+                </RadzenChart>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenCard class="rz-p-4 rz-mt-4">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Operations per Program</RadzenText>
+        <RadzenChart Style="height: 400px;">
+            <RadzenBarSeries Data="@_perProgram" CategoryProperty="Program" ValueProperty="Matched" Title="Matched" />
+            <RadzenBarSeries Data="@_perProgram" CategoryProperty="Program" ValueProperty="Unmatched" Title="Unmatched" />
+            <RadzenCategoryAxis />
+            <RadzenValueAxis />
+            <RadzenLegend Position="LegendPosition.Top" />
+        </RadzenChart>
+    </RadzenCard>
+}
+else
+{
+    <RadzenProgressBarCircular ShowValue="true" Value="100" Mode="ProgressBarMode.Indeterminate" />
+}
+
+@code {
+    private bool _loaded;
+    private int _totalOps, _matchedOps, _totalModels, _matchedModels;
+    private List<CoverageItem> _opCoverage = [];
+    private List<CoverageItem> _modelCoverage = [];
+    private List<ProgramCoverage> _perProgram = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var data = await MappingService.GetMappingDataAsync();
+
+        _matchedOps = data.Operations.Count(o => o.MatchStatus == "Matched");
+        _totalOps = data.Operations.Count;
+        _matchedModels = data.Models.Count(m => m.MatchType == "Matched");
+        _totalModels = data.Models.Count;
+
+        _opCoverage =
+        [
+            new("Matched", _matchedOps),
+            new("Unmatched", _totalOps - _matchedOps)
+        ];
+
+        _modelCoverage =
+        [
+            new("Matched", _matchedModels),
+            new("Unmatched", _totalModels - _matchedModels)
+        ];
+
+        _perProgram = data.ProgramStats
+            .OrderBy(kv => kv.Key)
+            .Select(kv => new ProgramCoverage(kv.Key, kv.Value.MatchedOperations, kv.Value.UnmatchedOperations))
+            .ToList();
+
+        _loaded = true;
+    }
+
+    private record CoverageItem(string Label, int Count);
+    private record ProgramCoverage(string Program, int Matched, int Unmatched);
+}

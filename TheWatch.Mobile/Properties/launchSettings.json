@@ -1,0 +1,15 @@
+{
+  "profiles": {
+    "Windows Machine": {
+      "commandName": "MsixPackage",
+      "nativeDebugging": false
+    },
+    "Android Emulator": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "environmentVariables": {
+        "DOTNET_MODIFIABLE_ASSEMBLIES": "debug"
+      }
+    }
+  }
+}

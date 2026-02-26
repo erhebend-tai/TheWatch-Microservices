@@ -1,0 +1,143 @@
+@page "/login"
+@inject WatchAuthService AuthService
+@inject NavigationManager Nav
+@inject NotificationService Notification
+
+<div class="page-content" style="display: flex; justify-content: center; align-items: center; min-height: 80vh;">
+    <RadzenCard Style="width: 100%; max-width: 400px; padding: 2rem;">
+        <RadzenStack AlignItems="AlignItems.Center" Gap="1rem" Style="margin-bottom: 1.5rem;">
+            <span class="material-symbols-outlined" style="font-size: 3rem; color: var(--rz-primary);">shield</span>
+            <RadzenText TextStyle="TextStyle.H4">TheWatch</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--watch-muted);">
+                Citizen Emergency Response
+            </RadzenText>
+        </RadzenStack>
+
+        @if (_isRegistering)
+        {
+            <RadzenTemplateForm TItem="RegisterModel" Data="@_registerModel" Submit="@OnRegister">
+                <RadzenStack Gap="1rem">
+                    <RadzenFormField Text="Display Name" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_registerModel.DisplayName" Name="DisplayName" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenRequiredValidator Component="DisplayName" Text="Required" />
+                        </Helper>
+                    </RadzenFormField>
+                    <RadzenFormField Text="Email" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_registerModel.Email" Name="RegEmail" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenRequiredValidator Component="RegEmail" Text="Required" />
+                            <RadzenEmailValidator Component="RegEmail" Text="Invalid email" />
+                        </Helper>
+                    </RadzenFormField>
+                    <RadzenFormField Text="Password" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenPassword @bind-Value="_registerModel.Password" Name="RegPassword" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenRequiredValidator Component="RegPassword" Text="Required" />
+                        </Helper>
+                    </RadzenFormField>
+                    <RadzenFormField Text="Phone (optional)" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_registerModel.Phone" />
+                        </ChildContent>
+                    </RadzenFormField>
+                    <RadzenButton Text="Register" ButtonType="ButtonType.Submit"
+                                  ButtonStyle="ButtonStyle.Primary" Style="width: 100%;" IsBusy="@_loading" />
+                    <RadzenLink Text="Already have an account? Login"
+                                Style="text-align: center; display: block;"
+                                @onclick="@(() => { _isRegistering = false; _error = null; })" />
+                </RadzenStack>
+            </RadzenTemplateForm>
+        }
+        else
+        {
+            <RadzenTemplateForm TItem="LoginModel" Data="@_loginModel" Submit="@OnLogin">
+                <RadzenStack Gap="1rem">
+                    <RadzenFormField Text="Email" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_loginModel.Email" Name="Email" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenRequiredValidator Component="Email" Text="Required" />
+                        </Helper>
+                    </RadzenFormField>
+                    <RadzenFormField Text="Password" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenPassword @bind-Value="_loginModel.Password" Name="Password" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenRequiredValidator Component="Password" Text="Required" />
+                        </Helper>
+                    </RadzenFormField>
+                    <RadzenButton Text="Login" ButtonType="ButtonType.Submit"
+                                  ButtonStyle="ButtonStyle.Primary" Style="width: 100%;" IsBusy="@_loading" />
+                    <RadzenLink Text="Need an account? Register"
+                                Style="text-align: center; display: block;"
+                                @onclick="@(() => { _isRegistering = true; _error = null; })" />
+                </RadzenStack>
+            </RadzenTemplateForm>
+        }
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Dark"
+                         AllowClose="false" Style="margin-top: 0.5rem;">@_error</RadzenAlert>
+        }
+    </RadzenCard>
+</div>
+
+@code {
+    private LoginModel _loginModel = new();
+    private RegisterModel _registerModel = new();
+    private bool _isRegistering;
+    private bool _loading;
+    private string? _error;
+
+    private string P5Url => "http://localhost:5005";
+
+    private async Task OnLogin()
+    {
+        _loading = true;
+        _error = null;
+        var (success, error) = await AuthService.LoginAsync(P5Url, _loginModel.Email, _loginModel.Password);
+        if (success)
+            Nav.NavigateTo("/");
+        else
+            _error = error;
+        _loading = false;
+    }
+
+    private async Task OnRegister()
+    {
+        _loading = true;
+        _error = null;
+        var (success, error) = await AuthService.RegisterAsync(
+            P5Url, _registerModel.Email, _registerModel.Password,
+            _registerModel.DisplayName, _registerModel.Phone);
+        if (success)
+            Nav.NavigateTo("/");
+        else
+            _error = error;
+        _loading = false;
+    }
+
+    private class LoginModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
+    private class RegisterModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+    }
+}

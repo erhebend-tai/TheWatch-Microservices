@@ -1,0 +1,194 @@
+@page "/phrases"
+@attribute [Authorize]
+@inject PhraseService PhraseService
+@inject SpeechListenerService SpeechService
+@inject NotificationService Notification
+
+<div class="page-content">
+    <RadzenStack Gap="1rem">
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                     AlignItems="AlignItems.Center">
+            <RadzenText TextStyle="TextStyle.H5">Activation Phrases</RadzenText>
+            <RadzenButton Icon="add" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary"
+                          Click="@ShowAddDialog" />
+        </RadzenStack>
+
+        <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--watch-muted);">
+            Configure voice phrases that trigger automatic actions.
+        </RadzenText>
+
+        <!-- Voice Listener Toggle -->
+        <div class="watch-card">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                         AlignItems="AlignItems.Center">
+                <RadzenStack>
+                    <RadzenText TextStyle="TextStyle.Body1">Voice Listening</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                        @(SpeechService.IsListening ? "Active — listening for phrases" : "Paused")
+                    </RadzenText>
+                </RadzenStack>
+                <RadzenSwitch Value="_voiceEnabled" Change="@((bool v) => OnVoiceToggle(v))" />
+            </RadzenStack>
+        </div>
+
+        <!-- Sensitivity -->
+        <div class="watch-card">
+            <RadzenStack Gap="0.5rem">
+                <RadzenText TextStyle="TextStyle.Body1">
+                    Match Sensitivity: @(_threshold.ToString("P0"))
+                </RadzenText>
+                <RadzenSlider TValue="int" Value="@((int)(_threshold * 100))" Min="30" Max="100" Step="5"
+                              Change="@((int v) => { _threshold = v / 100.0; OnThresholdChanged(_threshold); })" Style="width: 100%;" />
+                <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                    Lower = more lenient matching. Higher = exact match required.
+                </RadzenText>
+            </RadzenStack>
+        </div>
+
+        <!-- Phrase List -->
+        @foreach (var phrase in _phrases)
+        {
+            <div class="watch-card">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                             AlignItems="AlignItems.Center">
+                    <RadzenStack>
+                        <RadzenText TextStyle="TextStyle.Body1">"@phrase.Text"</RadzenText>
+                        <StatusBadge Text="@phrase.Action.ToString()" StatusClass="@GetActionClass(phrase.Action)" />
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem">
+                        <RadzenButton Icon="mic" Size="ButtonSize.ExtraSmall" Variant="Variant.Text"
+                                      ButtonStyle="ButtonStyle.Info" Click="@(() => TestPhrase(phrase.Text))" />
+                        <RadzenButton Icon="delete" Size="ButtonSize.ExtraSmall" Variant="Variant.Text"
+                                      ButtonStyle="ButtonStyle.Danger" Click="@(() => RemovePhrase(phrase.Text))" />
+                    </RadzenStack>
+                </RadzenStack>
+            </div>
+        }
+
+        <!-- Test Area -->
+        @if (!string.IsNullOrEmpty(_testResult))
+        {
+            <RadzenAlert AlertStyle="@_testAlertStyle" Shade="Shade.Dark" AllowClose="true"
+                         Close="@(() => _testResult = null)">
+                @_testResult
+            </RadzenAlert>
+        }
+    </RadzenStack>
+</div>
+
+<!-- Add Phrase Dialog -->
+@if (_showAddDialog)
+{
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; align-items: center; justify-content: center;">
+        <RadzenCard Style="width: 320px; padding: 1.5rem;">
+            <RadzenText TextStyle="TextStyle.H6">Add Phrase</RadzenText>
+            <RadzenStack Gap="1rem" Style="margin-top: 1rem;">
+                <RadzenFormField Text="Phrase" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_newPhrase" Style="width: 100%;" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Action" Style="width: 100%;">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="_newAction" Data="@_actions"
+                                        TextProperty="Text" ValueProperty="Value" Style="width: 100%;" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                    <RadzenButton Text="Cancel" Variant="Variant.Text" Click="@(() => _showAddDialog = false)" />
+                    <RadzenButton Text="Add" ButtonStyle="ButtonStyle.Primary" Click="@AddPhrase" />
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenCard>
+    </div>
+}
+
+@code {
+    private List<ActivationPhrase> _phrases = [];
+    private bool _voiceEnabled;
+    private double _threshold = 0.7;
+    private string? _testResult;
+    private AlertStyle _testAlertStyle = AlertStyle.Info;
+
+    // Add dialog
+    private bool _showAddDialog;
+    private string _newPhrase = "";
+    private PhraseAction _newAction = PhraseAction.EmergencySOS;
+
+    private readonly List<ActionOption> _actions =
+    [
+        new("Emergency SOS", PhraseAction.EmergencySOS),
+        new("Check In", PhraseAction.CheckIn),
+        new("Silent Alert", PhraseAction.SilentAlert),
+    ];
+
+    protected override void OnInitialized()
+    {
+        _phrases = PhraseService.GetPhrases().ToList();
+        _threshold = PhraseService.Threshold;
+        _voiceEnabled = SpeechService.IsListening;
+    }
+
+    private void ShowAddDialog()
+    {
+        _newPhrase = "";
+        _newAction = PhraseAction.EmergencySOS;
+        _showAddDialog = true;
+    }
+
+    private void AddPhrase()
+    {
+        if (!string.IsNullOrWhiteSpace(_newPhrase))
+        {
+            PhraseService.AddPhrase(_newPhrase.Trim(), _newAction);
+            _phrases = PhraseService.GetPhrases().ToList();
+            _showAddDialog = false;
+            Notification.Notify(NotificationSeverity.Success, "Added", $"Phrase \"{_newPhrase}\" added.");
+        }
+    }
+
+    private void RemovePhrase(string text)
+    {
+        PhraseService.RemovePhrase(text);
+        _phrases = PhraseService.GetPhrases().ToList();
+    }
+
+    private void TestPhrase(string phrase)
+    {
+        var match = PhraseService.MatchPhrase(phrase);
+        if (match is not null)
+        {
+            _testResult = $"Matched! \"{match.Value.phrase}\" -> {match.Value.action}";
+            _testAlertStyle = AlertStyle.Success;
+        }
+        else
+        {
+            _testResult = $"No match for \"{phrase}\"";
+            _testAlertStyle = AlertStyle.Warning;
+        }
+    }
+
+    private async void OnVoiceToggle(bool enabled)
+    {
+        if (enabled)
+            await SpeechService.StartListeningAsync();
+        else
+            await SpeechService.StopListeningAsync();
+        _voiceEnabled = SpeechService.IsListening;
+    }
+
+    private void OnThresholdChanged(double value)
+    {
+        PhraseService.Threshold = value;
+    }
+
+    private static string GetActionClass(PhraseAction action) => action switch
+    {
+        PhraseAction.EmergencySOS => "status-danger",
+        PhraseAction.CheckIn => "status-safe",
+        PhraseAction.SilentAlert => "status-warning",
+        _ => "status-offline"
+    };
+
+    private record ActionOption(string Text, PhraseAction Value);
+}

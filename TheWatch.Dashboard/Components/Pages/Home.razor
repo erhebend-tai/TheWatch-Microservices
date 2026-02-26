@@ -1,0 +1,75 @@
+@page "/"
+@inject MicroserviceClient Client
+@inject NavigationManager Nav
+
+<PageTitle>TheWatch — Dashboard</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">Program Overview</RadzenText>
+
+<RadzenRow Gap="1rem">
+    @foreach (var prog in Client.Programs.Values.OrderBy(p => p.Id))
+    {
+        <RadzenColumn Size="12" SizeMD="6" SizeLG="4" SizeXL="3">
+            <RadzenCard class="rz-p-4" style="cursor: pointer; min-height: 200px;"
+                        @onclick="@(() => Nav.NavigateTo($"/program/{prog.Id}"))">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-mb-3">
+                    <RadzenIcon Icon="@prog.Icon" style="font-size: 2rem; color: var(--rz-primary);" />
+                    <div>
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">@prog.Id</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-0" style="opacity: 0.7;">@prog.Name</RadzenText>
+                    </div>
+                </RadzenStack>
+
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-3" style="opacity: 0.8;">
+                    @prog.Description
+                </RadzenText>
+
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    @if (_healthStatus.TryGetValue(prog.Id, out var health))
+                    {
+                        <RadzenBadge BadgeStyle="@GetBadgeStyle(health.Status)" Text="@(health.Status ?? "Unknown")" />
+                        @if (health.ResponseTimeMs.HasValue)
+                        {
+                            <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.5;">@(health.ResponseTimeMs)ms</RadzenText>
+                        }
+                    }
+                    else
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="Checking..." />
+                    }
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    }
+</RadzenRow>
+
+@code {
+    private Dictionary<string, ProgramInfo> _healthStatus = new();
+    private System.Threading.Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshHealth();
+        _timer = new System.Threading.Timer(async _ =>
+        {
+            await RefreshHealth();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    private async Task RefreshHealth()
+    {
+        try { _healthStatus = await Client.CheckAllHealthAsync(); }
+        catch { /* swallow on dashboard */ }
+    }
+
+    private static BadgeStyle GetBadgeStyle(string? status) => status switch
+    {
+        "Healthy" => BadgeStyle.Success,
+        "Unhealthy" => BadgeStyle.Warning,
+        "Offline" => BadgeStyle.Danger,
+        _ => BadgeStyle.Light
+    };
+
+    public void Dispose() => _timer?.Dispose();
+}

@@ -1,0 +1,208 @@
+@page "/health"
+@attribute [Authorize]
+@inject WatchApiClient Api
+@inject NotificationService Notification
+
+<div class="page-content">
+    <RadzenStack Gap="1rem">
+        <RadzenText TextStyle="TextStyle.H5">Family Health</RadzenText>
+
+        @if (_loading)
+        {
+            <RadzenProgressBarCircular ShowValue="false" />
+        }
+        else if (_familyGroup is null)
+        {
+            <div class="watch-card">
+                <RadzenStack Gap="0.75rem" AlignItems="AlignItems.Center">
+                    <span class="material-symbols-outlined" style="font-size: 3rem; color: var(--watch-muted);">
+                        family_restroom
+                    </span>
+                    <RadzenText TextStyle="TextStyle.Body1">No family group found.</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                        Create a family group to track member health and check-ins.
+                    </RadzenText>
+                    <RadzenButton Text="Create Family Group" Icon="group_add"
+                                  ButtonStyle="ButtonStyle.Primary" Click="@CreateFamilyGroup" />
+                </RadzenStack>
+            </div>
+        }
+        else
+        {
+            <RadzenText TextStyle="TextStyle.Subtitle1">@_familyGroup.Name</RadzenText>
+
+            <!-- Quick Check-In Button -->
+            <RadzenButton Text="Request Check-In" Icon="check_circle" ButtonStyle="ButtonStyle.Success"
+                          Size="ButtonSize.Small" Style="width: fit-content;" Click="@RequestCheckIn" />
+
+            <!-- Family Members -->
+            @foreach (var member in _familyGroup.Members)
+            {
+                <div class="watch-card">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenStack Orientation="Orientation.Horizontal"
+                                     JustifyContent="JustifyContent.SpaceBetween"
+                                     AlignItems="AlignItems.Center">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem"
+                                         AlignItems="AlignItems.Center">
+                                <span class="material-symbols-outlined">@GetRoleIcon(member.Role)</span>
+                                <RadzenText TextStyle="TextStyle.Body1">@member.Name</RadzenText>
+                            </RadzenStack>
+                            <StatusBadge Text="@GetLastStatus(member.Id)"
+                                         StatusClass="@GetStatusClass(member.Id)" />
+                        </RadzenStack>
+
+                        <!-- Latest Vitals -->
+                        @if (_memberVitals.TryGetValue(member.Id, out var vitals) && vitals.Count > 0)
+                        {
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
+                                @foreach (var v in vitals.Take(4))
+                                {
+                                    <RadzenStack AlignItems="AlignItems.Center">
+                                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                                            @v.Type
+                                        </RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body1" Style="font-weight: 600;">
+                                            @v.Value @v.Unit
+                                        </RadzenText>
+                                    </RadzenStack>
+                                }
+                            </RadzenStack>
+                        }
+
+                        <!-- Last Check-In -->
+                        @if (_memberCheckIns.TryGetValue(member.Id, out var checkIn))
+                        {
+                            <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                                Last check-in: @checkIn.Timestamp.ToString("g")
+                                @if (!string.IsNullOrEmpty(checkIn.Message))
+                                {
+                                    <text> — @checkIn.Message</text>
+                                }
+                            </RadzenText>
+                        }
+                    </RadzenStack>
+                </div>
+            }
+
+            <!-- Vital History Chart -->
+            @if (_chartData.Count > 0)
+            {
+                <RadzenText TextStyle="TextStyle.Subtitle1" Style="margin-top: 0.5rem;">
+                    Heart Rate History
+                </RadzenText>
+                <RadzenChart Style="height: 200px;">
+                    <RadzenLineSeries Data="@_chartData" CategoryProperty="Time"
+                                     ValueProperty="Value" Title="BPM" />
+                    <RadzenCategoryAxis FormatString="{0:HH:mm}" />
+                    <RadzenValueAxis Min="40" Max="160" />
+                </RadzenChart>
+            }
+        }
+    </RadzenStack>
+</div>
+
+@code {
+    private bool _loading = true;
+    private FamilyGroupDto? _familyGroup;
+    private Dictionary<Guid, List<VitalReadingDto>> _memberVitals = new();
+    private Dictionary<Guid, CheckInDto> _memberCheckIns = new();
+    private List<ChartPoint> _chartData = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+        _loading = false;
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            _familyGroup = await Api.GetFamilyGroupAsync();
+            if (_familyGroup is null) return;
+
+            foreach (var member in _familyGroup.Members)
+            {
+                try
+                {
+                    var vitals = await Api.GetMemberVitalsAsync(member.Id);
+                    _memberVitals[member.Id] = vitals;
+
+                    var checkIn = await Api.GetLatestCheckInAsync(member.Id);
+                    if (checkIn is not null)
+                        _memberCheckIns[member.Id] = checkIn;
+                }
+                catch { /* member data unavailable */ }
+            }
+
+            // Build chart from first member's heart rate
+            var firstMember = _familyGroup.Members.FirstOrDefault();
+            if (firstMember is not null &&
+                _memberVitals.TryGetValue(firstMember.Id, out var allVitals))
+            {
+                _chartData = allVitals
+                    .Where(v => v.Type == VitalType.HeartRate)
+                    .OrderBy(v => v.Timestamp)
+                    .Take(20)
+                    .Select(v => new ChartPoint(v.Timestamp.ToString("HH:mm"), v.Value))
+                    .ToList();
+            }
+        }
+        catch
+        {
+            _familyGroup = null;
+        }
+    }
+
+    private async Task CreateFamilyGroup()
+    {
+        try
+        {
+            await Api.CreateFamilyGroupAsync("My Family");
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+    }
+
+    private async Task RequestCheckIn()
+    {
+        try
+        {
+            await Api.CreateCheckInAsync(CheckInStatus.Safe, "Check-in requested");
+            Notification.Notify(NotificationSeverity.Success, "Sent", "Check-in request sent.");
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+    }
+
+    private string GetLastStatus(Guid memberId) =>
+        _memberCheckIns.TryGetValue(memberId, out var c) ? c.Status.ToString() : "Unknown";
+
+    private string GetStatusClass(Guid memberId)
+    {
+        if (!_memberCheckIns.TryGetValue(memberId, out var c)) return "status-offline";
+        return c.Status switch
+        {
+            CheckInStatus.Safe => "status-safe",
+            CheckInStatus.NeedHelp => "status-warning",
+            CheckInStatus.Emergency => "status-danger",
+            _ => "status-offline"
+        };
+    }
+
+    private static string GetRoleIcon(FamilyRole role) => role switch
+    {
+        FamilyRole.Parent or FamilyRole.Guardian => "person",
+        FamilyRole.Child => "child_care",
+        FamilyRole.ElderlyRelative => "elderly",
+        _ => "person"
+    };
+
+    private record ChartPoint(string Time, double Value);
+}

@@ -1,0 +1,48 @@
+@page "/api-explorer"
+@inject CatalogDataService CatalogService
+
+<PageTitle>TheWatch — API Explorer</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">API Explorer</RadzenText>
+
+<RadzenText TextStyle="TextStyle.Subtitle1" class="rz-mb-3" style="opacity: 0.7;">
+    @_operations.Count operations across all OpenAPI specs
+</RadzenText>
+
+<RadzenDataGrid Data="@_operations" TItem="ApiOperation"
+                AllowFiltering="true" AllowSorting="true" AllowPaging="true"
+                PageSize="50" FilterMode="FilterMode.Simple"
+                AllowColumnResize="true"
+                Style="min-height: 600px;">
+    <Columns>
+        <RadzenDataGridColumn Property="Domain" Title="Domain" Width="130px" />
+        <RadzenDataGridColumn Property="Spec" Title="Spec" Width="160px" />
+        <RadzenDataGridColumn Property="Method" Title="Method" Width="80px">
+            <Template Context="op">
+                <RadzenBadge BadgeStyle="@GetMethodStyle(op.Method)" Text="@op.Method" />
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn Property="Path" Title="Path" Width="300px" />
+        <RadzenDataGridColumn Property="OperationId" Title="Operation ID" Width="200px" />
+        <RadzenDataGridColumn Property="Summary" Title="Summary" />
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    private List<ApiOperation> _operations = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _operations = await CatalogService.GetAllOperationsAsync();
+    }
+
+    private static BadgeStyle GetMethodStyle(string? method) => method?.ToUpper() switch
+    {
+        "GET" => BadgeStyle.Success,
+        "POST" => BadgeStyle.Primary,
+        "PUT" => BadgeStyle.Warning,
+        "DELETE" => BadgeStyle.Danger,
+        "PATCH" => BadgeStyle.Info,
+        _ => BadgeStyle.Light
+    };
+}

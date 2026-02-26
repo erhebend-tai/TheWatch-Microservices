@@ -1,0 +1,165 @@
+@page "/sos"
+@attribute [Authorize]
+@inject WatchApiClient Api
+@inject WatchAuthService AuthService
+@inject NavigationManager Nav
+@inject NotificationService Notification
+@inject SpeechListenerService SpeechService
+
+<div class="page-content" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh;">
+
+    @if (!_incidentCreated)
+    {
+        <RadzenStack AlignItems="AlignItems.Center" Gap="1.5rem">
+            <RadzenText TextStyle="TextStyle.H5">Emergency SOS</RadzenText>
+
+            <!-- Emergency Type Selector -->
+            <RadzenFormField Text="Emergency Type" Style="width: 280px;">
+                <ChildContent>
+                    <RadzenDropDown @bind-Value="_selectedType" Data="@_emergencyTypes"
+                                   TextProperty="Text" ValueProperty="Value"
+                                   Style="width: 100%;" />
+                </ChildContent>
+            </RadzenFormField>
+
+            <!-- Severity Slider -->
+            <RadzenFormField Text="Severity (1-5)" Style="width: 280px;">
+                <ChildContent>
+                    <RadzenSlider @bind-Value="_severity" Min="1" Max="5" Step="1"
+                                  Style="width: 100%;" />
+                </ChildContent>
+            </RadzenFormField>
+
+            <!-- THE SOS BUTTON -->
+            <button class="sos-button" @onclick="OnSOSActivated" disabled="@_activating">
+                @if (_activating)
+                {
+                    <RadzenProgressBarCircular ShowValue="false" Size="ProgressBarCircularSize.Medium"
+                                               Style="color: white;" />
+                }
+                else
+                {
+                    <span>SOS</span>
+                }
+            </button>
+
+            <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--watch-muted); text-align: center;">
+                Tap the button or say an activation phrase
+            </RadzenText>
+
+            <!-- Voice status -->
+            @if (SpeechService.IsListening)
+            {
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <span class="material-symbols-outlined" style="color: var(--watch-success); animation: pulse-ring 2s infinite;">mic</span>
+                    <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-success);">
+                        Voice listening active
+                    </RadzenText>
+                </RadzenStack>
+            }
+        </RadzenStack>
+    }
+    else
+    {
+        <!-- Incident Created Confirmation -->
+        <RadzenStack AlignItems="AlignItems.Center" Gap="1rem">
+            <span class="material-symbols-outlined" style="font-size: 4rem; color: var(--watch-warning);">
+                warning
+            </span>
+            <RadzenText TextStyle="TextStyle.H5">Incident Reported</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body1" Style="color: var(--watch-muted);">
+                Emergency responders are being dispatched.
+            </RadzenText>
+
+            <div class="watch-card" style="width: 100%; max-width: 320px;">
+                <RadzenStack Gap="0.5rem">
+                    <RadzenText><strong>Type:</strong> @_selectedType</RadzenText>
+                    <RadzenText><strong>Severity:</strong> @_severity / 5</RadzenText>
+                    <RadzenText><strong>Status:</strong> Dispatched</RadzenText>
+                    @if (_location is not null)
+                    {
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            Location: @_location.Value.lat.ToString("F4"), @_location.Value.lon.ToString("F4")
+                        </RadzenText>
+                    }
+                </RadzenStack>
+            </div>
+
+            <RadzenButton Text="Back to Home" Icon="home"
+                          ButtonStyle="ButtonStyle.Secondary" Click="@(() => Nav.NavigateTo("/"))" />
+        </RadzenStack>
+    }
+</div>
+
+@code {
+    private EmergencyType _selectedType = EmergencyType.MedicalEmergency;
+    private int _severity = 3;
+    private bool _activating;
+    private bool _incidentCreated;
+    private (double lat, double lon)? _location;
+
+    private readonly List<TypeOption> _emergencyTypes = Enum.GetValues<EmergencyType>()
+        .Select(e => new TypeOption(e.ToString(), e))
+        .ToList();
+
+    protected override void OnInitialized()
+    {
+        SpeechService.OnPhraseMatched += OnVoiceSOSTriggered;
+    }
+
+    private async void OnVoiceSOSTriggered(string phrase, PhraseAction action)
+    {
+        if (action == PhraseAction.EmergencySOS && !_activating && !_incidentCreated)
+        {
+            await InvokeAsync(async () =>
+            {
+                await OnSOSActivated();
+                StateHasChanged();
+            });
+        }
+    }
+
+    private async Task OnSOSActivated()
+    {
+        _activating = true;
+
+        // Get location
+        try
+        {
+            var loc = await Geolocation.GetLastKnownLocationAsync();
+            if (loc is not null)
+                _location = (loc.Latitude, loc.Longitude);
+        }
+        catch { /* location unavailable */ }
+
+        var user = AuthService.CurrentUser;
+        var request = new CreateIncidentRequest(
+            _selectedType,
+            $"SOS activated via TheWatch Mobile",
+            new LocationDto(_location?.lat ?? 0, _location?.lon ?? 0),
+            user?.Id ?? Guid.Empty,
+            user?.DisplayName,
+            user?.Phone,
+            _severity);
+
+        try
+        {
+            await Api.CreateIncidentAsync(request);
+
+            // Vibrate for haptic feedback
+            try { Vibration.Vibrate(TimeSpan.FromMilliseconds(500)); } catch { }
+
+            _incidentCreated = true;
+            Notification.Notify(NotificationSeverity.Warning, "SOS Sent",
+                "Emergency dispatched. Help is on the way.");
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "SOS Failed", ex.Message);
+        }
+
+        _activating = false;
+    }
+
+    private record TypeOption(string Text, EmergencyType Value);
+}

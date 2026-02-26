@@ -1,0 +1,115 @@
+@page "/profile"
+@attribute [Authorize]
+@inject WatchAuthService AuthService
+@inject SpeechListenerService SpeechService
+@inject NavigationManager Nav
+@inject NotificationService Notification
+
+<div class="page-content">
+    <RadzenStack Gap="1rem">
+        <RadzenText TextStyle="TextStyle.H5">Profile</RadzenText>
+
+        @if (AuthService.CurrentUser is not null)
+        {
+            var user = AuthService.CurrentUser;
+
+            <!-- User Info Card -->
+            <div class="watch-card">
+                <RadzenStack Gap="0.75rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem"
+                                 AlignItems="AlignItems.Center">
+                        <RadzenStack AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center"
+                                     Style="width: 56px; height: 56px; border-radius: 50%; background: var(--rz-primary); font-size: 1.5rem; font-weight: 700; color: white;">
+                            @(user.DisplayName.Length > 0 ? user.DisplayName[0].ToString().ToUpper() : "?")
+                        </RadzenStack>
+                        <RadzenStack>
+                            <RadzenText TextStyle="TextStyle.H6">@user.DisplayName</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                                @user.Email
+                            </RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                        @foreach (var role in user.Roles)
+                        {
+                            <span class="status-badge status-safe">@role</span>
+                        }
+                    </RadzenStack>
+                </RadzenStack>
+            </div>
+
+            <!-- Settings -->
+            <RadzenText TextStyle="TextStyle.Subtitle1">Settings</RadzenText>
+
+            <!-- Voice Listening -->
+            <div class="watch-card">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                             AlignItems="AlignItems.Center">
+                    <RadzenStack>
+                        <RadzenText TextStyle="TextStyle.Body1">Voice Listening</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            Continuously listen for activation phrases
+                        </RadzenText>
+                    </RadzenStack>
+                    <RadzenSwitch Value="@SpeechService.IsListening" Change="@((bool v) => OnVoiceToggle(v))" />
+                </RadzenStack>
+            </div>
+
+            <!-- Phrase Configuration Link -->
+            <div class="watch-card" @onclick="@(() => Nav.NavigateTo("/phrases"))" style="cursor: pointer;">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                             AlignItems="AlignItems.Center">
+                    <RadzenStack>
+                        <RadzenText TextStyle="TextStyle.Body1">Activation Phrases</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            Configure voice-activated commands
+                        </RadzenText>
+                    </RadzenStack>
+                    <span class="material-symbols-outlined" style="color: var(--watch-muted);">
+                        chevron_right
+                    </span>
+                </RadzenStack>
+            </div>
+
+            <!-- About Section -->
+            <RadzenText TextStyle="TextStyle.Subtitle1" Style="margin-top: 0.5rem;">About</RadzenText>
+            <div class="watch-card">
+                <RadzenStack Gap="0.5rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenText>Version</RadzenText>
+                        <RadzenText Style="color: var(--watch-muted);">1.0.0</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenText>User ID</RadzenText>
+                        <RadzenText Style="color: var(--watch-muted); font-size: 0.7rem;">
+                            @user.Id.ToString()[..8]...
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </div>
+
+            <!-- Logout -->
+            <RadzenButton Text="Logout" Icon="logout" ButtonStyle="ButtonStyle.Danger"
+                          Variant="Variant.Outlined" Style="width: 100%; margin-top: 1rem;"
+                          Click="@OnLogout" />
+        }
+    </RadzenStack>
+</div>
+
+@code {
+    private async void OnVoiceToggle(bool enabled)
+    {
+        if (enabled)
+            await SpeechService.StartListeningAsync();
+        else
+            await SpeechService.StopListeningAsync();
+    }
+
+    private async Task OnLogout()
+    {
+        await SpeechService.StopListeningAsync();
+        await AuthService.LogoutAsync();
+        Nav.NavigateTo("/login");
+    }
+}

@@ -1,0 +1,140 @@
+@page "/"
+@attribute [Authorize]
+@inject WatchApiClient Api
+@inject NavigationManager Nav
+@inject WatchAuthService AuthService
+
+<div class="page-content">
+    <RadzenStack Gap="1rem">
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                     AlignItems="AlignItems.Center">
+            <RadzenText TextStyle="TextStyle.H5">
+                Welcome, @(AuthService.CurrentUser?.DisplayName ?? "Citizen")
+            </RadzenText>
+            <StatusBadge Text="@_overallStatus" StatusClass="@_overallStatusClass" />
+        </RadzenStack>
+
+        <!-- Quick Actions -->
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+            <RadzenButton Text="Report Emergency" Icon="emergency" ButtonStyle="ButtonStyle.Danger"
+                          Size="ButtonSize.Small" Click="@(() => Nav.NavigateTo("/sos"))" />
+            <RadzenButton Text="Check In" Icon="check_circle" ButtonStyle="ButtonStyle.Success"
+                          Size="ButtonSize.Small" Click="@OnQuickCheckIn" />
+            <RadzenButton Text="View Vitals" Icon="monitor_heart" ButtonStyle="ButtonStyle.Info"
+                          Size="ButtonSize.Small" Click="@(() => Nav.NavigateTo("/health"))" />
+        </RadzenStack>
+
+        <!-- Service Status -->
+        <RadzenText TextStyle="TextStyle.Subtitle1" Style="margin-top: 0.5rem;">Service Status</RadzenText>
+        <RadzenStack Gap="0.5rem">
+            @foreach (var svc in _services)
+            {
+                <ServiceCard Name="@svc.Name" Program="@svc.Program"
+                             Icon="@svc.Icon" Status="@svc.Status" />
+            }
+        </RadzenStack>
+
+        <!-- Recent Incidents -->
+        <RadzenText TextStyle="TextStyle.Subtitle1" Style="margin-top: 0.5rem;">Recent Incidents</RadzenText>
+        @if (_recentIncidents.Count == 0)
+        {
+            <div class="watch-card">
+                <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--watch-muted);">
+                    No recent incidents.
+                </RadzenText>
+            </div>
+        }
+        else
+        {
+            @foreach (var incident in _recentIncidents)
+            {
+                <div class="watch-card">
+                    <RadzenStack Orientation="Orientation.Horizontal"
+                                 JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenText TextStyle="TextStyle.Body1">@incident.Type</RadzenText>
+                        <StatusBadge Text="@incident.Status.ToString()"
+                                     StatusClass="@GetIncidentStatusClass(incident.Status)" />
+                    </RadzenStack>
+                    <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                        @incident.CreatedAt.ToString("g") — Severity @incident.Severity
+                    </RadzenText>
+                </div>
+            }
+        }
+    </RadzenStack>
+</div>
+
+@code {
+    private string _overallStatus = "Online";
+    private string _overallStatusClass = "status-safe";
+    private List<ServiceInfo> _services = [];
+    private List<IncidentDto> _recentIncidents = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _services =
+        [
+            new("Core Gateway", "P1", "hub", "Checking..."),
+            new("Voice Emergency", "P2", "record_voice_over", "Checking..."),
+            new("Mesh Network", "P3", "lan", "Checking..."),
+            new("Wearable", "P4", "watch", "Checking..."),
+            new("Auth & Security", "P5", "shield", "Checking..."),
+            new("First Responder", "P6", "local_fire_department", "Checking..."),
+            new("Family Health", "P7", "family_restroom", "Checking..."),
+            new("Disaster Relief", "P8", "flood", "Checking..."),
+            new("Doctor Services", "P9", "medical_services", "Checking..."),
+            new("Gamification", "P10", "emoji_events", "Checking..."),
+        ];
+
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        // Load recent incidents
+        try
+        {
+            _recentIncidents = await Api.GetRecentIncidentsAsync(5);
+        }
+        catch { /* offline */ }
+
+        // Check service health
+        for (int i = 0; i < _services.Count; i++)
+        {
+            try
+            {
+                var healthy = await Api.CheckHealthAsync(_services[i].Program);
+                _services[i] = _services[i] with { Status = healthy ? "Healthy" : "Unhealthy" };
+            }
+            catch
+            {
+                _services[i] = _services[i] with { Status = "Offline" };
+            }
+        }
+
+        var healthyCount = _services.Count(s => s.Status == "Healthy");
+        _overallStatus = healthyCount == _services.Count ? "All Online"
+            : healthyCount > 0 ? $"{healthyCount}/10 Online" : "Offline";
+        _overallStatusClass = healthyCount == _services.Count ? "status-safe"
+            : healthyCount > 0 ? "status-warning" : "status-danger";
+    }
+
+    private async Task OnQuickCheckIn()
+    {
+        try
+        {
+            await Api.CreateCheckInAsync(CheckInStatus.Safe, "Quick check-in from mobile");
+        }
+        catch { /* notify */ }
+    }
+
+    private static string GetIncidentStatusClass(IncidentStatus status) => status switch
+    {
+        IncidentStatus.Resolved or IncidentStatus.Archived => "status-safe",
+        IncidentStatus.Reported or IncidentStatus.Dispatched => "status-warning",
+        IncidentStatus.InProgress => "status-danger",
+        _ => "status-offline"
+    };
+
+    private record ServiceInfo(string Name, string Program, string Icon, string Status);
+}
