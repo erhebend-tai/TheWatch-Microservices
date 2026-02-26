@@ -27,6 +27,7 @@
     <ProjectReference Include="..\TheWatch.P8.DisasterRelief\TheWatch.P8.DisasterRelief.csproj" />
     <ProjectReference Include="..\TheWatch.P9.DoctorServices\TheWatch.P9.DoctorServices.csproj" />
     <ProjectReference Include="..\TheWatch.P10.Gamification\TheWatch.P10.Gamification.csproj" />
+    <ProjectReference Include="..\TheWatch.P11.Surveillance\TheWatch.P11.Surveillance.csproj" />
     <ProjectReference Include="..\TheWatch.Geospatial\TheWatch.Geospatial.csproj" />
     <ProjectReference Include="..\TheWatch.Dashboard\TheWatch.Dashboard.csproj" />
     <ProjectReference Include="..\TheWatch.Admin\TheWatch.Admin.csproj" />

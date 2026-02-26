@@ -20,6 +20,7 @@ using TheWatch.Contracts.DisasterRelief;
 using TheWatch.Contracts.DoctorServices;
 using TheWatch.Contracts.Gamification;
 using TheWatch.Contracts.Geospatial;
+using TheWatch.Contracts.Surveillance;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,7 +38,7 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 // ──────── Security+ 1.3: JWT Authentication (AAA) ────────────────────
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "TheWatch-P5-AuthSecurity-DevKey-Min32Chars!!";
+var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("FATAL: Jwt:Key not configured. Set the Jwt:Key configuration value.");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "TheWatch.P5.AuthSecurity";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "TheWatch";
 var clockSkewSeconds = int.TryParse(builder.Configuration["Jwt:ClockSkewSeconds"], out var cs) ? cs : 30;
@@ -232,6 +233,8 @@ ConfigureClient(builder.Services.AddDisasterReliefClient(), "p8-disasterrelief")
 ConfigureClient(builder.Services.AddDoctorServicesClient(), "p9-doctorservices");
 ConfigureClient(builder.Services.AddGamificationClient(), "p10-gamification");
 ConfigureClient(builder.Services.AddGeospatialClient(), "geospatial");
+ConfigureClient(builder.Services.AddSurveillanceClient(), "p11-surveillance");
+ConfigureClient(builder.Services.AddSurveillanceClient(), "p11-surveillance");
 
 // ──────── App Pipeline (Security+ 3.1: Defense in Depth layers) ─────
 var app = builder.Build();
@@ -243,11 +246,12 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseHttpsRedirection();
 
-// Middleware order: security headers → correlation → exception → rate limit → CORS → auth → zero trust
+// Middleware order: security headers → correlation → rate limit → exception → CORS → auth → zero trust
+// Security+ 2.3: GlobalExceptionMiddleware AFTER RateLimiter so 429 responses aren't caught/masked
 app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<CorrelationIdMiddleware>();
-app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseRateLimiter();
+app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();

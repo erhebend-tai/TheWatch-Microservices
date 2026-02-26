@@ -34,6 +34,43 @@ public record DispatchRequestedEvent : WatchDomainEvent
     public double Longitude { get; init; }
 }
 
+// ── P11 Surveillance events ──
+
+public record FootageSubmittedEvent : WatchDomainEvent
+{
+    public Guid FootageId { get; init; }
+    public Guid CameraId { get; init; }
+    public double GpsLatitude { get; init; }
+    public double GpsLongitude { get; init; }
+    public Guid SubmitterId { get; init; }
+}
+
+public record FootageAnalyzedEvent : WatchDomainEvent
+{
+    public Guid FootageId { get; init; }
+    public int DetectionCount { get; init; }
+    public bool HasSuspiciousActivity { get; init; }
+    public string DetectionSummary { get; init; } = string.Empty;
+}
+
+public record CrimeLocationReportedEvent : WatchDomainEvent
+{
+    public Guid CrimeLocationId { get; init; }
+    public double Latitude { get; init; }
+    public double Longitude { get; init; }
+    public string CrimeType { get; init; } = string.Empty;
+    public Guid ReporterId { get; init; }
+}
+
+public record SuspiciousDetectionEvent : WatchDomainEvent
+{
+    public Guid FootageId { get; init; }
+    public string DetectionType { get; init; } = string.Empty;
+    public float Confidence { get; init; }
+    public string Label { get; init; } = string.Empty;
+    public Guid CameraId { get; init; }
+}
+
 // ── Dead letter envelope ──
 
 public record DeadLetterEvent
