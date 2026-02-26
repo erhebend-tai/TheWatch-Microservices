@@ -160,15 +160,22 @@ internal static class GeneratorHelpers
         var t = paramType.Trim();
         string attr = null;
 
-        if (t.StartsWith("["))
+        // Strip all bracket attributes, only keeping From* as the binding attribute
+        while (t.StartsWith("["))
         {
             var end = t.IndexOf(']');
-            if (end > 0)
-            {
-                attr = t.Substring(1, end - 1); // e.g. "FromBody"
-                t = t.Substring(end + 1).Trim();
-            }
+            if (end < 0) break;
+            var attrContent = t.Substring(1, end - 1); // e.g. "FromBody", "Required"
+            t = t.Substring(end + 1).Trim();
+
+            // Only recognize From* attributes as binding attributes
+            if (attrContent.StartsWith("From"))
+                attr = attrContent;
         }
+
+        // Remove newlines and attribute noise (e.g. "[Required]\n public string")
+        var nlIdx = t.LastIndexOf('\n');
+        if (nlIdx >= 0) t = t.Substring(nlIdx + 1).Trim();
 
         // Clean the type name — remove modifiers but keep the type identifier
         foreach (var mod in new[] { "public ", "private ", "protected ", "internal ", "static ", "readonly ", "virtual ", "override ", "abstract ", "sealed ", "required " })
@@ -177,9 +184,13 @@ internal static class GeneratorHelpers
                 t = t.Substring(mod.Length);
         }
 
-        // Remove newlines and attribute noise (e.g. "[Required]\n public string")
-        var nlIdx = t.LastIndexOf('\n');
-        if (nlIdx >= 0) t = t.Substring(nlIdx + 1).Trim();
+        // Strip any remaining bracket attributes after newline processing
+        while (t.StartsWith("["))
+        {
+            var end = t.IndexOf(']');
+            if (end < 0) break;
+            t = t.Substring(end + 1).Trim();
+        }
 
         if (string.IsNullOrEmpty(t)) t = "object";
 
