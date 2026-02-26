@@ -1,0 +1,364 @@
+@page "/settings"
+@attribute [Authorize(Roles = "Admin")]
+@inject IConfiguration Config
+@inject AdminApiClient ApiClient
+
+<PageTitle>TheWatch Admin — Settings</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">
+    <RadzenIcon Icon="settings" style="vertical-align: middle;" /> System Settings
+</RadzenText>
+
+@* ---------------------------------------------------------------
+   Section 1: JWT Configuration
+   --------------------------------------------------------------- *@
+
+<RadzenRow Gap="1rem" class="rz-mb-6">
+    <RadzenColumn Size="12" SizeLG="6">
+        <RadzenCard class="rz-p-4" Style="height: 100%;">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+                <RadzenIcon Icon="key" style="font-size: 1.5rem; color: var(--rz-warning);" />
+                <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">JWT Configuration</RadzenText>
+            </RadzenStack>
+
+            <RadzenStack Gap="0.75rem">
+                <RadzenFormField Text="Issuer" Style="width: 100%;">
+                    <RadzenTextBox Value="@_jwtIssuer" Disabled="true" Style="width: 100%;" />
+                </RadzenFormField>
+                <RadzenFormField Text="Audience" Style="width: 100%;">
+                    <RadzenTextBox Value="@_jwtAudience" Disabled="true" Style="width: 100%;" />
+                </RadzenFormField>
+                <RadzenFormField Text="Access Token Lifetime (minutes)" Style="width: 100%;">
+                    <RadzenTextBox Value="@_accessTokenLifetime" Disabled="true" Style="width: 100%;" />
+                </RadzenFormField>
+                <RadzenFormField Text="Refresh Token Lifetime (days)" Style="width: 100%;">
+                    <RadzenTextBox Value="@_refreshTokenLifetime" Disabled="true" Style="width: 100%;" />
+                </RadzenFormField>
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
+
+    @* ---------------------------------------------------------------
+       Section 2: Security Policies
+       --------------------------------------------------------------- *@
+
+    <RadzenColumn Size="12" SizeLG="6">
+        <RadzenCard class="rz-p-4" Style="height: 100%;">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-mb-4">
+                <RadzenIcon Icon="security" style="font-size: 1.5rem; color: var(--rz-danger);" />
+                <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">Security Policies</RadzenText>
+            </RadzenStack>
+
+            <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-2" style="color: var(--rz-text-secondary-color);">
+                Account Lockout
+            </RadzenText>
+            <RadzenRow Gap="0.75rem" class="rz-mb-4">
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Max Failed Login Attempts" Style="width: 100%;">
+                        <RadzenTextBox Value="@_maxFailedAttempts" Disabled="true" Style="width: 100%;" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Lockout Duration" Style="width: 100%;">
+                        <RadzenTextBox Value="@_lockoutDuration" Disabled="true" Style="width: 100%;" />
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-2" style="color: var(--rz-text-secondary-color);">
+                Password Requirements
+            </RadzenText>
+            <RadzenRow Gap="0.75rem" class="rz-mb-4">
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Minimum Length" Style="width: 100%;">
+                        <RadzenTextBox Value="@_passwordMinLength" Disabled="true" Style="width: 100%;" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Require Uppercase" Style="width: 100%;">
+                        <RadzenTextBox Value="@_requireUppercase" Disabled="true" Style="width: 100%;" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Require Lowercase" Style="width: 100%;">
+                        <RadzenTextBox Value="@_requireLowercase" Disabled="true" Style="width: 100%;" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Require Digit" Style="width: 100%;">
+                        <RadzenTextBox Value="@_requireDigit" Disabled="true" Style="width: 100%;" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Require Non-Alphanumeric" Style="width: 100%;">
+                        <RadzenTextBox Value="@_requireNonAlpha" Disabled="true" Style="width: 100%;" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Required Unique Chars" Style="width: 100%;">
+                        <RadzenTextBox Value="@_requiredUniqueChars" Disabled="true" Style="width: 100%;" />
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-2" style="color: var(--rz-text-secondary-color);">
+                Rate Limiting
+            </RadzenText>
+            <RadzenRow Gap="0.75rem">
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenFormField Text="Standard (per min)" Style="width: 100%;">
+                        <RadzenTextBox Value="@_rateLimitStandard" Disabled="true" Style="width: 100%;" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenFormField Text="Auth (per min)" Style="width: 100%;">
+                        <RadzenTextBox Value="@_rateLimitAuth" Disabled="true" Style="width: 100%;" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenFormField Text="Global (per min)" Style="width: 100%;">
+                        <RadzenTextBox Value="@_rateLimitGlobal" Disabled="true" Style="width: 100%;" />
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
+
+@* ---------------------------------------------------------------
+   Section 3: Service Endpoints
+   --------------------------------------------------------------- *@
+
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-mb-3">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">Service Endpoints</RadzenText>
+    <RadzenButton Text="Check Health" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                  Size="ButtonSize.Small" Click="@RefreshServiceHealth" IsBusy="@_loadingHealth" />
+</RadzenStack>
+<RadzenDataGrid Data="@_serviceEndpoints" TItem="ServiceEndpointRow"
+                AllowSorting="true" AllowFiltering="false"
+                Density="Density.Compact" class="rz-mb-6">
+    <Columns>
+        <RadzenDataGridColumn Property="ServiceId" Title="Service ID" Width="110px">
+            <Template Context="svc">
+                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@svc.ServiceId" />
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="Name" Title="Name" Width="200px">
+            <Template Context="svc">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="@svc.Icon" style="font-size: 1rem;" />
+                    <RadzenText>@svc.Name</RadzenText>
+                </RadzenStack>
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="Url" Title="URL">
+            <Template Context="svc">
+                <RadzenText TextStyle="TextStyle.Body2"
+                            style="font-family: monospace; font-size: 0.85rem; opacity: 0.8;">
+                    @svc.Url
+                </RadzenText>
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="Status" Title="Status" Width="130px">
+            <Template Context="svc">
+                @if (svc.Status is null)
+                {
+                    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="Not Checked" />
+                }
+                else
+                {
+                    <RadzenBadge BadgeStyle="@GetStatusBadge(svc.Status)" Text="@svc.Status" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@* ---------------------------------------------------------------
+   Section 4: System Info
+   --------------------------------------------------------------- *@
+
+<RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">System Information</RadzenText>
+<RadzenCard class="rz-p-4">
+    <RadzenRow Gap="1rem">
+        <RadzenColumn Size="6" SizeMD="3">
+            <RadzenFormField Text=".NET Version" Style="width: 100%;">
+                <RadzenTextBox Value="@_dotnetVersion" Disabled="true" Style="width: 100%;" />
+            </RadzenFormField>
+        </RadzenColumn>
+        <RadzenColumn Size="6" SizeMD="3">
+            <RadzenFormField Text="Environment" Style="width: 100%;">
+                <RadzenTextBox Value="@_environment" Disabled="true" Style="width: 100%;" />
+            </RadzenFormField>
+        </RadzenColumn>
+        <RadzenColumn Size="6" SizeMD="3">
+            <RadzenFormField Text="Server Time (UTC)" Style="width: 100%;">
+                <RadzenTextBox Value="@_serverTime" Disabled="true" Style="width: 100%;" />
+            </RadzenFormField>
+        </RadzenColumn>
+        <RadzenColumn Size="6" SizeMD="3">
+            <RadzenFormField Text="App Version" Style="width: 100%;">
+                <RadzenTextBox Value="@_appVersion" Disabled="true" Style="width: 100%;" />
+            </RadzenFormField>
+        </RadzenColumn>
+    </RadzenRow>
+</RadzenCard>
+
+@code {
+    // -- JWT Configuration --
+    private string _jwtIssuer = "";
+    private string _jwtAudience = "";
+    private string _accessTokenLifetime = "";
+    private string _refreshTokenLifetime = "";
+
+    // -- Security Policies --
+    private string _maxFailedAttempts = "";
+    private string _lockoutDuration = "";
+    private string _passwordMinLength = "";
+    private string _requireUppercase = "";
+    private string _requireLowercase = "";
+    private string _requireDigit = "";
+    private string _requireNonAlpha = "";
+    private string _requiredUniqueChars = "";
+    private string _rateLimitStandard = "";
+    private string _rateLimitAuth = "";
+    private string _rateLimitGlobal = "";
+
+    // -- Service Endpoints --
+    private List<ServiceEndpointRow> _serviceEndpoints = [];
+    private bool _loadingHealth;
+
+    // -- System Info --
+    private string _dotnetVersion = "";
+    private string _environment = "";
+    private string _serverTime = "";
+    private string _appVersion = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadJwtConfiguration();
+        LoadSecurityPolicies();
+        LoadSystemInfo();
+        LoadServiceEndpoints();
+        await RefreshServiceHealth();
+    }
+
+    private void LoadJwtConfiguration()
+    {
+        _jwtIssuer = Config["Jwt:Issuer"] ?? "TheWatch.P5.AuthSecurity";
+        _jwtAudience = Config["Jwt:Audience"] ?? "TheWatch";
+        _accessTokenLifetime = Config["Jwt:AccessTokenLifetimeMinutes"] ?? "60";
+        _refreshTokenLifetime = Config["Jwt:RefreshTokenLifetimeDays"] ?? "7";
+    }
+
+    private void LoadSecurityPolicies()
+    {
+        // Account lockout
+        _maxFailedAttempts = Config["Security:MaxFailedLoginAttempts"] ?? "5";
+        _lockoutDuration = Config["Security:LockoutDuration"] ?? "15 minutes";
+
+        // Password requirements
+        _passwordMinLength = Config["Security:Password:MinLength"] ?? "12";
+        _requireUppercase = Config["Security:Password:RequireUppercase"] ?? "true";
+        _requireLowercase = Config["Security:Password:RequireLowercase"] ?? "true";
+        _requireDigit = Config["Security:Password:RequireDigit"] ?? "true";
+        _requireNonAlpha = Config["Security:Password:RequireNonAlphanumeric"] ?? "true";
+        _requiredUniqueChars = Config["Security:Password:RequiredUniqueChars"] ?? "4";
+
+        // Rate limiting (values matching WatchRateLimitExtensions defaults)
+        _rateLimitStandard = Config["RateLimiting:Standard:PermitLimit"] ?? "100";
+        _rateLimitAuth = Config["RateLimiting:Auth:PermitLimit"] ?? "10";
+        _rateLimitGlobal = Config["RateLimiting:Global:PermitLimit"] ?? "200";
+    }
+
+    private void LoadServiceEndpoints()
+    {
+        var services = new (string Id, string Name, string Icon, string Resource)[]
+        {
+            ("P1",  "Core Gateway",     "dns",              "p1-coregateway"),
+            ("P2",  "Voice Emergency",  "emergency",        "p2-voiceemergency"),
+            ("P3",  "Mesh Network",     "cell_tower",       "p3-meshnetwork"),
+            ("P4",  "Wearable",         "watch",            "p4-wearable"),
+            ("P5",  "Auth & Security",  "shield",           "p5-authsecurity"),
+            ("P6",  "First Responder",  "local_police",     "p6-firstresponder"),
+            ("P7",  "Family Health",    "favorite",         "p7-familyhealth"),
+            ("P8",  "Disaster Relief",  "flood",            "p8-disasterrelief"),
+            ("P9",  "Doctor Services",  "medical_services", "p9-doctorservices"),
+            ("P10", "Gamification",     "trophy",           "p10-gamification"),
+        };
+
+        _serviceEndpoints = services.Select(s => new ServiceEndpointRow
+        {
+            ServiceId = s.Id,
+            Name = s.Name,
+            Icon = s.Icon,
+            Url = ResolveUrl(s.Resource),
+            Status = null
+        }).ToList();
+    }
+
+    private string ResolveUrl(string resourceName)
+    {
+        return Config[$"services:{resourceName}:http:0"]
+            ?? Config[$"services:{resourceName}:https:0"]
+            ?? $"https+http://{resourceName}";
+    }
+
+    private async Task RefreshServiceHealth()
+    {
+        _loadingHealth = true;
+        StateHasChanged();
+
+        try
+        {
+            var healthResults = await ApiClient.GetAllServiceHealthAsync();
+
+            foreach (var result in healthResults)
+            {
+                var endpoint = _serviceEndpoints.FirstOrDefault(e => e.ServiceId == result.Id);
+                if (endpoint is not null)
+                {
+                    endpoint.Status = result.Status;
+                    if (!string.IsNullOrEmpty(result.BaseUrl))
+                        endpoint.Url = result.BaseUrl;
+                }
+            }
+        }
+        catch
+        {
+            // Leave status as null (Not Checked)
+        }
+
+        _loadingHealth = false;
+    }
+
+    private void LoadSystemInfo()
+    {
+        _dotnetVersion = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
+        _environment = Config["ASPNETCORE_ENVIRONMENT"]
+                       ?? Config["DOTNET_ENVIRONMENT"]
+                       ?? "Production";
+        _serverTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") + " UTC";
+        _appVersion = typeof(Settings).Assembly.GetName().Version?.ToString() ?? "1.0.0";
+    }
+
+    private static BadgeStyle GetStatusBadge(string? status) => status switch
+    {
+        "Healthy"   => BadgeStyle.Success,
+        "Unhealthy" => BadgeStyle.Warning,
+        "Offline"   => BadgeStyle.Danger,
+        _           => BadgeStyle.Light
+    };
+
+    private class ServiceEndpointRow
+    {
+        public string ServiceId { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string Url { get; set; } = "";
+        public string? Status { get; set; }
+    }
+}

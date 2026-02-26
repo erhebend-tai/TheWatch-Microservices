@@ -147,4 +147,63 @@ internal static class GeneratorHelpers
         var name = PascalCase(method.ToLowerInvariant()) + string.Join("", segments);
         return SanitizeIdentifier(name);
     }
+
+    /// <summary>
+    /// Parses parameter types like "[FromBody] RegisterRequest" into (attributeName, typeName).
+    /// Returns (null, cleanedType) if no binding attribute is present.
+    /// </summary>
+    internal static (string Attribute, string TypeName) ExtractFromAttribute(string paramType)
+    {
+        if (string.IsNullOrEmpty(paramType))
+            return (null, "object");
+
+        var t = paramType.Trim();
+        string attr = null;
+
+        if (t.StartsWith("["))
+        {
+            var end = t.IndexOf(']');
+            if (end > 0)
+            {
+                attr = t.Substring(1, end - 1); // e.g. "FromBody"
+                t = t.Substring(end + 1).Trim();
+            }
+        }
+
+        // Clean the type name — remove modifiers but keep the type identifier
+        foreach (var mod in new[] { "public ", "private ", "protected ", "internal ", "static ", "readonly ", "virtual ", "override ", "abstract ", "sealed ", "required " })
+        {
+            while (t.StartsWith(mod))
+                t = t.Substring(mod.Length);
+        }
+
+        // Remove newlines and attribute noise (e.g. "[Required]\n public string")
+        var nlIdx = t.LastIndexOf('\n');
+        if (nlIdx >= 0) t = t.Substring(nlIdx + 1).Trim();
+
+        if (string.IsNullOrEmpty(t)) t = "object";
+
+        return (attr, t);
+    }
+
+    /// <summary>
+    /// Extracts the HTTP method attribute name from attributes like "HttpPost(\"register\")" or "HttpGet".
+    /// Returns (httpVerb, routeArg) e.g. ("HttpPost", "register") or ("HttpGet", null).
+    /// </summary>
+    internal static (string Verb, string Route) ParseHttpAttribute(string attr)
+    {
+        if (string.IsNullOrEmpty(attr)) return (null, null);
+
+        var parenIdx = attr.IndexOf('(');
+        if (parenIdx < 0)
+            return (attr, null);
+
+        var verb = attr.Substring(0, parenIdx);
+        // Extract route from HttpPost("register") → register
+        var routeStart = attr.IndexOf('"', parenIdx);
+        if (routeStart < 0) return (verb, null);
+        var routeEnd = attr.IndexOf('"', routeStart + 1);
+        if (routeEnd < 0) return (verb, null);
+        return (verb, attr.Substring(routeStart + 1, routeEnd - routeStart - 1));
+    }
 }

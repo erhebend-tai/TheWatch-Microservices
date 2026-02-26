@@ -36,5 +36,6 @@
     <AdditionalFiles Include="..\Models.json" Link="Data\Models.json" />
     <AdditionalFiles Include="..\Interfaces.json" Link="Data\Interfaces.json" />
     <AdditionalFiles Include="..\_mapping.json" Link="Data\_mapping.json" />
+    <AdditionalFiles Include="..\Controllers.json" Link="Data\Controllers.json" />
   </ItemGroup>
 </Project>

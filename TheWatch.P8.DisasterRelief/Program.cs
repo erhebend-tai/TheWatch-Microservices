@@ -37,6 +37,7 @@ builder.Services.AddScoped<IShelterService, ShelterService>();
 builder.Services.AddScoped<IResourceService, ResourceService>();
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, DisasterReliefSeeder>();
+builder.AddWatchControllers();
 
 var app = builder.Build();
 await app.UseWatchMigrations();
@@ -48,6 +49,7 @@ app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
+app.MapWatchControllers();
 
 // Recurring Hangfire jobs
 RecurringJob.AddOrUpdate<IResourceService>(

@@ -35,6 +35,7 @@ builder.Services.AddSingleton<IConfigService, ConfigService>();
 builder.Services.AddHttpClient("services");
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, CoreGatewaySeeder>();
+builder.AddWatchControllers();
 
 var app = builder.Build();
 await app.UseWatchMigrations();
@@ -46,6 +47,7 @@ app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
+app.MapWatchControllers();
 
 app.MapGet("/health", () => new HealthResponse(
     "TheWatch.P1.CoreGateway", "P1", "Healthy", DateTime.UtcNow));

@@ -32,6 +32,7 @@ builder.Services.AddHangfireServer();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, WearableSeeder>();
+builder.AddWatchControllers();
 
 var app = builder.Build();
 await app.UseWatchMigrations();
@@ -43,6 +44,7 @@ app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
+app.MapWatchControllers();
 
 app.MapGet("/health", () => new HealthResponse(
     "TheWatch.P4.Wearable", "P4", "Healthy", DateTime.UtcNow));

@@ -1,0 +1,46 @@
+@inject AdminAuthStateProvider AuthState
+@inject NavigationManager Nav
+
+<RadzenPanelMenu>
+    <RadzenPanelMenuItem Text="Dashboard" Icon="dashboard" Path="/" />
+
+    <RadzenPanelMenuItem Text="User Management" Icon="people">
+        <RadzenPanelMenuItem Text="All Users" Icon="group" Path="/users" />
+        <RadzenPanelMenuItem Text="Role Management" Icon="assignment_ind" Path="/roles" />
+    </RadzenPanelMenuItem>
+
+    <RadzenPanelMenuItem Text="Security" Icon="security">
+        <RadzenPanelMenuItem Text="Security Dashboard" Icon="shield" Path="/security" />
+        <RadzenPanelMenuItem Text="Audit Log" Icon="receipt_long" Path="/audit" />
+    </RadzenPanelMenuItem>
+
+    <RadzenPanelMenuItem Text="Services" Icon="dns">
+        <RadzenPanelMenuItem Text="Service Health" Icon="monitor_heart" Path="/services" />
+    </RadzenPanelMenuItem>
+
+    <RadzenPanelMenuItem Text="Settings" Icon="settings" Path="/settings" />
+</RadzenPanelMenu>
+
+<div class="rz-p-3" style="position: absolute; bottom: 0; width: 100%;">
+    <AuthorizeView>
+        <Authorized>
+            <RadzenStack Gap="0.25rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="admin_panel_settings" style="color: var(--rz-danger); font-size: 1rem;" />
+                    <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6;">Admin</RadzenText>
+                </RadzenStack>
+                <RadzenText TextStyle="TextStyle.Body2">@context.User.FindFirst("email")?.Value</RadzenText>
+                <RadzenButton Text="Logout" Icon="logout" ButtonStyle="ButtonStyle.Danger"
+                              Size="ButtonSize.Small" Click="@OnLogout" Style="width: 100%;" />
+            </RadzenStack>
+        </Authorized>
+    </AuthorizeView>
+</div>
+
+@code {
+    private async Task OnLogout()
+    {
+        await AuthState.LogoutAsync();
+        Nav.NavigateTo("/login");
+    }
+}

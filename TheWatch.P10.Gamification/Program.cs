@@ -32,6 +32,7 @@ builder.Services.AddHangfireServer();
 builder.Services.AddScoped<IGamificationService, GamificationService>();
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, GamificationSeeder>();
+builder.AddWatchControllers();
 
 var app = builder.Build();
 await app.UseWatchMigrations();
@@ -43,6 +44,7 @@ app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
+app.MapWatchControllers();
 
 // Recurring Hangfire jobs
 RecurringJob.AddOrUpdate<IGamificationService>(

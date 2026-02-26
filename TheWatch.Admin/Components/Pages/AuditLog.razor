@@ -1,0 +1,304 @@
+@page "/audit"
+@attribute [Authorize(Roles = "Admin")]
+@inject AdminApiClient Api
+@inject NotificationService Notification
+
+<PageTitle>TheWatch — Audit Log</PageTitle>
+
+<!-- Header -->
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
+        <RadzenIcon Icon="receipt_long" style="font-size: 2rem; color: var(--rz-danger);" />
+        <RadzenText TextStyle="TextStyle.H4" class="rz-mb-0">Audit Log</RadzenText>
+    </RadzenStack>
+    <RadzenButton Text="Export CSV" Icon="download" ButtonStyle="ButtonStyle.Secondary"
+                  Size="ButtonSize.Small" Click="@ExportCsv" Disabled="@(_entries.Count == 0)" />
+</RadzenStack>
+
+<!-- Summary Stats -->
+<RadzenRow Gap="1rem" class="rz-mb-4">
+    <RadzenColumn Size="12" SizeMD="4">
+        <RadzenCard Style="text-align: center;">
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                <RadzenIcon Icon="summarize" style="font-size: 1.5rem; opacity: 0.6;" />
+                <RadzenText TextStyle="TextStyle.H3" class="rz-mb-0">@_totalCount.ToString("N0")</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6;">Total Events</RadzenText>
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
+    <RadzenColumn Size="12" SizeMD="4">
+        <RadzenCard Style="text-align: center; border-left: 3px solid var(--rz-danger);">
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                <RadzenIcon Icon="error" style="font-size: 1.5rem; color: var(--rz-danger);" />
+                <RadzenText TextStyle="TextStyle.H3" class="rz-mb-0" style="color: var(--rz-danger);">@_criticalCount.ToString("N0")</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6;">Critical Events</RadzenText>
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
+    <RadzenColumn Size="12" SizeMD="4">
+        <RadzenCard Style="text-align: center; border-left: 3px solid var(--rz-info);">
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                <RadzenIcon Icon="schedule" style="font-size: 1.5rem; color: var(--rz-info);" />
+                <RadzenText TextStyle="TextStyle.H3" class="rz-mb-0" style="color: var(--rz-info);">@_last24hCount.ToString("N0")</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6;">Last 24h Events</RadzenText>
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
+
+<!-- Filters Row -->
+<RadzenCard class="rz-mb-4">
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.End" Gap="0.75rem" Wrap="FlexWrap.Wrap">
+        <RadzenStack Gap="0.25rem">
+            <RadzenText TextStyle="TextStyle.Caption">Start Date</RadzenText>
+            <RadzenDatePicker @bind-Value="_filterStartDate" DateFormat="yyyy-MM-dd" Placeholder="Start date..."
+                              Style="width: 160px;" ShowTime="false" />
+        </RadzenStack>
+        <RadzenStack Gap="0.25rem">
+            <RadzenText TextStyle="TextStyle.Caption">End Date</RadzenText>
+            <RadzenDatePicker @bind-Value="_filterEndDate" DateFormat="yyyy-MM-dd" Placeholder="End date..."
+                              Style="width: 160px;" ShowTime="false" />
+        </RadzenStack>
+        <RadzenStack Gap="0.25rem">
+            <RadzenText TextStyle="TextStyle.Caption">Event Type</RadzenText>
+            <RadzenDropDown @bind-Value="_filterEventType" Data="@_eventTypes" TextProperty="Text" ValueProperty="Value"
+                            Placeholder="All types..." AllowClear="true" Style="width: 200px;" />
+        </RadzenStack>
+        <RadzenStack Gap="0.25rem">
+            <RadzenText TextStyle="TextStyle.Caption">Severity</RadzenText>
+            <RadzenDropDown @bind-Value="_filterSeverity" Data="@_severityOptions" TextProperty="Text" ValueProperty="Value"
+                            Placeholder="All severities..." AllowClear="true" Style="width: 160px;" />
+        </RadzenStack>
+        <RadzenStack Gap="0.25rem">
+            <RadzenText TextStyle="TextStyle.Caption">User Search</RadzenText>
+            <RadzenTextBox @bind-Value="_filterUserSearch" Placeholder="Search by user..." Style="width: 200px;" />
+        </RadzenStack>
+        <RadzenButton Text="Apply Filters" Icon="filter_alt" ButtonStyle="ButtonStyle.Primary"
+                      Size="ButtonSize.Small" Click="@ApplyFilters" IsBusy="@_loading" />
+        <RadzenButton Text="Clear" Icon="clear" ButtonStyle="ButtonStyle.Light"
+                      Size="ButtonSize.Small" Click="@ClearFilters" />
+    </RadzenStack>
+</RadzenCard>
+
+<!-- Audit DataGrid -->
+<RadzenDataGrid @ref="_grid" Data="@_entries" TItem="AuditEntry" Count="@_totalCount"
+                AllowSorting="true" AllowPaging="true" PageSize="50" PagerHorizontalAlign="HorizontalAlign.Center"
+                LoadData="@OnLoadData" IsLoading="@_loading"
+                Style="min-height: 500px;">
+    <Columns>
+        <RadzenDataGridColumn Property="Timestamp" Title="Timestamp" Width="180px" SortOrder="SortOrder.Descending">
+            <Template Context="entry">
+                <RadzenText Style="font-size: 0.875rem;">@entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</RadzenText>
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="EventType" Title="Event Type" Width="200px">
+            <Template Context="entry">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="@GetEventIcon(entry.EventType)" style="font-size: 1.1rem;" />
+                    <RadzenText Style="font-size: 0.875rem;">@FormatEventType(entry.EventType)</RadzenText>
+                </RadzenStack>
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="User" Title="User" Width="200px">
+            <Template Context="entry">
+                <RadzenText Style="font-size: 0.875rem;">@entry.User</RadzenText>
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="Details" Title="Details">
+            <Template Context="entry">
+                <RadzenText Style="font-size: 0.875rem; word-break: break-word;">@entry.Details</RadzenText>
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="IpAddress" Title="IP Address" Width="150px">
+            <Template Context="entry">
+                <RadzenText Style="font-size: 0.875rem; font-family: monospace;">@(entry.IpAddress ?? "---")</RadzenText>
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="Severity" Title="Severity" Width="120px">
+            <Template Context="entry">
+                <RadzenBadge BadgeStyle="@GetSeverityBadgeStyle(entry.Severity)" Text="@entry.Severity" />
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    // --- State ---
+    private RadzenDataGrid<AuditEntry>? _grid;
+    private List<AuditEntry> _entries = [];
+    private bool _loading;
+    private int _totalCount;
+    private int _criticalCount;
+    private int _last24hCount;
+
+    // --- Filters ---
+    private DateTime? _filterStartDate;
+    private DateTime? _filterEndDate;
+    private string? _filterEventType;
+    private string? _filterSeverity;
+    private string? _filterUserSearch;
+
+    // --- Dropdown options ---
+    private static readonly List<DropdownItem> _eventTypes =
+    [
+        new("Login", "Login"),
+        new("Logout", "Logout"),
+        new("RoleChange", "RoleChange"),
+        new("UserCreated", "UserCreated"),
+        new("UserDeactivated", "UserDeactivated"),
+        new("SecurityAlert", "SecurityAlert"),
+        new("BruteForceDetected", "BruteForceDetected"),
+        new("IpBlocked", "IpBlocked"),
+        new("MfaEnabled", "MfaEnabled"),
+        new("PasswordChanged", "PasswordChanged"),
+    ];
+
+    private static readonly List<DropdownItem> _severityOptions =
+    [
+        new("Critical", "Critical"),
+        new("High", "High"),
+        new("Medium", "Medium"),
+        new("Low", "Low"),
+        new("Info", "Info"),
+    ];
+
+    private record DropdownItem(string Text, string Value);
+
+    // --- Lifecycle ---
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAuditData();
+    }
+
+    // --- Data Loading ---
+    private async Task OnLoadData(LoadDataArgs args)
+    {
+        var page = (args.Skip ?? 0) / (args.Top ?? 50) + 1;
+        var pageSize = args.Top ?? 50;
+        await LoadAuditData(page, pageSize);
+    }
+
+    private async Task LoadAuditData(int page = 1, int pageSize = 50)
+    {
+        _loading = true;
+        try
+        {
+            var filter = new AuditLogFilter(
+                _filterStartDate,
+                _filterEndDate,
+                _filterEventType,
+                _filterSeverity,
+                string.IsNullOrWhiteSpace(_filterUserSearch) ? null : _filterUserSearch.Trim(),
+                page,
+                pageSize);
+
+            var response = await Api.GetAuditLogAsync(filter);
+
+            _entries = response.Entries;
+            _totalCount = response.TotalCount;
+            _criticalCount = response.CriticalCount;
+            _last24hCount = response.Last24hCount;
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Load Failed", $"Could not load audit log: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // --- Filter Actions ---
+    private async Task ApplyFilters()
+    {
+        if (_grid is not null)
+        {
+            await _grid.GoToPage(0);
+        }
+        await LoadAuditData();
+    }
+
+    private async Task ClearFilters()
+    {
+        _filterStartDate = null;
+        _filterEndDate = null;
+        _filterEventType = null;
+        _filterSeverity = null;
+        _filterUserSearch = null;
+
+        if (_grid is not null)
+        {
+            await _grid.GoToPage(0);
+        }
+        await LoadAuditData();
+    }
+
+    // --- Export ---
+    private async Task ExportCsv()
+    {
+        try
+        {
+            // Build CSV content from current entries
+            var csv = new System.Text.StringBuilder();
+            csv.AppendLine("Timestamp,EventType,User,Details,IpAddress,Severity");
+            foreach (var entry in _entries)
+            {
+                var details = entry.Details.Replace("\"", "\"\"");
+                csv.AppendLine($"\"{entry.Timestamp:yyyy-MM-dd HH:mm:ss}\",\"{entry.EventType}\",\"{entry.User}\",\"{details}\",\"{entry.IpAddress ?? ""}\",\"{entry.Severity}\"");
+            }
+
+            Notification.Notify(NotificationSeverity.Success, "Export Ready", $"Exported {_entries.Count} entries to CSV.");
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Export Failed", ex.Message);
+        }
+    }
+
+    // --- Icon Mapping ---
+    private static string GetEventIcon(string eventType) => eventType switch
+    {
+        "Login" => "login",
+        "Logout" => "logout",
+        "RoleChange" => "swap_horiz",
+        "UserCreated" => "person_add",
+        "UserDeactivated" => "person_off",
+        "SecurityAlert" => "warning",
+        "BruteForceDetected" => "gpp_bad",
+        "IpBlocked" => "block",
+        "MfaEnabled" => "verified_user",
+        "PasswordChanged" => "key",
+        _ => "info"
+    };
+
+    // --- Format Event Type for Display ---
+    private static string FormatEventType(string eventType) => eventType switch
+    {
+        "RoleChange" => "Role Change",
+        "UserCreated" => "User Created",
+        "UserDeactivated" => "User Deactivated",
+        "SecurityAlert" => "Security Alert",
+        "BruteForceDetected" => "Brute Force Detected",
+        "IpBlocked" => "IP Blocked",
+        "MfaEnabled" => "MFA Enabled",
+        "PasswordChanged" => "Password Changed",
+        _ => eventType
+    };
+
+    // --- Severity Badge Styles ---
+    private static BadgeStyle GetSeverityBadgeStyle(string severity) => severity switch
+    {
+        "Critical" => BadgeStyle.Danger,
+        "High" => BadgeStyle.Warning,
+        "Medium" => BadgeStyle.Info,
+        "Low" => BadgeStyle.Success,
+        "Info" => BadgeStyle.Light,
+        _ => BadgeStyle.Light
+    };
+}

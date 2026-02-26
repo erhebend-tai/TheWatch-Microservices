@@ -29,6 +29,7 @@
     <ProjectReference Include="..\TheWatch.P10.Gamification\TheWatch.P10.Gamification.csproj" />
     <ProjectReference Include="..\TheWatch.Geospatial\TheWatch.Geospatial.csproj" />
     <ProjectReference Include="..\TheWatch.Dashboard\TheWatch.Dashboard.csproj" />
+    <ProjectReference Include="..\TheWatch.Admin\TheWatch.Admin.csproj" />
   </ItemGroup>
 
 </Project>

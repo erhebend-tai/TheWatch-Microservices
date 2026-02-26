@@ -1,0 +1,33 @@
+@inherits LayoutComponentBase
+
+<RadzenLayout>
+    <RadzenHeader>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-p-2 admin-header">
+            <RadzenSidebarToggle Click="@(() => _sidebarExpanded = !_sidebarExpanded)" />
+            <RadzenIcon Icon="admin_panel_settings" style="font-size: 1.5rem; color: var(--rz-danger);" />
+            <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0" style="color: var(--rz-danger);">
+                TheWatch
+            </RadzenText>
+            <span class="admin-badge">ADMIN</span>
+        </RadzenStack>
+    </RadzenHeader>
+
+    <RadzenSidebar @bind-Expanded="_sidebarExpanded" style="width: 280px;">
+        <AdminNavMenu />
+    </RadzenSidebar>
+
+    <RadzenBody>
+        <div class="rz-p-4">
+            @Body
+        </div>
+    </RadzenBody>
+</RadzenLayout>
+
+<RadzenNotification />
+<RadzenDialog />
+<RadzenContextMenu />
+<RadzenTooltip />
+
+@code {
+    private bool _sidebarExpanded = true;
+}

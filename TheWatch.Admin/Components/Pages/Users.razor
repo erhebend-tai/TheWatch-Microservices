@@ -1,0 +1,441 @@
+@page "/users"
+@attribute [Authorize(Roles = "Admin")]
+@inject AdminApiClient AdminApi
+@inject DialogService DialogService
+@inject NotificationService Notification
+
+<PageTitle>TheWatch — User Management</PageTitle>
+
+<RadzenStack Gap="1rem">
+    @* ── Header ── *@
+    <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+        <RadzenColumn>
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="people" style="font-size: 1.75rem; color: var(--rz-primary);" />
+                <RadzenText TextStyle="TextStyle.H4" class="rz-mb-0">User Management</RadzenText>
+            </RadzenStack>
+        </RadzenColumn>
+        <RadzenColumn>
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+                <RadzenButton Text="Add User" Icon="person_add" ButtonStyle="ButtonStyle.Primary"
+                              Click="@OpenCreateUserDialog" />
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+
+    @* ── Search box ── *@
+    <RadzenCard>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="search" />
+            <RadzenTextBox @bind-Value="_searchText" Placeholder="Search by name or email..."
+                           Style="width: 100%; max-width: 400px;"
+                           Change="@OnSearchChanged" />
+            @if (!string.IsNullOrEmpty(_searchText))
+            {
+                <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text"
+                              Size="ButtonSize.Small" Click="@ClearSearch" />
+            }
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-ml-auto rz-mb-0" style="opacity: 0.6;">
+                @_filteredUsers.Count user(s) found
+            </RadzenText>
+        </RadzenStack>
+    </RadzenCard>
+
+    @* ── Data Grid ── *@
+    <RadzenDataGrid @ref="_grid" Data="@_filteredUsers" TItem="UserDto"
+                    AllowSorting="true" AllowFiltering="true" AllowPaging="true"
+                    PageSize="20" PagerHorizontalAlign="HorizontalAlign.Center"
+                    FilterMode="FilterMode.Simple" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                    IsLoading="@_loading" style="min-height: 400px;">
+        <Columns>
+            @* Avatar (initials) *@
+            <RadzenDataGridColumn TItem="UserDto" Title="" Width="60px"
+                                  Sortable="false" Filterable="false" TextAlign="TextAlign.Center">
+                <Template Context="user">
+                    <RadzenStack AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center"
+                                 style="width: 36px; height: 36px; border-radius: 50%;
+                                        background: var(--rz-primary); color: white;
+                                        font-weight: 600; font-size: 0.85rem;
+                                        display: inline-flex; align-items: center; justify-content: center;">
+                        @GetInitials(user.DisplayName)
+                    </RadzenStack>
+                </Template>
+            </RadzenDataGridColumn>
+
+            @* Email *@
+            <RadzenDataGridColumn TItem="UserDto" Property="Email" Title="Email" Width="240px" />
+
+            @* Display Name *@
+            <RadzenDataGridColumn TItem="UserDto" Property="DisplayName" Title="Display Name" Width="200px" />
+
+            @* Roles *@
+            <RadzenDataGridColumn TItem="UserDto" Title="Roles" Sortable="false" Width="280px">
+                <Template Context="user">
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" Wrap="FlexWrap.Wrap">
+                        @foreach (var role in user.Roles)
+                        {
+                            <RadzenBadge Text="@role" BadgeStyle="@GetRoleBadgeStyle(role)"
+                                         IsPill="true" class="rz-mr-1" />
+                        }
+                        @if (user.Roles.Length == 0)
+                        {
+                            <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.4;">No roles</RadzenText>
+                        }
+                    </RadzenStack>
+                </Template>
+            </RadzenDataGridColumn>
+
+            @* Created Date *@
+            <RadzenDataGridColumn TItem="UserDto" Property="CreatedAt" Title="Created" Width="160px"
+                                  FormatString="{0:yyyy-MM-dd HH:mm}" />
+
+            @* Status *@
+            <RadzenDataGridColumn TItem="UserDto" Title="Status" Width="110px" TextAlign="TextAlign.Center"
+                                  Sortable="true" Filterable="false">
+                <Template Context="user">
+                    @if (user.IsActive)
+                    {
+                        <RadzenBadge Text="Active" BadgeStyle="BadgeStyle.Success" IsPill="true" />
+                    }
+                    else
+                    {
+                        <RadzenBadge Text="Inactive" BadgeStyle="BadgeStyle.Danger" IsPill="true" />
+                    }
+                </Template>
+            </RadzenDataGridColumn>
+
+            @* Actions *@
+            <RadzenDataGridColumn TItem="UserDto" Title="Actions" Width="200px"
+                                  Sortable="false" Filterable="false" TextAlign="TextAlign.Center">
+                <Template Context="user">
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem"
+                                 JustifyContent="JustifyContent.Center">
+                        <RadzenButton Icon="assignment_ind" Size="ButtonSize.Small"
+                                      ButtonStyle="ButtonStyle.Info" Variant="Variant.Outlined"
+                                      Click="@(() => OpenEditRolesDialog(user))"
+                                      MouseEnter="@(args => _tooltipService?.Open(args, "Edit Roles"))" />
+                        @if (user.IsActive)
+                        {
+                            <RadzenButton Icon="block" Size="ButtonSize.Small"
+                                          ButtonStyle="ButtonStyle.Danger" Variant="Variant.Outlined"
+                                          Click="@(() => ToggleActivation(user))"
+                                          MouseEnter="@(args => _tooltipService?.Open(args, "Deactivate User"))" />
+                        }
+                        else
+                        {
+                            <RadzenButton Icon="check_circle" Size="ButtonSize.Small"
+                                          ButtonStyle="ButtonStyle.Success" Variant="Variant.Outlined"
+                                          Click="@(() => ToggleActivation(user))"
+                                          MouseEnter="@(args => _tooltipService?.Open(args, "Activate User"))" />
+                        }
+                    </RadzenStack>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenStack>
+
+@code {
+    // ── Injected via field for tooltip (optional if registered) ──
+    [Inject] private TooltipService? _tooltipService { get; set; }
+
+    // ── State ──
+    private List<UserDto> _allUsers = new();
+    private List<UserDto> _filteredUsers = new();
+    private string? _searchText;
+    private bool _loading = true;
+    private RadzenDataGrid<UserDto>? _grid;
+
+    // ── Lifecycle ──
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadUsersAsync();
+            StateHasChanged();
+        }
+    }
+
+    // ── Data Loading ──
+    private async Task LoadUsersAsync()
+    {
+        _loading = true;
+        try
+        {
+            _allUsers = await AdminApi.ListUsersAsync();
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Load Failed", $"Could not load users: {ex.Message}");
+            _allUsers = new();
+            _filteredUsers = new();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // ── Search / Filter ──
+    private void OnSearchChanged(string value)
+    {
+        _searchText = value;
+        ApplyFilter();
+    }
+
+    private void ClearSearch()
+    {
+        _searchText = null;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        if (string.IsNullOrWhiteSpace(_searchText))
+        {
+            _filteredUsers = _allUsers.ToList();
+        }
+        else
+        {
+            var term = _searchText.Trim();
+            _filteredUsers = _allUsers
+                .Where(u => u.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                          || u.Email.Contains(term, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+    }
+
+    // ── Role Badge Colors ──
+    private static BadgeStyle GetRoleBadgeStyle(string role) => role switch
+    {
+        WatchRoles.Admin        => BadgeStyle.Danger,
+        WatchRoles.Responder    => BadgeStyle.Primary,
+        WatchRoles.Doctor       => BadgeStyle.Info,
+        WatchRoles.Patient      => BadgeStyle.Success,
+        WatchRoles.FamilyMember => BadgeStyle.Warning,
+        WatchRoles.ServiceAccount => BadgeStyle.Light,
+        _                       => BadgeStyle.Light
+    };
+
+    // ── Avatar Initials ──
+    private static string GetInitials(string displayName)
+    {
+        if (string.IsNullOrWhiteSpace(displayName))
+            return "?";
+
+        var parts = displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length switch
+        {
+            0 => "?",
+            1 => parts[0][..1].ToUpper(),
+            _ => $"{parts[0][..1]}{parts[^1][..1]}".ToUpper()
+        };
+    }
+
+    // ── Toggle Activate / Deactivate ──
+    private async Task ToggleActivation(UserDto user)
+    {
+        var action = user.IsActive ? "deactivate" : "activate";
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to {action} <b>{user.Email}</b>?",
+            $"{(user.IsActive ? "Deactivate" : "Activate")} User",
+            new ConfirmOptions
+            {
+                OkButtonText = user.IsActive ? "Deactivate" : "Activate",
+                CancelButtonText = "Cancel"
+            });
+
+        if (confirmed != true) return;
+
+        try
+        {
+            if (user.IsActive)
+                await AdminApi.DeactivateUserAsync(user.Id);
+            else
+                await AdminApi.ActivateUserAsync(user.Id);
+
+            Notification.Notify(NotificationSeverity.Success, "Success",
+                $"User {user.Email} has been {action}d.");
+            await LoadUsersAsync();
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Error",
+                $"Failed to {action} user: {ex.Message}");
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    //  Edit Roles Dialog
+    // ──────────────────────────────────────────────
+    private async Task OpenEditRolesDialog(UserDto user)
+    {
+        // Build mutable role state from user's current roles
+        var roleStates = WatchRoles.All.ToDictionary(r => r, r => user.Roles.Contains(r));
+
+        var result = await DialogService.OpenAsync($"Edit Roles — {user.Email}", ds =>
+            @<RadzenStack Gap="1rem" class="rz-p-4" Style="min-width: 360px;">
+                <RadzenText TextStyle="TextStyle.Subtitle1">
+                    Assign roles for <strong>@user.Email</strong>
+                </RadzenText>
+
+                @foreach (var role in WatchRoles.All)
+                {
+                    var localRole = role;
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenCheckBox TValue="bool" Value="@roleStates[localRole]"
+                                        ValueChanged="@(val => roleStates[localRole] = val)" />
+                        <RadzenBadge Text="@localRole" BadgeStyle="@GetRoleBadgeStyle(localRole)" IsPill="true" />
+                    </RadzenStack>
+                }
+
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem"
+                             JustifyContent="JustifyContent.End" class="rz-mt-4">
+                    <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat"
+                                  Click="@(() => ds.Close(false))" />
+                    <RadzenButton Text="Save Roles" Icon="save" ButtonStyle="ButtonStyle.Primary"
+                                  Click="@(async () =>
+                                  {
+                                      await SaveRolesAsync(user, roleStates);
+                                      ds.Close(true);
+                                  })" />
+                </RadzenStack>
+            </RadzenStack>
+        , new DialogOptions
+        {
+            Width = "440px",
+            CloseDialogOnOverlayClick = true,
+            ShowClose = true
+        });
+    }
+
+    private async Task SaveRolesAsync(UserDto user, Dictionary<string, bool> roleStates)
+    {
+        try
+        {
+            var currentRoles = user.Roles.ToHashSet();
+
+            foreach (var (role, isChecked) in roleStates)
+            {
+                var hadRole = currentRoles.Contains(role);
+                if (isChecked && !hadRole)
+                    await AdminApi.AssignRoleAsync(user.Id, role);
+                else if (!isChecked && hadRole)
+                    await AdminApi.RemoveRoleAsync(user.Id, role);
+            }
+
+            Notification.Notify(NotificationSeverity.Success, "Roles Updated",
+                $"Roles for {user.Email} saved successfully.");
+            await LoadUsersAsync();
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Error",
+                $"Failed to update roles: {ex.Message}");
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    //  Create User Dialog
+    // ──────────────────────────────────────────────
+    private async Task OpenCreateUserDialog()
+    {
+        var model = new CreateUserFormModel();
+
+        var result = await DialogService.OpenAsync("Create New User", ds =>
+            @<RadzenStack Gap="1rem" class="rz-p-4" Style="min-width: 420px;">
+                <RadzenTemplateForm TItem="CreateUserFormModel" Data="@model">
+                    <RadzenStack Gap="1rem">
+                        <RadzenFormField Text="Email" Style="width: 100%;">
+                            <RadzenTextBox @bind-Value="model.Email" Name="NewEmail" />
+                            <RadzenRequiredValidator Component="NewEmail" Text="Email is required." />
+                            <RadzenEmailValidator Component="NewEmail" Text="Enter a valid email." />
+                        </RadzenFormField>
+
+                        <RadzenFormField Text="Display Name" Style="width: 100%;">
+                            <RadzenTextBox @bind-Value="model.DisplayName" Name="NewDisplayName" />
+                            <RadzenRequiredValidator Component="NewDisplayName" Text="Display name is required." />
+                        </RadzenFormField>
+
+                        <RadzenFormField Text="Password" Style="width: 100%;">
+                            <RadzenPassword @bind-Value="model.Password" Name="NewPassword" />
+                            <RadzenRequiredValidator Component="NewPassword" Text="Password is required." />
+                        </RadzenFormField>
+
+                        <RadzenFormField Text="Phone (optional)" Style="width: 100%;">
+                            <RadzenTextBox @bind-Value="model.Phone" Name="NewPhone" />
+                        </RadzenFormField>
+
+                        <RadzenFormField Text="Initial Role" Style="width: 100%;">
+                            <RadzenDropDown TValue="string" @bind-Value="model.InitialRole"
+                                            Data="@WatchRoles.All" Name="NewRole"
+                                            Placeholder="Select a role..." Style="width: 100%;" />
+                            <RadzenRequiredValidator Component="NewRole" Text="An initial role is required." />
+                        </RadzenFormField>
+                    </RadzenStack>
+                </RadzenTemplateForm>
+
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem"
+                             JustifyContent="JustifyContent.End" class="rz-mt-4">
+                    <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat"
+                                  Click="@(() => ds.Close(false))" />
+                    <RadzenButton Text="Create User" Icon="person_add" ButtonStyle="ButtonStyle.Primary"
+                                  Click="@(async () =>
+                                  {
+                                      if (string.IsNullOrWhiteSpace(model.Email) ||
+                                          string.IsNullOrWhiteSpace(model.Password) ||
+                                          string.IsNullOrWhiteSpace(model.DisplayName) ||
+                                          string.IsNullOrWhiteSpace(model.InitialRole))
+                                      {
+                                          Notification.Notify(NotificationSeverity.Warning, "Validation",
+                                              "Please fill in all required fields.");
+                                          return;
+                                      }
+                                      await CreateUserAsync(model);
+                                      ds.Close(true);
+                                  })" />
+                </RadzenStack>
+            </RadzenStack>
+        , new DialogOptions
+        {
+            Width = "500px",
+            CloseDialogOnOverlayClick = false,
+            ShowClose = true
+        });
+    }
+
+    private async Task CreateUserAsync(CreateUserFormModel model)
+    {
+        try
+        {
+            var request = new CreateUserRequest(
+                model.Email!,
+                model.Password!,
+                model.DisplayName!,
+                string.IsNullOrWhiteSpace(model.Phone) ? null : model.Phone,
+                model.InitialRole!);
+
+            await AdminApi.CreateUserAsync(request);
+
+            Notification.Notify(NotificationSeverity.Success, "User Created",
+                $"User {model.Email} has been created successfully.");
+            await LoadUsersAsync();
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Creation Failed",
+                $"Could not create user: {ex.Message}");
+        }
+    }
+
+    // ── Form model for the create dialog (mutable, unlike the record) ──
+    private class CreateUserFormModel
+    {
+        public string? Email { get; set; }
+        public string? Password { get; set; }
+        public string? DisplayName { get; set; }
+        public string? Phone { get; set; }
+        public string? InitialRole { get; set; }
+    }
+}

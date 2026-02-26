@@ -40,6 +40,7 @@ builder.Services.AddScoped<ICheckInService, CheckInService>();
 builder.Services.AddScoped<IVitalService, VitalService>();
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, FamilyHealthSeeder>();
+builder.AddWatchControllers();
 
 var app = builder.Build();
 await app.UseWatchMigrations();
@@ -51,6 +52,7 @@ app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
+app.MapWatchControllers();
 
 // Recurring Hangfire jobs
 RecurringJob.AddOrUpdate<ICheckInService>(

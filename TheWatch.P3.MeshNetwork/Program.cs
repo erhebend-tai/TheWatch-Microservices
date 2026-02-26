@@ -38,6 +38,7 @@ builder.Services.AddScoped<IMeshService, MeshService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, MeshNetworkSeeder>();
+builder.AddWatchControllers();
 
 var app = builder.Build();
 await app.UseWatchMigrations();
@@ -49,6 +50,7 @@ app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
+app.MapWatchControllers();
 
 // Recurring Hangfire jobs
 RecurringJob.AddOrUpdate<IMeshService>(

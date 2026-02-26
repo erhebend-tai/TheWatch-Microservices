@@ -1,0 +1,51 @@
+/* TheWatch Admin — custom overrides */
+.admin-header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-bottom: 2px solid var(--rz-primary);
+}
+
+.admin-badge {
+    background: var(--rz-danger);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stat-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    opacity: 0.6;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.audit-severity-critical { color: var(--rz-danger); }
+.audit-severity-high { color: var(--rz-warning); }
+.audit-severity-medium { color: var(--rz-info); }
+.audit-severity-low { color: var(--rz-success); }
+
+.threat-card {
+    border-left: 4px solid var(--rz-danger);
+}
+
+.service-healthy { border-left: 4px solid var(--rz-success); }
+.service-unhealthy { border-left: 4px solid var(--rz-warning); }
+.service-offline { border-left: 4px solid var(--rz-danger); }

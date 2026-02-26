@@ -1,0 +1,470 @@
+@page "/security"
+@attribute [Authorize(Roles = "Admin")]
+@inject AdminApiClient AdminApi
+@inject NotificationService Notification
+@implements IDisposable
+
+<PageTitle>TheWatch — Security Dashboard</PageTitle>
+
+<RadzenStack Gap="1.5rem">
+
+    @* ───────────── Page Header ───────────── *@
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="security" style="font-size: 2rem; color: var(--rz-danger);" />
+            <RadzenText TextStyle="TextStyle.H4" class="rz-mb-0">Security Dashboard</RadzenText>
+        </RadzenStack>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.5;">
+                Auto-refresh every 30 s
+            </RadzenText>
+            <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                          Click="@RefreshAsync" IsBusy="@_loading" Text="Refresh" />
+        </RadzenStack>
+    </RadzenStack>
+
+    @if (_data is null)
+    {
+        <RadzenProgressBarCircular ShowValue="true" Mode="ProgressBarMode.Indeterminate"
+                                   Size="ProgressBarCircularSize.Large" class="rz-mx-auto rz-my-12" />
+    }
+    else
+    {
+        @* ───────────── Overall Threat Level ───────────── *@
+        <RadzenCard class="rz-p-6" style="@ThreatLevelCardStyle(_data.OverallThreatLevel)">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1.5rem">
+                <RadzenIcon Icon="@ThreatLevelIcon(_data.OverallThreatLevel)"
+                            style="font-size: 3.5rem; color: inherit;" />
+                <RadzenStack Gap="0.25rem">
+                    <RadzenText TextStyle="TextStyle.Overline" style="color: inherit; opacity: 0.8; letter-spacing: 0.15em;">
+                        OVERALL THREAT LEVEL
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.H3" style="color: inherit; font-weight: 700;" class="rz-mb-0">
+                        @_data.OverallThreatLevel.ToUpperInvariant()
+                    </RadzenText>
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenCard>
+
+        @* ───────────── Stats Row ───────────── *@
+        <RadzenRow Gap="1rem">
+            @* Active Threats *@
+            <RadzenColumn Size="12" SizeSM="6" SizeLG="3">
+                <RadzenCard class="rz-p-4" style="@($"border-left: 4px solid {ActiveThreatColor(_data.ActiveThreats)};")">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="warning" style="@($"color: {ActiveThreatColor(_data.ActiveThreats)};")" />
+                            <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6;">Active Threats</RadzenText>
+                        </RadzenStack>
+                        <RadzenText TextStyle="TextStyle.H3" class="rz-mb-0"
+                                    style="@($"color: {ActiveThreatColor(_data.ActiveThreats)}; font-weight: 700;")">
+                            @_data.ActiveThreats
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+
+            @* Blocked IPs (24h) *@
+            <RadzenColumn Size="12" SizeSM="6" SizeLG="3">
+                <RadzenCard class="rz-p-4" style="border-left: 4px solid var(--rz-warning);">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="block" style="color: var(--rz-warning);" />
+                            <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6;">Blocked IPs (24h)</RadzenText>
+                        </RadzenStack>
+                        <RadzenText TextStyle="TextStyle.H3" class="rz-mb-0"
+                                    style="color: var(--rz-warning); font-weight: 700;">
+                            @_data.BlockedIps
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+
+            @* Failed Logins (24h) *@
+            <RadzenColumn Size="12" SizeSM="6" SizeLG="3">
+                <RadzenCard class="rz-p-4" style="border-left: 4px solid var(--rz-danger);">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="lock_open" style="color: var(--rz-danger);" />
+                            <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6;">Failed Logins (24h)</RadzenText>
+                        </RadzenStack>
+                        <RadzenText TextStyle="TextStyle.H3" class="rz-mb-0"
+                                    style="color: var(--rz-danger); font-weight: 700;">
+                            @_data.FailedLogins
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+
+            @* MFA Adoption Rate *@
+            <RadzenColumn Size="12" SizeSM="6" SizeLG="3">
+                <RadzenCard class="rz-p-4" style="border-left: 4px solid var(--rz-success);">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="verified_user" style="color: var(--rz-success);" />
+                            <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6;">MFA Adoption Rate</RadzenText>
+                        </RadzenStack>
+                        <RadzenText TextStyle="TextStyle.H3" class="rz-mb-0"
+                                    style="color: var(--rz-success); font-weight: 700;">
+                            @_data.MfaAdoptionRate.ToString("F1")%
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+
+        @* ───────────── STRIDE Analysis ───────────── *@
+        <RadzenCard class="rz-p-4">
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="category" style="color: var(--rz-danger);" />
+                    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">STRIDE Threat Model</RadzenText>
+                </RadzenStack>
+
+                <RadzenRow Gap="1rem">
+                    @foreach (var stride in _data.StrideAnalysis)
+                    {
+                        <RadzenColumn Size="12" SizeSM="6" SizeMD="4" SizeLG="2">
+                            <RadzenCard class="rz-p-3" style="@($"height: 100%; border-top: 3px solid {RiskLevelColor(stride.RiskLevel)};")">
+                                <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                                    <RadzenIcon Icon="@stride.Icon"
+                                                style="@($"font-size: 2rem; color: {RiskLevelColor(stride.RiskLevel)};")" />
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" style="text-align: center; font-weight: 600;">
+                                        @stride.Name
+                                    </RadzenText>
+                                    <RadzenText TextStyle="TextStyle.H4" class="rz-mb-0"
+                                                style="@($"color: {RiskLevelColor(stride.RiskLevel)}; font-weight: 700;")">
+                                        @stride.ThreatCount
+                                    </RadzenText>
+                                    <RadzenBadge Text="@stride.RiskLevel"
+                                                 BadgeStyle="@RiskLevelBadgeStyle(stride.RiskLevel)"
+                                                 IsPill="true" />
+                                </RadzenStack>
+                            </RadzenCard>
+                        </RadzenColumn>
+                    }
+                </RadzenRow>
+            </RadzenStack>
+        </RadzenCard>
+
+        @* ───────────── MITRE ATT&CK Detections ───────────── *@
+        <RadzenCard class="rz-p-4">
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="track_changes" style="color: var(--rz-danger);" />
+                    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">MITRE ATT&amp;CK Detections</RadzenText>
+                </RadzenStack>
+
+                <RadzenDataGrid Data="@_data.MitreDetections" TItem="MitreDetection"
+                                AllowSorting="true" AllowPaging="true" PageSize="8"
+                                PagerHorizontalAlign="HorizontalAlign.Center"
+                                Density="Density.Compact" class="rz-mt-2">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="MitreDetection" Property="TechniqueId" Title="Technique ID" Width="120px">
+                            <Template Context="item">
+                                <RadzenText TextStyle="TextStyle.Body2" style="font-family: monospace; font-weight: 600;">
+                                    @item.TechniqueId
+                                </RadzenText>
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="MitreDetection" Property="TechniqueName" Title="Technique Name" />
+                        <RadzenDataGridColumn TItem="MitreDetection" Property="Tactic" Title="Tactic" Width="160px" />
+                        <RadzenDataGridColumn TItem="MitreDetection" Property="DetectionCount" Title="Detections" Width="120px"
+                                              TextAlign="TextAlign.Center">
+                            <Template Context="item">
+                                <RadzenBadge Text="@item.DetectionCount.ToString()" BadgeStyle="BadgeStyle.Info" IsPill="true" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="MitreDetection" Property="LastDetected" Title="Last Detected" Width="180px">
+                            <Template Context="item">
+                                @(item.LastDetected?.ToString("yyyy-MM-dd HH:mm") ?? "N/A")
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="MitreDetection" Property="Status" Title="Status" Width="130px"
+                                              TextAlign="TextAlign.Center">
+                            <Template Context="item">
+                                <RadzenBadge Text="@item.Status"
+                                             BadgeStyle="@(item.Status == "Active" ? BadgeStyle.Danger : BadgeStyle.Success)"
+                                             IsPill="true" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+            </RadzenStack>
+        </RadzenCard>
+
+        @* ───────────── Active Threat Assessments ───────────── *@
+        <RadzenCard class="rz-p-4">
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="gpp_bad" style="color: var(--rz-danger);" />
+                    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">Active Threat Assessments</RadzenText>
+                </RadzenStack>
+
+                <RadzenDataGrid Data="@_data.Threats" TItem="ThreatAssessmentDto"
+                                AllowSorting="true" AllowPaging="true" PageSize="10"
+                                PagerHorizontalAlign="HorizontalAlign.Center"
+                                Density="Density.Compact" class="rz-mt-2"
+                                RowRender="@OnThreatRowRender">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="ThreatAssessmentDto" Property="Id" Title="Threat ID" Width="160px">
+                            <Template Context="item">
+                                <RadzenText TextStyle="TextStyle.Body2" style="font-family: monospace; font-size: 0.8rem;">
+                                    @item.Id.ToString()[..8]...
+                                </RadzenText>
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="ThreatAssessmentDto" Property="Description" Title="Description" />
+                        <RadzenDataGridColumn TItem="ThreatAssessmentDto" Property="Severity" Title="Severity" Width="120px"
+                                              TextAlign="TextAlign.Center">
+                            <Template Context="item">
+                                <RadzenBadge Text="@item.Severity"
+                                             BadgeStyle="@SeverityBadgeStyle(item.Severity)"
+                                             IsPill="true" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="ThreatAssessmentDto" Property="Source" Title="Source" Width="150px" />
+                        <RadzenDataGridColumn TItem="ThreatAssessmentDto" Property="DetectedAt" Title="Detected At" Width="180px">
+                            <Template Context="item">
+                                @item.DetectedAt.ToString("yyyy-MM-dd HH:mm")
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="ThreatAssessmentDto" Property="Status" Title="Status" Width="130px"
+                                              TextAlign="TextAlign.Center">
+                            <Template Context="item">
+                                <RadzenBadge Text="@item.Status"
+                                             BadgeStyle="@(item.Status == "Active" ? BadgeStyle.Danger : item.Status == "Investigating" ? BadgeStyle.Warning : BadgeStyle.Success)"
+                                             IsPill="true" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+            </RadzenStack>
+        </RadzenCard>
+
+        @* ───────────── Brute Force Detection ───────────── *@
+        <RadzenCard class="rz-p-4">
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="gpp_maybe" style="color: var(--rz-warning);" />
+                        <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">Brute Force Detection</RadzenText>
+                    </RadzenStack>
+                    <RadzenBadge Text="@($"{_data.BlockedIpList.Count} IPs Currently Blocked")"
+                                 BadgeStyle="@(_data.BlockedIpList.Count > 0 ? BadgeStyle.Danger : BadgeStyle.Success)"
+                                 IsPill="true" Style="font-size: 0.85rem; padding: 0.4rem 0.85rem;" />
+                </RadzenStack>
+
+                @if (_data.BlockedIpList.Count == 0)
+                {
+                    <RadzenStack AlignItems="AlignItems.Center" class="rz-py-6" Gap="0.5rem">
+                        <RadzenIcon Icon="check_circle" style="font-size: 2.5rem; color: var(--rz-success);" />
+                        <RadzenText TextStyle="TextStyle.Body1" style="opacity: 0.6;">No blocked IPs at this time.</RadzenText>
+                    </RadzenStack>
+                }
+                else
+                {
+                    <RadzenDataGrid Data="@_data.BlockedIpList" TItem="BlockedIpDto"
+                                    AllowSorting="true" AllowPaging="true" PageSize="8"
+                                    PagerHorizontalAlign="HorizontalAlign.Center"
+                                    Density="Density.Compact">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="BlockedIpDto" Property="IpAddress" Title="IP Address" Width="200px">
+                                <Template Context="item">
+                                    <RadzenText TextStyle="TextStyle.Body2" style="font-family: monospace; font-weight: 600;">
+                                        @item.IpAddress
+                                    </RadzenText>
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="BlockedIpDto" Property="BlockedAt" Title="Blocked At" Width="200px">
+                                <Template Context="item">
+                                    @item.BlockedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="BlockedIpDto" Property="AttemptCount" Title="Attempt Count" Width="150px"
+                                                  TextAlign="TextAlign.Center">
+                                <Template Context="item">
+                                    <RadzenBadge Text="@item.AttemptCount.ToString()"
+                                                 BadgeStyle="@(item.AttemptCount >= 20 ? BadgeStyle.Danger : item.AttemptCount >= 10 ? BadgeStyle.Warning : BadgeStyle.Info)"
+                                                 IsPill="true" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                }
+            </RadzenStack>
+        </RadzenCard>
+    }
+
+</RadzenStack>
+
+@code {
+    private SecurityDashboardData? _data;
+    private bool _loading;
+    private Timer? _refreshTimer;
+
+    // ───────── Lifecycle ─────────
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+
+        _refreshTimer = new Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadDataAsync();
+                StateHasChanged();
+            });
+        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    private async Task RefreshAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        await LoadDataAsync();
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            _data = await AdminApi.GetSecurityDashboardAsync();
+        }
+        catch (Exception ex)
+        {
+            Notification.Notify(NotificationSeverity.Warning,
+                "Security data unavailable", $"Loading sample data. {ex.Message}", 5000);
+            _data = BuildFallbackData();
+        }
+    }
+
+    // ───────── Fallback / sample data ─────────
+
+    private static SecurityDashboardData BuildFallbackData()
+    {
+        var now = DateTime.UtcNow;
+        return new SecurityDashboardData(
+            OverallThreatLevel: "High",
+            ActiveThreats: 7,
+            BlockedIps: 23,
+            FailedLogins: 142,
+            MfaAdoptionRate: 68.5,
+            StrideAnalysis: new List<StrideCategory>
+            {
+                new("Spoofing", "badge", 3, "High"),
+                new("Tampering", "edit_off", 1, "Medium"),
+                new("Repudiation", "history_toggle_off", 0, "Low"),
+                new("Information Disclosure", "visibility", 2, "High"),
+                new("Denial of Service", "block", 4, "Critical"),
+                new("Elevation of Privilege", "trending_up", 1, "Medium")
+            },
+            MitreDetections: new List<MitreDetection>
+            {
+                new("T1110.001", "Password Guessing", "Credential Access", 34, now.AddMinutes(-12), "Active"),
+                new("T1078", "Valid Accounts", "Defense Evasion", 8, now.AddHours(-2), "Active"),
+                new("T1071.001", "Web Protocols", "Command and Control", 15, now.AddMinutes(-45), "Active"),
+                new("T1059.001", "PowerShell", "Execution", 5, now.AddHours(-6), "Mitigated"),
+                new("T1053.005", "Scheduled Task", "Persistence", 2, now.AddDays(-1), "Mitigated"),
+                new("T1021.001", "Remote Desktop Protocol", "Lateral Movement", 11, now.AddMinutes(-90), "Active"),
+                new("T1486", "Data Encrypted for Impact", "Impact", 0, null, "Mitigated"),
+                new("T1190", "Exploit Public-Facing Application", "Initial Access", 19, now.AddMinutes(-5), "Active"),
+                new("T1548.002", "Bypass User Account Control", "Privilege Escalation", 3, now.AddHours(-4), "Active"),
+                new("T1562.001", "Disable or Modify Tools", "Defense Evasion", 1, now.AddDays(-2), "Mitigated")
+            },
+            Threats: new List<ThreatAssessmentDto>
+            {
+                new(Guid.NewGuid(), "Brute force attack detected from Eastern European IP range", "Critical", "IDS", now.AddMinutes(-5), "Active"),
+                new(Guid.NewGuid(), "Suspicious API call pattern — possible credential stuffing", "High", "WAF", now.AddMinutes(-18), "Investigating"),
+                new(Guid.NewGuid(), "Anomalous data exfiltration attempt on /api/users endpoint", "High", "SIEM", now.AddHours(-1), "Active"),
+                new(Guid.NewGuid(), "SQL injection attempt blocked on search parameter", "Medium", "WAF", now.AddHours(-2), "Mitigated"),
+                new(Guid.NewGuid(), "TLS certificate nearing expiration for auth service", "Medium", "Monitor", now.AddHours(-3), "Investigating"),
+                new(Guid.NewGuid(), "Port scan detected from cloud provider IP", "Low", "Firewall", now.AddHours(-5), "Mitigated"),
+                new(Guid.NewGuid(), "Repeated 403 responses indicating directory traversal attempt", "High", "WAF", now.AddMinutes(-30), "Active")
+            },
+            BlockedIpList: new List<BlockedIpDto>
+            {
+                new("185.220.101.34", now.AddMinutes(-5), 47),
+                new("91.240.118.172", now.AddMinutes(-12), 31),
+                new("45.155.205.233", now.AddMinutes(-28), 23),
+                new("194.26.192.64", now.AddHours(-1), 18),
+                new("103.75.201.2", now.AddHours(-2), 15),
+                new("5.188.206.14", now.AddHours(-3), 12)
+            }
+        );
+    }
+
+    // ───────── Styling helpers ─────────
+
+    private static string ThreatLevelCardStyle(string level) => level.ToLowerInvariant() switch
+    {
+        "critical" => "background: linear-gradient(135deg, #d32f2f, #b71c1c); color: #ffffff; border: none;",
+        "high"     => "background: linear-gradient(135deg, #f57c00, #e65100); color: #ffffff; border: none;",
+        "medium"   => "background: linear-gradient(135deg, #fbc02d, #f9a825); color: #263238; border: none;",
+        "low"      => "background: linear-gradient(135deg, #388e3c, #2e7d32); color: #ffffff; border: none;",
+        _          => "background: var(--rz-base-700); color: #ffffff; border: none;"
+    };
+
+    private static string ThreatLevelIcon(string level) => level.ToLowerInvariant() switch
+    {
+        "critical" => "crisis_alert",
+        "high"     => "warning",
+        "medium"   => "info",
+        "low"      => "check_circle",
+        _          => "help"
+    };
+
+    private static string ActiveThreatColor(int count) => count switch
+    {
+        0             => "var(--rz-success)",
+        >= 1 and <= 3 => "var(--rz-warning)",
+        _             => "var(--rz-danger)"
+    };
+
+    private static string RiskLevelColor(string level) => level.ToLowerInvariant() switch
+    {
+        "critical" => "#d32f2f",
+        "high"     => "#f57c00",
+        "medium"   => "#fbc02d",
+        "low"      => "#388e3c",
+        _          => "#90a4ae"
+    };
+
+    private static BadgeStyle RiskLevelBadgeStyle(string level) => level.ToLowerInvariant() switch
+    {
+        "critical" => BadgeStyle.Danger,
+        "high"     => BadgeStyle.Warning,
+        "medium"   => BadgeStyle.Info,
+        "low"      => BadgeStyle.Success,
+        _          => BadgeStyle.Light
+    };
+
+    private static BadgeStyle SeverityBadgeStyle(string severity) => severity.ToLowerInvariant() switch
+    {
+        "critical" => BadgeStyle.Danger,
+        "high"     => BadgeStyle.Warning,
+        "medium"   => BadgeStyle.Info,
+        "low"      => BadgeStyle.Success,
+        _          => BadgeStyle.Light
+    };
+
+    private void OnThreatRowRender(RowRenderEventArgs<ThreatAssessmentDto> args)
+    {
+        args.Attributes.Add("style", args.Data.Severity.ToLowerInvariant() switch
+        {
+            "critical" => "background-color: rgba(211, 47, 47, 0.08);",
+            "high"     => "background-color: rgba(245, 124, 0, 0.06);",
+            _          => string.Empty
+        });
+    }
+
+    // ───────── Cleanup ─────────
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+    }
+}

@@ -1,0 +1,102 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@inject IConfiguration Config
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Nav
+@inject AdminAuthStateProvider AuthState
+@inject NotificationService Notification
+
+<PageTitle>TheWatch — Admin Login</PageTitle>
+
+<RadzenRow JustifyContent="JustifyContent.Center" class="rz-mt-12">
+    <RadzenColumn Size="12" SizeMD="6" SizeLG="4">
+        <RadzenCard class="rz-p-6">
+            <RadzenStack AlignItems="AlignItems.Center" Gap="1rem" class="rz-mb-4">
+                <RadzenIcon Icon="shield" style="font-size: 3rem; color: var(--rz-danger);" />
+                <RadzenText TextStyle="TextStyle.H4">TheWatch</RadzenText>
+                <RadzenText TextStyle="TextStyle.Overline"
+                            style="color: var(--rz-danger); letter-spacing: 0.2em; font-weight: 600;">
+                    ADMIN PORTAL
+                </RadzenText>
+            </RadzenStack>
+
+            <RadzenTemplateForm TItem="LoginModel" Data="@_loginModel" Submit="@OnLogin">
+                <RadzenStack Gap="1rem">
+                    <RadzenFormField Text="Email" Style="width: 100%;">
+                        <RadzenTextBox @bind-Value="_loginModel.Email" Name="Email" />
+                        <RadzenRequiredValidator Component="Email" Text="Required" />
+                    </RadzenFormField>
+                    <RadzenFormField Text="Password" Style="width: 100%;">
+                        <RadzenPassword @bind-Value="_loginModel.Password" Name="Password" />
+                        <RadzenRequiredValidator Component="Password" Text="Required" />
+                    </RadzenFormField>
+                    <RadzenButton Text="Login" ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Danger"
+                                  Style="width: 100%;" IsBusy="@_loading" />
+                </RadzenStack>
+            </RadzenTemplateForm>
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Dark" class="rz-mt-2"
+                             AllowClose="false">@_error</RadzenAlert>
+            }
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
+
+@code {
+    private LoginModel _loginModel = new();
+    private bool _loading;
+    private string? _error;
+
+    private async Task OnLogin()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var p5Url = Config["Services:P5:Url"] ?? "http://localhost:5005";
+            var client = HttpClientFactory.CreateClient("microservices");
+            var response = await client.PostAsJsonAsync($"{p5Url}/api/auth/login",
+                new { _loginModel.Email, _loginModel.Password });
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<LoginResponseDto>();
+                if (result is not null)
+                {
+                    try
+                    {
+                        await AuthState.LoginAsync(result.AccessToken, result.RefreshToken);
+                        Nav.NavigateTo("/");
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        _error = "Access denied. Admin role required.";
+                    }
+                }
+            }
+            else
+            {
+                _error = "Invalid email or password.";
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            _error = "Access denied. Admin role required.";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Cannot reach auth service: {ex.Message}";
+        }
+        _loading = false;
+    }
+
+    private class LoginModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
+    private record LoginResponseDto(string AccessToken, string RefreshToken, DateTime ExpiresAt);
+}

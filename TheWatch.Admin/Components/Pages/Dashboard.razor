@@ -1,0 +1,243 @@
+@page "/"
+@attribute [Authorize(Roles = "Admin")]
+@implements IDisposable
+@inject AdminApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>TheWatch Admin - Dashboard</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">
+    <RadzenIcon Icon="dashboard" style="vertical-align: middle;" /> Admin Dashboard
+</RadzenText>
+
+@* ===== 1. Stat Cards Row ===== *@
+<RadzenRow Gap="1rem" class="rz-mb-4">
+    <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+        <RadzenCard class="stat-card" style="border-left: 4px solid var(--rz-primary);">
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="people" style="font-size: 2rem; color: var(--rz-primary);" />
+                <div class="stat-value" style="color: var(--rz-primary);">@_stats.TotalUsers</div>
+                <div class="stat-label">Total Users</div>
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
+
+    <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+        <RadzenCard class="stat-card" style="border-left: 4px solid var(--rz-success);">
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="dns" style="font-size: 2rem; color: var(--rz-success);" />
+                <div class="stat-value" style="color: var(--rz-success);">@_stats.ActiveServices</div>
+                <div class="stat-label">Active Services</div>
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
+
+    <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+        <RadzenCard class="stat-card" style="border-left: 4px solid var(--rz-warning);">
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="shield" style="font-size: 2rem; color: var(--rz-warning);" />
+                <div class="stat-value" style="color: var(--rz-warning);">@_stats.SecurityEvents</div>
+                <div class="stat-label">Security Events</div>
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
+
+    <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+        <RadzenCard class="stat-card" style="border-left: 4px solid var(--rz-info);">
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="schedule" style="font-size: 2rem; color: var(--rz-info);" />
+                <div class="stat-value" style="color: var(--rz-info);">@_stats.Uptime</div>
+                <div class="stat-label">System Uptime</div>
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
+
+@* ===== 2. Service Health Overview ===== *@
+<RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">
+    <RadzenIcon Icon="monitor_heart" style="vertical-align: middle;" /> Service Health Overview
+</RadzenText>
+
+<RadzenCard class="rz-mb-4">
+    <RadzenDataGrid Data="@_serviceHealth" TItem="ServiceHealthInfo" AllowSorting="true"
+                    AllowFiltering="false" PageSize="10" Density="Density.Compact"
+                    Style="width: 100%;">
+        <Columns>
+            <RadzenDataGridColumn TItem="ServiceHealthInfo" Property="Id" Title="Program ID" Width="120px" />
+            <RadzenDataGridColumn TItem="ServiceHealthInfo" Property="Name" Title="Name" />
+            <RadzenDataGridColumn TItem="ServiceHealthInfo" Title="Status" Width="140px" Sortable="false">
+                <Template Context="svc">
+                    <RadzenBadge Text="@(svc.Status ?? "Unknown")"
+                                 BadgeStyle="@GetServiceBadgeStyle(svc.Status)"
+                                 IsPill="true" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="ServiceHealthInfo" Title="Response Time" Width="160px" TextAlign="TextAlign.Right">
+                <Template Context="svc">
+                    @if (svc.ResponseTimeMs.HasValue)
+                    {
+                        <span>@(svc.ResponseTimeMs.Value) ms</span>
+                    }
+                    else
+                    {
+                        <span style="opacity: 0.4;">N/A</span>
+                    }
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="ServiceHealthInfo" Title="Last Check" Width="200px">
+                <Template Context="svc">
+                    @if (svc.LastCheck.HasValue)
+                    {
+                        <span>@svc.LastCheck.Value.ToString("yyyy-MM-dd HH:mm:ss")</span>
+                    }
+                    else
+                    {
+                        <span style="opacity: 0.4;">Never</span>
+                    }
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenCard>
+
+@* ===== 3. Recent Activity ===== *@
+<RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">
+    <RadzenIcon Icon="receipt_long" style="vertical-align: middle;" /> Recent Activity
+</RadzenText>
+
+<RadzenCard class="rz-mb-4">
+    @if (_auditEvents.Count == 0)
+    {
+        <RadzenText TextStyle="TextStyle.Body2" style="opacity: 0.5;">No recent audit events.</RadzenText>
+    }
+    else
+    {
+        <RadzenDataList Data="@_auditEvents" TItem="AuditEventDto" Style="width: 100%;">
+            <Template Context="evt">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center"
+                             Gap="1rem" Wrap="FlexWrap.Wrap" class="rz-p-2"
+                             Style="border-bottom: 1px solid var(--rz-base-600);">
+                    <RadzenText TextStyle="TextStyle.Caption" Style="min-width: 160px; opacity: 0.6;">
+                        @evt.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")
+                    </RadzenText>
+                    <RadzenBadge Text="@evt.Severity"
+                                 BadgeStyle="@GetSeverityBadgeStyle(evt.Severity)"
+                                 IsPill="true" />
+                    <RadzenText TextStyle="TextStyle.Body2" Style="font-weight: 600; min-width: 120px;">
+                        @evt.User
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2" Style="flex: 1;">
+                        @evt.Action
+                    </RadzenText>
+                </RadzenStack>
+            </Template>
+        </RadzenDataList>
+    }
+</RadzenCard>
+
+@* ===== 4. Quick Actions ===== *@
+<RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">
+    <RadzenIcon Icon="bolt" style="vertical-align: middle;" /> Quick Actions
+</RadzenText>
+
+<RadzenCard>
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
+        <RadzenButton Text="Manage Users" Icon="people" ButtonStyle="ButtonStyle.Primary"
+                      Click="@(() => Nav.NavigateTo("/users"))" />
+        <RadzenButton Text="View Audit Log" Icon="receipt_long" ButtonStyle="ButtonStyle.Warning"
+                      Click="@(() => Nav.NavigateTo("/audit"))" />
+        <RadzenButton Text="Security Dashboard" Icon="shield" ButtonStyle="ButtonStyle.Danger"
+                      Click="@(() => Nav.NavigateTo("/security"))" />
+    </RadzenStack>
+</RadzenCard>
+
+@code {
+    private AdminDashboardStats _stats = new(0, 0, 0, "--:--");
+    private List<ServiceHealthInfo> _serviceHealth = new();
+    private List<AuditEventDto> _auditEvents = new();
+    private Timer? _refreshTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardDataAsync();
+
+        // Auto-refresh every 30 seconds
+        _refreshTimer = new Timer(async _ =>
+        {
+            await LoadDashboardDataAsync();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    private async Task LoadDashboardDataAsync()
+    {
+        try
+        {
+            _stats = await Api.GetDashboardStatsAsync();
+        }
+        catch
+        {
+            _stats = new AdminDashboardStats(0, 0, 0, "--:--");
+        }
+
+        try
+        {
+            _serviceHealth = await Api.GetAllServiceHealthAsync();
+        }
+        catch
+        {
+            _serviceHealth = GetPlaceholderServiceHealth();
+        }
+
+        try
+        {
+            _auditEvents = await Api.GetRecentAuditEventsAsync(10);
+        }
+        catch
+        {
+            _auditEvents = GetPlaceholderAuditEvents();
+        }
+    }
+
+    private static BadgeStyle GetServiceBadgeStyle(string? status) => status switch
+    {
+        "Healthy" => BadgeStyle.Success,
+        "Unhealthy" => BadgeStyle.Warning,
+        "Offline" => BadgeStyle.Danger,
+        _ => BadgeStyle.Light
+    };
+
+    private static BadgeStyle GetSeverityBadgeStyle(string severity) => severity switch
+    {
+        "Critical" => BadgeStyle.Danger,
+        "High" => BadgeStyle.Warning,
+        "Medium" => BadgeStyle.Info,
+        "Low" => BadgeStyle.Success,
+        _ => BadgeStyle.Light
+    };
+
+    private static List<ServiceHealthInfo> GetPlaceholderServiceHealth() =>
+    [
+        new("P1", "Core Gateway", "Central API gateway and routing", "hub", "Offline", null, null, null),
+        new("P2", "Voice Emergency", "Voice-activated emergency services", "emergency", "Offline", null, null, null),
+        new("P3", "Mesh Network", "Mesh networking and connectivity", "lan", "Offline", null, null, null),
+        new("P4", "Wearable", "Wearable device integration", "watch", "Offline", null, null, null),
+        new("P5", "Auth & Security", "Authentication and security services", "lock", "Offline", null, null, null),
+        new("P6", "First Responder", "First responder coordination", "local_fire_department", "Offline", null, null, null),
+        new("P7", "Family Health", "Family health monitoring", "family_restroom", "Offline", null, null, null),
+        new("P8", "Disaster Relief", "Disaster relief coordination", "public", "Offline", null, null, null),
+        new("P9", "Doctor Services", "Doctor and clinical services", "medical_services", "Offline", null, null, null),
+        new("P10", "Gamification", "Gamification and engagement", "emoji_events", "Offline", null, null, null),
+    ];
+
+    private static List<AuditEventDto> GetPlaceholderAuditEvents() =>
+    [
+        new(DateTime.UtcNow, "system", "Dashboard loaded — API unreachable", "Medium"),
+    ];
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+    }
+
+}

@@ -35,6 +35,7 @@ builder.Services.AddHangfireServer();
 // Configurable: PostGIS (default) or Azure Maps (when Azure:UseAzureMaps = true)
 builder.Services.AddGeospatialProvider(builder.Configuration);
 builder.AddWatchSecurity();
+builder.AddWatchControllers();
 
 var app = builder.Build();
 
@@ -45,6 +46,7 @@ app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
+app.MapWatchControllers();
 
 app.MapGet("/health", () => new HealthResponse(
     "TheWatch.Geospatial", "Geo", "Healthy", DateTime.UtcNow));

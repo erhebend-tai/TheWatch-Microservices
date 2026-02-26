@@ -46,6 +46,7 @@ builder.AddWatchSecurity();
 builder.Services.AddScoped<IEmergencyService, EmergencyService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
 builder.Services.AddScoped<IWatchDataSeeder, VoiceEmergencySeeder>();
+builder.AddWatchControllers();
 
 var app = builder.Build();
 await app.UseWatchMigrations();
@@ -57,6 +58,7 @@ app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
+app.MapWatchControllers();
 
 // Register recurring Hangfire jobs
 RecurringJob.AddOrUpdate<IDispatchService>(

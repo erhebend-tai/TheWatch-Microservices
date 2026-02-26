@@ -1,0 +1,288 @@
+@page "/roles"
+@attribute [Authorize(Roles = "Admin")]
+@inject AdminApiClient ApiClient
+@inject NotificationService Notification
+
+<PageTitle>TheWatch Admin — Role Management</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H4" class="rz-mb-4">
+    <RadzenIcon Icon="assignment_ind" style="vertical-align: middle;" /> Role Management
+</RadzenText>
+
+@* ---------------------------------------------------------------
+   Section 1: Roles Overview
+   --------------------------------------------------------------- *@
+
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-mb-3">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">System Roles</RadzenText>
+    <RadzenButton Text="Refresh Counts" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                  Size="ButtonSize.Small" Click="@LoadRoles" IsBusy="@_loadingCounts" />
+</RadzenStack>
+
+<RadzenDataGrid Data="@_roles" TItem="RoleInfo" AllowSorting="true" class="rz-mb-6"
+                Density="Density.Compact">
+    <Columns>
+        <RadzenDataGridColumn Property="Name" Title="Role Name" Width="180px">
+            <Template Context="role">
+                <RadzenBadge BadgeStyle="@role.BadgeColor" Text="@role.Name" />
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="Description" Title="Description" />
+
+        <RadzenDataGridColumn Property="UserCount" Title="User Count" Width="120px" TextAlign="TextAlign.Center">
+            <Template Context="role">
+                @if (_loadingCounts)
+                {
+                    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="..." />
+                }
+                else
+                {
+                    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@role.UserCount.ToString()" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="BadgeColorName" Title="Badge Color" Width="140px">
+            <Template Context="role">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <span style="display: inline-block; width: 14px; height: 14px; border-radius: 3px; background-color: @GetCssColor(role.BadgeColor);"></span>
+                    <RadzenText TextStyle="TextStyle.Body2">@role.BadgeColorName</RadzenText>
+                </RadzenStack>
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="Name" Title="Included In Policies" Width="300px">
+            <Template Context="role">
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" Wrap="FlexWrap.Wrap">
+                    @foreach (var policy in GetPoliciesForRole(role.Name))
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@policy" Shade="Shade.Lighter"
+                                     Style="font-size: 0.75rem;" />
+                    }
+                </RadzenStack>
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@* ---------------------------------------------------------------
+   Section 2: Authorization Policies
+   --------------------------------------------------------------- *@
+
+<RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">Authorization Policies</RadzenText>
+<RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4" style="opacity: 0.6;">
+    Policies defined in <code>WatchPolicies</code> and configured via <code>WatchAuthExtensions.AddWatchJwtAuth()</code>.
+    Each policy specifies which roles grant access.
+</RadzenText>
+
+<RadzenRow Gap="1rem" class="rz-mb-6">
+    @foreach (var policy in _policies)
+    {
+        <RadzenColumn Size="12" SizeMD="6" SizeLG="4">
+            <RadzenCard class="rz-p-4" Style="height: 100%;">
+                <RadzenStack Gap="0.75rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="policy" style="color: var(--rz-info); font-size: 1.25rem;" />
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">@policy.Name</RadzenText>
+                    </RadzenStack>
+
+                    <RadzenText TextStyle="TextStyle.Body2" style="opacity: 0.7;">
+                        @policy.Description
+                    </RadzenText>
+
+                    <RadzenText TextStyle="TextStyle.Caption" style="color: var(--rz-text-secondary-color);">
+                        Allowed Roles:
+                    </RadzenText>
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" Wrap="FlexWrap.Wrap">
+                        @foreach (var role in policy.Roles)
+                        {
+                            <RadzenBadge BadgeStyle="@GetRoleBadgeStyle(role)" Text="@role" />
+                        }
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    }
+</RadzenRow>
+
+@* ---------------------------------------------------------------
+   Section 3: Role Assignment Quick View
+   --------------------------------------------------------------- *@
+
+<RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">Role Assignment Quick View</RadzenText>
+<RadzenRow Gap="1rem">
+    @foreach (var role in _roles)
+    {
+        <RadzenColumn Size="6" SizeMD="4" SizeLG="2">
+            <RadzenCard class="rz-p-4" Style="text-align: center;">
+                <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenBadge BadgeStyle="@role.BadgeColor" Text="@role.Name"
+                                 Style="font-size: 0.85rem; padding: 0.25rem 0.75rem;" />
+                    <RadzenText TextStyle="TextStyle.H3" class="rz-mb-0"
+                                style="font-weight: 700;">
+                        @if (_loadingCounts)
+                        {
+                            <text>--</text>
+                        }
+                        else
+                        {
+                            @role.UserCount
+                        }
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.5;">
+                        users assigned
+                    </RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    }
+</RadzenRow>
+
+@code {
+    private List<RoleInfo> _roles = [];
+    private List<PolicyInfo> _policies = [];
+    private bool _loadingCounts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        InitializeRolesWithDefaults();
+        LoadPolicies();
+        await LoadRoles();
+    }
+
+    /// <summary>
+    /// Sets up role list with zero counts, then fetches actual counts from P5 Auth service.
+    /// </summary>
+    private void InitializeRolesWithDefaults()
+    {
+        _roles = new()
+        {
+            new(WatchRoles.Admin,          "Full system administration access",              0, BadgeStyle.Danger,  "Danger"),
+            new(WatchRoles.Responder,      "First responder and emergency dispatch",         0, BadgeStyle.Primary, "Primary"),
+            new(WatchRoles.FamilyMember,   "Family health monitoring and check-ins",         0, BadgeStyle.Warning, "Warning"),
+            new(WatchRoles.Doctor,         "Medical professional services access",           0, BadgeStyle.Info,    "Info"),
+            new(WatchRoles.Patient,        "Standard user/patient access",                   0, BadgeStyle.Success, "Success"),
+            new(WatchRoles.ServiceAccount, "Machine-to-machine service authentication",      0, BadgeStyle.Light,   "Light"),
+        };
+    }
+
+    private async Task LoadRoles()
+    {
+        _loadingCounts = true;
+        StateHasChanged();
+
+        try
+        {
+            var counts = await ApiClient.GetRoleUserCountsAsync();
+
+            // Update user counts from API response
+            foreach (var role in _roles)
+            {
+                if (counts.TryGetValue(role.Name, out var count))
+                {
+                    role.UserCount = count;
+                }
+            }
+        }
+        catch
+        {
+            // Counts remain at 0 if service is unavailable
+            Notification.Notify(NotificationSeverity.Warning,
+                "Could not load role counts",
+                "The Auth service may be unavailable. User counts are shown as 0.");
+        }
+
+        _loadingCounts = false;
+    }
+
+    private void LoadPolicies()
+    {
+        // Matches WatchAuthExtensions.AddWatchJwtAuth() policy definitions exactly
+        _policies = new()
+        {
+            new(WatchPolicies.AdminOnly,
+                "Requires Admin role. Full system access for platform administrators.",
+                new[] { WatchRoles.Admin }),
+
+            new(WatchPolicies.ResponderAccess,
+                "Access for first responders and administrators. Used by dispatch and incident endpoints.",
+                new[] { WatchRoles.Admin, WatchRoles.Responder }),
+
+            new(WatchPolicies.DoctorAccess,
+                "Access for medical professionals and administrators. Used by clinical and telemedicine endpoints.",
+                new[] { WatchRoles.Admin, WatchRoles.Doctor }),
+
+            new(WatchPolicies.FamilyAccess,
+                "Access for family members, patients, and administrators. Used by health monitoring and check-in endpoints.",
+                new[] { WatchRoles.Admin, WatchRoles.FamilyMember, WatchRoles.Patient }),
+
+            new(WatchPolicies.ServiceToService,
+                "Machine-to-machine authentication for inter-service communication. Used by internal API calls between microservices.",
+                new[] { WatchRoles.Admin, WatchRoles.ServiceAccount }),
+
+            new(WatchPolicies.Authenticated,
+                "Any authenticated user regardless of role. Used for basic profile and common endpoints.",
+                new[] { WatchRoles.Admin, WatchRoles.Responder, WatchRoles.FamilyMember,
+                        WatchRoles.Doctor, WatchRoles.Patient, WatchRoles.ServiceAccount }),
+        };
+    }
+
+    /// <summary>
+    /// Returns which WatchPolicies a given role is included in.
+    /// </summary>
+    private static string[] GetPoliciesForRole(string role) => role switch
+    {
+        "Admin"          => new[] { WatchPolicies.AdminOnly, WatchPolicies.ResponderAccess,
+                                    WatchPolicies.DoctorAccess, WatchPolicies.FamilyAccess,
+                                    WatchPolicies.ServiceToService, WatchPolicies.Authenticated },
+        "Responder"      => new[] { WatchPolicies.ResponderAccess, WatchPolicies.Authenticated },
+        "Doctor"         => new[] { WatchPolicies.DoctorAccess, WatchPolicies.Authenticated },
+        "FamilyMember"   => new[] { WatchPolicies.FamilyAccess, WatchPolicies.Authenticated },
+        "Patient"        => new[] { WatchPolicies.FamilyAccess, WatchPolicies.Authenticated },
+        "ServiceAccount" => new[] { WatchPolicies.ServiceToService },
+        _                => Array.Empty<string>()
+    };
+
+    private static BadgeStyle GetRoleBadgeStyle(string role) => role switch
+    {
+        "Admin"          => BadgeStyle.Danger,
+        "Responder"      => BadgeStyle.Primary,
+        "Doctor"         => BadgeStyle.Info,
+        "Patient"        => BadgeStyle.Success,
+        "FamilyMember"   => BadgeStyle.Warning,
+        "ServiceAccount" => BadgeStyle.Light,
+        _                => BadgeStyle.Light
+    };
+
+    private static string GetCssColor(BadgeStyle style) => style switch
+    {
+        BadgeStyle.Danger  => "var(--rz-danger)",
+        BadgeStyle.Primary => "var(--rz-primary)",
+        BadgeStyle.Info    => "var(--rz-info)",
+        BadgeStyle.Success => "var(--rz-success)",
+        BadgeStyle.Warning => "var(--rz-warning)",
+        BadgeStyle.Light   => "var(--rz-base-600)",
+        _                  => "var(--rz-base-600)"
+    };
+
+    private class RoleInfo
+    {
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public int UserCount { get; set; }
+        public BadgeStyle BadgeColor { get; set; }
+        public string BadgeColorName { get; set; }
+
+        public RoleInfo(string name, string description, int userCount, BadgeStyle badgeColor, string badgeColorName)
+        {
+            Name = name;
+            Description = description;
+            UserCount = userCount;
+            BadgeColor = badgeColor;
+            BadgeColorName = badgeColorName;
+        }
+    }
+
+    private record PolicyInfo(string Name, string Description, string[] Roles);
+}

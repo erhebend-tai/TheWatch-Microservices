@@ -102,6 +102,7 @@ builder.Services.AddScoped<EulaService>();
 builder.Services.AddScoped<OnboardingService>();
 builder.Services.AddScoped<StrideThreatService>();
 builder.Services.AddScoped<MitreDetectionService>();
+builder.AddWatchControllers();
 
 var app = builder.Build();
 
@@ -122,6 +123,7 @@ app.UseMiddleware<IpThrottlingMiddleware>();
 app.UseMiddleware<SlidingWindowTokenMiddleware>();
 
 app.UseHangfireDashboard("/hangfire");
+app.MapWatchControllers();
 
 // Schedule recurring security jobs
 RecurringJob.AddOrUpdate<StrideThreatService>("stride-threat-scan", s => s.ScanAsync(), "*/15 * * * *");
