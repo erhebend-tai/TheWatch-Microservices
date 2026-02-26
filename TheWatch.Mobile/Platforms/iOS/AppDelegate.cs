@@ -16,7 +16,8 @@ public class AppDelegate : MauiUIApplicationDelegate
         return result;
     }
 
-    public override void RegisteredForRemoteNotifications(UIApplication application, NSData deviceToken)
+    [Export("application:didRegisterForRemoteNotificationsWithDeviceToken:")]
+    public void RegisteredForRemoteNotifications(UIApplication application, NSData deviceToken)
     {
         WatchPushNotificationDelegate.DidRegisterForRemoteNotifications(deviceToken);
     }
