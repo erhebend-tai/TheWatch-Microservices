@@ -103,4 +103,19 @@ builder.AddProject<Projects.TheWatch_Admin>("admin")
     .WithReference(p10_gamification)
     .WithReference(geospatial);
 
+// Admin REST API Gateway — Zero Trust API gateway for all services
+builder.AddProject<Projects.TheWatch_Admin_RestAPI>("admin-restapi")
+    .WithExternalHttpEndpoints()
+    .WithReference(p1_coregateway)
+    .WithReference(p2_voiceemergency)
+    .WithReference(p3_meshnetwork)
+    .WithReference(p4_wearable)
+    .WithReference(p5_authsecurity)
+    .WithReference(p6_firstresponder)
+    .WithReference(p7_familyhealth)
+    .WithReference(p8_disasterrelief)
+    .WithReference(p9_doctorservices)
+    .WithReference(p10_gamification)
+    .WithReference(geospatial);
+
 builder.Build().Run();

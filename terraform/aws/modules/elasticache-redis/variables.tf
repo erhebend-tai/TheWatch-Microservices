@@ -1,43 +1,42 @@
-﻿variable "environment" {
-  description = "The deployment environment"
+variable "environment" {
+  description = "Deployment environment (dev, staging, production)"
   type        = string
 }
 
 variable "project_name" {
-  description = "The name of the project"
+  description = "Project name used in resource naming"
   type        = string
+  default     = "TheWatch"
 }
 
-variable "subnet_ids" {
-  description = "List of private subnet IDs for ElastiCache"
-  type        = list(string)
+variable "aws_region" {
+  description = "AWS region for resource deployment"
+  type        = string
+  default     = "us-east-1"
 }
 
 variable "vpc_id" {
-  description = "VPC ID for security group"
+  description = "VPC ID where the Redis cluster will be deployed"
+  type        = string
+}
+
+variable "private_subnet_ids" {
+  description = "List of private subnet IDs for the Redis subnet group"
+  type        = list(string)
+}
+
+variable "vpc_cidr" {
+  description = "VPC CIDR block for security group ingress rules"
   type        = string
 }
 
 variable "node_type" {
-  description = "ElastiCache node type"
+  description = "ElastiCache node instance type"
   type        = string
   default     = "cache.r6g.large"
 }
 
-variable "num_node_groups" {
-  description = "Number of shards"
-  type        = number
-  default     = 3
-}
-
-variable "replicas_per_node_group" {
-  description = "Replicas per shard"
-  type        = number
-  default     = 2
-}
-
-variable "kms_key_id" {
-  description = "KMS key ID for encryption at rest"
+variable "kms_key_arn" {
+  description = "ARN of the KMS key for at-rest encryption"
   type        = string
-  default     = null
 }

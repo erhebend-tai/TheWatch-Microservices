@@ -26,13 +26,13 @@
 ### 5B. SQL Server Schema
 > **NOTE**: Items 15-21 are still pending and should be prioritized before Stage 9 work begins. These schema adaptations ensure the EfRepository layer (converted in Session 13) operates against correct table structures with proper indexes, constraints, and seed data. Without these, all 10 services run against auto-generated EF schemas that lack the production-grade constraints defined in the spec documents.
 
-- [ ] 15. Map P0 `UniversalMeasurementsDB` tables from `00_Schema.sql`–`10_Devices.sql` to EF seed data
-- [ ] 16. Adapt P2 DDL from `Watch_Program_02_VoiceEmergency.md` to EF entity configs
-- [ ] 17. Adapt P3 DDL from `Watch-MeshNetwork.md` (19 tables) to EF entity configs
-- [ ] 18. Adapt P4 DDL from `Program4_Watch_Wearable.sql` to EF entity configs
-- [ ] 19. Adapt P5 DDL from `Watch-AuthSecurity/` (4 parts) to EF entity configs
-- [ ] 20. Adapt P8 DDL from `Watch-DisasterRelief/` to EF entity configs (18 tables)
-- [ ] 21. Create seed data scripts for development (test users, sample incidents, demo families)
+- [x] 15. Map P0 `UniversalMeasurementsDB` tables from `00_Schema.sql`–`10_Devices.sql` to EF seed data
+- [x] 16. Adapt P2 DDL from `Watch_Program_02_VoiceEmergency.md` to EF entity configs
+- [x] 17. Adapt P3 DDL from `Watch-MeshNetwork.md` (19 tables) to EF entity configs
+- [x] 18. Adapt P4 DDL from `Program4_Watch_Wearable.sql` to EF entity configs
+- [x] 19. Adapt P5 DDL from `Watch-AuthSecurity/` (4 parts) to EF entity configs
+- [x] 20. Adapt P8 DDL from `Watch-DisasterRelief/` to EF entity configs (18 tables)
+- [x] 21. Create seed data scripts for development (test users, sample incidents, demo families)
 
 ### 5C. Repository Pattern + Aspire
 - [x] 22. Extract `IRepository<T>` generic interface from existing service interfaces
@@ -361,30 +361,30 @@
 ### 13B. AWS Data Services
 - [x] 159. Create Terraform module for Amazon RDS SQL Server (Multi-AZ, `db.r6i.xlarge`) with 10 databases matching the EF DbContext schemas, automated backups (35-day retention), and Performance Insights enabled
 - [x] 160. Create Terraform module for Amazon Aurora PostgreSQL (PostGIS extension) for TheWatch.Geospatial service — configure read replicas in 2 AZs, enable Babelfish for SQL Server compatibility layer if needed for migration
-- [ ] 161. Create Terraform module for Amazon ElastiCache Redis cluster (cluster mode enabled, 3 shards x 2 replicas) for session store, rate limiting counters, and SignalR backplane — configure encryption at rest (KMS) and in transit (TLS)
-- [ ] 162. Create Terraform module for Amazon MSK (Managed Streaming for Kafka) cluster with 3 brokers across 3 AZs, topic auto-creation disabled, and IAM authentication — create topics matching existing Kafka event bus configuration
-- [ ] 163. Create Terraform module for Amazon S3 buckets: `thewatch-evidence-{env}` (Intelligent-Tiering, versioning, object lock for legal hold), `thewatch-backups-{env}` (Glacier Deep Archive lifecycle at 90 days), `thewatch-static-{env}` (CloudFront origin)
-- [ ] 164. Configure S3 event notifications to SQS to Lambda pipeline for evidence processing: on `PutObject` to evidence bucket, trigger Lambda that validates SHA-256 chain-of-custody hash, runs content moderation via Rekognition, and writes metadata to DynamoDB
-- [ ] 165. Create Terraform module for Amazon DynamoDB table `thewatch-audit-log` with on-demand capacity, partition key `ServiceName#Date`, sort key `Timestamp#EventId`, TTL on `ExpiresAt` (365 days), and DynamoDB Streams enabled for real-time audit forwarding
+- [x] 161. Create Terraform module for Amazon ElastiCache Redis cluster (cluster mode enabled, 3 shards x 2 replicas) for session store, rate limiting counters, and SignalR backplane — configure encryption at rest (KMS) and in transit (TLS)
+- [x] 162. Create Terraform module for Amazon MSK (Managed Streaming for Kafka) cluster with 3 brokers across 3 AZs, topic auto-creation disabled, and IAM authentication — create topics matching existing Kafka event bus configuration
+- [x] 163. Create Terraform module for Amazon S3 buckets: `thewatch-evidence-{env}` (Intelligent-Tiering, versioning, object lock for legal hold), `thewatch-backups-{env}` (Glacier Deep Archive lifecycle at 90 days), `thewatch-static-{env}` (CloudFront origin)
+- [x] 164. Configure S3 event notifications to SQS to Lambda pipeline for evidence processing: on `PutObject` to evidence bucket, trigger Lambda that validates SHA-256 chain-of-custody hash, runs content moderation via Rekognition, and writes metadata to DynamoDB
+- [x] 165. Create Terraform module for Amazon DynamoDB table `thewatch-audit-log` with on-demand capacity, partition key `ServiceName#Date`, sort key `Timestamp#EventId`, TTL on `ExpiresAt` (365 days), and DynamoDB Streams enabled for real-time audit forwarding
 
 ### 13C. AWS Security & Identity
-- [ ] 166. Create Terraform module for Amazon Cognito User Pool with custom attributes mapping to TheWatch roles (Admin, Responder, FamilyMember, Doctor, Patient), MFA enforcement (TOTP + SMS), and advanced security features (compromised credentials detection, adaptive authentication)
-- [ ] 167. Create IAM roles with least-privilege policies for each ECS task: P2 gets `rekognition:DetectModerationLabels` + `transcribe:StartStreamTranscription`, P7/P9 get `healthlake:*`, P5 gets `cognito-idp:Admin*`, all get `s3:PutObject` scoped to their service prefix
-- [ ] 168. Create Terraform module for AWS KMS customer-managed keys: `thewatch-data-key` (RDS, ElastiCache, S3 encryption), `thewatch-jwt-key` (JWT signing), `thewatch-evidence-key` (evidence bucket SSE with key rotation every 365 days)
-- [ ] 169. Configure AWS Secrets Manager for all service secrets: database connection strings, Kafka SASL credentials, Redis AUTH tokens, Firebase server key, third-party API keys — create rotation Lambda for database credentials (30-day rotation)
-- [ ] 170. Create Terraform module for AWS WAF v2 WebACL attached to ALB/API Gateway: rate-based rule (2,000 requests/5min per IP), SQL injection rule set, XSS rule set, known bad inputs rule set, geo-restriction (block OFAC-sanctioned countries), and IP reputation list
-- [ ] 171. Configure AWS GuardDuty with S3 protection, ECS runtime monitoring, and Malware Protection — create EventBridge rule to forward HIGH and CRITICAL findings to SNS topic linked to PagerDuty integration
-- [ ] 172. Configure AWS Security Hub with CIS AWS Foundations Benchmark v1.4, AWS Foundational Security Best Practices, and NIST 800-53 standards — create custom actions for automated remediation of non-compliant resources via Lambda
+- [x] 166. Create Terraform module for Amazon Cognito User Pool with custom attributes mapping to TheWatch roles (Admin, Responder, FamilyMember, Doctor, Patient), MFA enforcement (TOTP + SMS), and advanced security features (compromised credentials detection, adaptive authentication)
+- [x] 167. Create IAM roles with least-privilege policies for each ECS task: P2 gets `rekognition:DetectModerationLabels` + `transcribe:StartStreamTranscription`, P7/P9 get `healthlake:*`, P5 gets `cognito-idp:Admin*`, all get `s3:PutObject` scoped to their service prefix
+- [x] 168. Create Terraform module for AWS KMS customer-managed keys: `thewatch-data-key` (RDS, ElastiCache, S3 encryption), `thewatch-jwt-key` (JWT signing), `thewatch-evidence-key` (evidence bucket SSE with key rotation every 365 days)
+- [x] 169. Configure AWS Secrets Manager for all service secrets: database connection strings, Kafka SASL credentials, Redis AUTH tokens, Firebase server key, third-party API keys — create rotation Lambda for database credentials (30-day rotation)
+- [x] 170. Create Terraform module for AWS WAF v2 WebACL attached to ALB/API Gateway: rate-based rule (2,000 requests/5min per IP), SQL injection rule set, XSS rule set, known bad inputs rule set, geo-restriction (block OFAC-sanctioned countries), and IP reputation list
+- [x] 171. Configure AWS GuardDuty with S3 protection, ECS runtime monitoring, and Malware Protection — create EventBridge rule to forward HIGH and CRITICAL findings to SNS topic linked to PagerDuty integration
+- [x] 172. Configure AWS Security Hub with CIS AWS Foundations Benchmark v1.4, AWS Foundational Security Best Practices, and NIST 800-53 standards — create custom actions for automated remediation of non-compliant resources via Lambda
 
 ### 13D. AWS Observability & DevOps
-- [ ] 173. Create Terraform module for Amazon CloudWatch: log groups per service (`/ecs/thewatch/{service}`, 90-day retention), metric filters for error rate and latency percentiles, composite alarms for service health, and Synthetics canaries for endpoint monitoring
-- [ ] 174. Configure AWS X-Ray tracing integrated with OpenTelemetry SDK in each service — create X-Ray groups per service, sampling rules (1% for health checks, 100% for errors, 5% for normal traffic), and service map dashboards
-- [ ] 175. Create CodePipeline with CodeBuild stages: Source (GitHub webhook) to Build (dotnet publish + Docker build) to Test (dotnet test + Trivy container scan) to Deploy-Staging (ECS rolling update) to Manual-Approval to Deploy-Prod (ECS blue/green via CodeDeploy)
-- [ ] 176. Create Terraform module for Amazon ECR repositories (one per service + dashboard) with lifecycle policies (keep last 20 tagged images, expire untagged after 7 days), image scanning on push, and cross-region replication to DR region
-- [ ] 177. Configure AWS Backup plan: daily RDS snapshots (35-day retention), weekly DynamoDB backups (90-day retention), monthly S3 cross-region copy to DR region — create backup vault with vault lock (72-hour cool-off, 365-day min retention)
-- [ ] 178. Create CloudFormation StackSets for multi-account deployment: `thewatch-dev`, `thewatch-staging`, `thewatch-prod` accounts with Service Control Policies preventing region usage outside us-east-1 and us-west-2
-- [ ] 179. Configure Amazon EventBridge event bus `thewatch-events` with rules routing domain events (IncidentCreated, DispatchRequested, SOSActivated) to targets: CloudWatch Logs (audit), Lambda (processing), SNS (notifications), Step Functions (orchestration)
-- [ ] 180. Create AWS Step Functions state machine for incident lifecycle orchestration: SOS received to validate caller to dispatch nearest responder to start evidence collection to monitor resolution to generate post-incident report — with error handling, retries, and timeouts at each step
+- [x] 173. Create Terraform module for Amazon CloudWatch: log groups per service (`/ecs/thewatch/{service}`, 90-day retention), metric filters for error rate and latency percentiles, composite alarms for service health, and Synthetics canaries for endpoint monitoring
+- [x] 174. Configure AWS X-Ray tracing integrated with OpenTelemetry SDK in each service — create X-Ray groups per service, sampling rules (1% for health checks, 100% for errors, 5% for normal traffic), and service map dashboards
+- [x] 175. Create CodePipeline with CodeBuild stages: Source (GitHub webhook) to Build (dotnet publish + Docker build) to Test (dotnet test + Trivy container scan) to Deploy-Staging (ECS rolling update) to Manual-Approval to Deploy-Prod (ECS blue/green via CodeDeploy)
+- [x] 176. Create Terraform module for Amazon ECR repositories (one per service + dashboard) with lifecycle policies (keep last 20 tagged images, expire untagged after 7 days), image scanning on push, and cross-region replication to DR region
+- [x] 177. Configure AWS Backup plan: daily RDS snapshots (35-day retention), weekly DynamoDB backups (90-day retention), monthly S3 cross-region copy to DR region — create backup vault with vault lock (72-hour cool-off, 365-day min retention)
+- [x] 178. Create CloudFormation StackSets for multi-account deployment: `thewatch-dev`, `thewatch-staging`, `thewatch-prod` accounts with Service Control Policies preventing region usage outside us-east-1 and us-west-2
+- [x] 179. Configure Amazon EventBridge event bus `thewatch-events` with rules routing domain events (IncidentCreated, DispatchRequested, SOSActivated) to targets: CloudWatch Logs (audit), Lambda (processing), SNS (notifications), Step Functions (orchestration)
+- [x] 180. Create AWS Step Functions state machine for incident lifecycle orchestration: SOS received to validate caller to dispatch nearest responder to start evidence collection to monitor resolution to generate post-incident report — with error handling, retries, and timeouts at each step
 
 ---
 
@@ -400,7 +400,8 @@
 | 106–120 | 10 | DevOps (Docker + K8s + CI/CD) |
 | 121–140 | 11 | Cloud (Azure + GCP + Cloudflare) |
 | 141–150 | 12 | Advanced (ML, Compliance, Graph, Observability) |
+| 151–180 | 13 | AWS Infrastructure (Compute, Data, Security, DevOps) |
 
 ---
 
-*Last updated: 2026-02-26 (Session 21 — Stage 12 complete: ML/AI, Compliance, Graph DB, Observability)*
+*Last updated: 2026-02-26 (Session 28 — All 180 items complete. Stage 13 AWS: 20 Terraform modules, 3 environments)*

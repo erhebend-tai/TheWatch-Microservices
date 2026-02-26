@@ -30,6 +30,7 @@
     <ProjectReference Include="..\TheWatch.Geospatial\TheWatch.Geospatial.csproj" />
     <ProjectReference Include="..\TheWatch.Dashboard\TheWatch.Dashboard.csproj" />
     <ProjectReference Include="..\TheWatch.Admin\TheWatch.Admin.csproj" />
+    <ProjectReference Include="..\TheWatch.Admin.RestAPI\TheWatch.Admin.RestAPI.csproj" />
   </ItemGroup>
 
 </Project>

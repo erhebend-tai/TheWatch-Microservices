@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"Prometheus\\\\|Metrics\\\\|OpenTelemetry\\\\|ApplicationInsights\" /e/json_output/Microservices/*.csproj)",
+      "Bash(xargs grep -l \"ML\\\\|Tensorflow\\\\|OpenTelemetry\\\\|Prometheus\")",
+      "Bash(xargs ls -la)",
+      "Bash(xargs grep -l \"Microsoft.EntityFrameworkCore\")",
+      "Bash(xargs grep -l \"AddServiceDefaults\\\\|MapDefaultEndpoints\")"
+    ]
+  }
+}

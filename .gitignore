@@ -95,3 +95,10 @@ coverage/
 *.ipa
 *.apk
 *.aab
+
+# Build artifacts
+*.binlog
+msbuild.binlog
+
+# Temporary output
+.output.txt
