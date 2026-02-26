@@ -252,11 +252,24 @@ public class RestApiControllerGenerator : IIncrementalGenerator
 
         // Build parameters
         var paramList = new List<string>();
+        var usedParamNames = new HashSet<string>();
         if (method.TryGetProperty("parameters", out var parameters))
         {
             foreach (var param in parameters.EnumerateArray())
             {
                 var paramName = param.TryGetProperty("name", out var pnEl) ? pnEl.GetString() ?? "param" : "param";
+                paramName = GeneratorHelpers.SanitizeIdentifier(paramName);
+
+                // Deduplicate parameter names
+                var uniqueParamName = paramName;
+                int paramSuffix = 2;
+                while (usedParamNames.Contains(uniqueParamName))
+                {
+                    uniqueParamName = paramName + paramSuffix;
+                    paramSuffix++;
+                }
+                usedParamNames.Add(uniqueParamName);
+
                 var paramType = "";
                 if (param.TryGetProperty("type", out var pt))
                     paramType = pt.GetString() ?? "object";
@@ -267,8 +280,8 @@ public class RestApiControllerGenerator : IIncrementalGenerator
                 var cleanType = GeneratorHelpers.CleanPropertyType(typeName);
 
                 var paramStr = bindingAttr != null
-                    ? $"[{bindingAttr}] {cleanType} {GeneratorHelpers.SanitizeIdentifier(paramName)}"
-                    : $"{cleanType} {GeneratorHelpers.SanitizeIdentifier(paramName)}";
+                    ? $"[{bindingAttr}] {cleanType} {uniqueParamName}"
+                    : $"{cleanType} {uniqueParamName}";
 
                 paramList.Add(paramStr);
             }
