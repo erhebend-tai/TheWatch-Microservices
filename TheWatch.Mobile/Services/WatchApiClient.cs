@@ -164,6 +164,73 @@ public class WatchApiClient
         await _http.DeleteAsync($"{P1}/api/devices/{registrationId}/topics/{topic}");
     }
 
+    // === P6 Responders (Map) ===
+
+    public async Task<List<NearbyResponderDto>> GetNearbyRespondersAsync(double lat, double lon, double radiusKm = 50)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<List<NearbyResponderDto>>(
+                $"{P6}/api/responders/nearby?lat={lat}&lon={lon}&radiusKm={radiusKm}&availableOnly=false") ?? [];
+        }
+        catch { return []; }
+    }
+
+    public async Task<List<ResponderDto>> GetAllRespondersAsync(int pageSize = 100)
+    {
+        try
+        {
+            var result = await _http.GetFromJsonAsync<ResponderListDto>(
+                $"{P6}/api/responders?pageSize={pageSize}");
+            return result?.Items ?? [];
+        }
+        catch { return []; }
+    }
+
+    // === P8 Disaster Relief (Map) ===
+
+    public async Task<List<ShelterDto>> GetActiveSheltersAsync()
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<List<ShelterDto>>(
+                $"{P8}/api/shelters?activeOnly=true") ?? [];
+        }
+        catch { return []; }
+    }
+
     // Local DTO for vital history response
     private record VitalHistory(List<VitalReadingDto> Readings, int TotalCount);
 }
+
+// === Map DTOs ===
+
+public record NearbyResponderDto(
+    Guid Id,
+    string Name,
+    string Type,
+    string Status,
+    double? DistanceKm,
+    LocationDto? Location);
+
+public record ResponderDto(
+    Guid Id,
+    string Name,
+    string Type,
+    string Status,
+    LocationDto? LastKnownLocation,
+    DateTime? LocationUpdatedAt);
+
+public record ResponderListDto(
+    List<ResponderDto> Items,
+    int TotalCount,
+    int Page,
+    int PageSize);
+
+public record ShelterDto(
+    Guid Id,
+    string Name,
+    string Address,
+    LocationDto Location,
+    int Capacity,
+    int CurrentOccupancy);

@@ -1,5 +1,7 @@
 @page "/health"
+@using Microsoft.AspNetCore.SignalR.Client
 @inject MicroserviceClient Client
+@inject DashboardSignalRService SignalR
 @implements IDisposable
 
 <PageTitle>TheWatch — Service Health</PageTitle>
@@ -50,14 +52,61 @@
     </Columns>
 </RadzenDataGrid>
 
+<!-- SignalR Real-Time Connections -->
+<RadzenText TextStyle="TextStyle.H5" class="rz-mt-6 rz-mb-3">Real-Time Connections (SignalR)</RadzenText>
+<RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+    @foreach (var hub in _hubStates)
+    {
+        <RadzenCard Style="min-width: 200px;">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenBadge BadgeStyle="@GetHubBadgeStyle(hub.Value)" Text="@hub.Value.ToString()" />
+                <RadzenText>@hub.Key</RadzenText>
+            </RadzenStack>
+        </RadzenCard>
+    }
+</RadzenStack>
+<RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-2">
+    <RadzenButton Text="Connect All" Icon="link" ButtonStyle="ButtonStyle.Primary"
+                  Size="ButtonSize.Small" Click="@ConnectSignalR" />
+    <RadzenButton Text="Disconnect" Icon="link_off" ButtonStyle="ButtonStyle.Light"
+                  Size="ButtonSize.Small" Click="@DisconnectSignalR" />
+</RadzenStack>
+
+<!-- Live Event Feed -->
+@if (_recentEvents.Count > 0)
+{
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-4 rz-mb-2">Live Event Feed</RadzenText>
+    <RadzenDataList Data="@_recentEvents" TItem="LiveEvent" Style="max-height: 300px; overflow-y: auto;">
+        <Template Context="evt">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenText style="opacity: 0.5; font-size: 0.85rem;">@evt.Timestamp.ToString("HH:mm:ss")</RadzenText>
+                <RadzenBadge BadgeStyle="@GetEventBadgeStyle(evt.Source)" Text="@evt.Source" />
+                <RadzenText><strong>@evt.Action</strong></RadzenText>
+            </RadzenStack>
+        </Template>
+    </RadzenDataList>
+}
+
 @code {
     private List<ProgramInfo> _services = [];
+    private Dictionary<string, HubConnectionState> _hubStates = [];
+    private List<LiveEvent> _recentEvents = [];
     private bool _autoRefresh = true;
     private System.Threading.Timer? _timer;
 
     protected override async Task OnInitializedAsync()
     {
         await RefreshHealth();
+        RefreshHubStates();
+
+        SignalR.OnConnectionStateChanged += OnHubStateChanged;
+        SignalR.OnIncidentEvent += (action, _) => AddEvent("Incident", action);
+        SignalR.OnDispatchEvent += (action, _) => AddEvent("Dispatch", action);
+        SignalR.OnResponderEvent += (action, _) => AddEvent("Responder", action);
+        SignalR.OnCheckInEvent += (action, _) => AddEvent("CheckIn", action);
+        SignalR.OnVitalEvent += (action, _) => AddEvent("Vital", action);
+        SignalR.OnAlertEvent += (action, _) => AddEvent("Alert", action);
+
         _timer = new System.Threading.Timer(async _ =>
         {
             if (!_autoRefresh) return;
@@ -76,6 +125,49 @@
         catch { /* swallow on dashboard */ }
     }
 
+    private void RefreshHubStates()
+    {
+        _hubStates = SignalR.GetAllConnectionStates();
+        if (_hubStates.Count == 0)
+        {
+            _hubStates = new()
+            {
+                ["incidents"] = HubConnectionState.Disconnected,
+                ["dispatches"] = HubConnectionState.Disconnected,
+                ["responders"] = HubConnectionState.Disconnected,
+                ["checkins"] = HubConnectionState.Disconnected,
+                ["vitalreadings"] = HubConnectionState.Disconnected,
+                ["medicalalerts"] = HubConnectionState.Disconnected,
+            };
+        }
+    }
+
+    private async Task ConnectSignalR()
+    {
+        await SignalR.ConnectAllAsync();
+        RefreshHubStates();
+    }
+
+    private async Task DisconnectSignalR()
+    {
+        await SignalR.DisconnectAllAsync();
+        RefreshHubStates();
+    }
+
+    private void OnHubStateChanged(string hub, HubConnectionState state)
+    {
+        _hubStates[hub] = state;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void AddEvent(string source, string action)
+    {
+        _recentEvents.Insert(0, new LiveEvent(source, action, DateTime.UtcNow));
+        if (_recentEvents.Count > 50)
+            _recentEvents.RemoveRange(50, _recentEvents.Count - 50);
+        InvokeAsync(StateHasChanged);
+    }
+
     private static BadgeStyle GetBadgeStyle(string? status) => status switch
     {
         "Healthy" => BadgeStyle.Success,
@@ -84,5 +176,24 @@
         _ => BadgeStyle.Light
     };
 
+    private static BadgeStyle GetHubBadgeStyle(HubConnectionState state) => state switch
+    {
+        HubConnectionState.Connected => BadgeStyle.Success,
+        HubConnectionState.Reconnecting => BadgeStyle.Warning,
+        HubConnectionState.Connecting => BadgeStyle.Info,
+        _ => BadgeStyle.Light
+    };
+
+    private static BadgeStyle GetEventBadgeStyle(string source) => source switch
+    {
+        "Incident" or "Dispatch" => BadgeStyle.Danger,
+        "Responder" => BadgeStyle.Primary,
+        "CheckIn" or "Vital" => BadgeStyle.Success,
+        "Alert" => BadgeStyle.Warning,
+        _ => BadgeStyle.Light
+    };
+
     public void Dispose() => _timer?.Dispose();
+
+    private record LiveEvent(string Source, string Action, DateTime Timestamp);
 }

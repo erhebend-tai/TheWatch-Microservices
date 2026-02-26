@@ -25,15 +25,19 @@ builder.Services.AddHangfire(config =>
     config.UseInMemoryStorage());
 builder.Services.AddHangfireServer();
 
-builder.Services.AddSingleton<IProfileService, ProfileService>();
+builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddSingleton<IConfigService, ConfigService>();
 builder.Services.AddHttpClient("services");
+builder.AddWatchSecurity();
 
 var app = builder.Build();
 
 app.UseCors();
+app.UseWatchSecurity();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
 
 app.MapGet("/health", () => new HealthResponse(
@@ -55,37 +59,37 @@ app.MapPost("/api/profiles", async (CreateProfileRequest request, IProfileServic
 {
     var profile = await svc.CreateAsync(request);
     return Results.Created($"/api/profiles/{profile.Id}", profile);
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapGet("/api/profiles", async (IProfileService svc, int? page, int? pageSize, UserRole? role) =>
 {
     var result = await svc.ListAsync(page ?? 1, pageSize ?? 20, role);
     return Results.Ok(result);
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapGet("/api/profiles/{id:guid}", async (Guid id, IProfileService svc) =>
 {
     var profile = await svc.GetByIdAsync(id);
     return profile is not null ? Results.Ok(profile) : Results.NotFound();
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapPut("/api/profiles/{id:guid}", async (Guid id, UpdateProfileRequest request, IProfileService svc) =>
 {
     var profile = await svc.UpdateAsync(id, request);
     return profile is not null ? Results.Ok(profile) : Results.NotFound();
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapPut("/api/profiles/{id:guid}/preferences", async (Guid id, SetPreferenceRequest request, IProfileService svc) =>
 {
     var profile = await svc.SetPreferenceAsync(id, request);
     return profile is not null ? Results.Ok(profile) : Results.NotFound();
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapDelete("/api/profiles/{id:guid}", async (Guid id, IProfileService svc) =>
 {
     var ok = await svc.DeactivateAsync(id);
     return ok ? Results.NoContent() : Results.NotFound();
-});
+}).RequireAuthorization("Authenticated");
 
 // === Config Endpoints ===
 
@@ -93,19 +97,19 @@ app.MapPost("/api/config", async (SetConfigRequest request, IConfigService svc) 
 {
     var config = await svc.SetAsync(request);
     return Results.Ok(config);
-});
+}).RequireAuthorization("AdminOnly");
 
 app.MapGet("/api/config/{key}", async (string key, IConfigService svc) =>
 {
     var config = await svc.GetAsync(key);
     return config is not null ? Results.Ok(config) : Results.NotFound();
-});
+}).RequireAuthorization("AdminOnly");
 
 app.MapGet("/api/config", async (IConfigService svc) =>
 {
     var configs = await svc.ListAllAsync();
     return Results.Ok(configs);
-});
+}).RequireAuthorization("AdminOnly");
 
 // === Service Health Aggregation ===
 

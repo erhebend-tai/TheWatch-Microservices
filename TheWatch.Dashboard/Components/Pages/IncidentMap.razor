@@ -1,0 +1,271 @@
+@page "/incident-map"
+@using Microsoft.AspNetCore.SignalR.Client
+@inject MicroserviceClient Client
+@inject DashboardSignalRService SignalR
+@inject IHttpClientFactory HttpClientFactory
+@inject IConfiguration Config
+@implements IDisposable
+
+<PageTitle>TheWatch — Incident Map</PageTitle>
+
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mb-3">
+    <RadzenText TextStyle="TextStyle.H4" class="rz-mb-0">Incident Map</RadzenText>
+    <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="@($"{_activeIncidents.Count} active")" />
+    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="@($"{_responders.Count} responders")" />
+    <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                  Size="ButtonSize.Small" Click="@RefreshAllAsync" />
+    <RadzenButton Text="Fit All" Icon="zoom_out_map" ButtonStyle="ButtonStyle.Light"
+                  Size="ButtonSize.Small" Click="@FitAllAsync" />
+</RadzenStack>
+
+<!-- Legend -->
+<div class="map-legend rz-mb-2">
+    <span class="legend-item"><span class="legend-dot" style="background:#e74c3c"></span> Incident</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#2ecc71"></span> Available</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#f39c12"></span> En Route</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#3498db"></span> On Scene</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#9b59b6"></span> Shelter</span>
+</div>
+
+<!-- Map -->
+<div style="height: 600px; border-radius: 8px; overflow: hidden;">
+    <WatchMap @ref="_map" Height="100%" CenterLat="39.8283" CenterLng="-98.5795" Zoom="4" />
+</div>
+
+<!-- Incident Table -->
+@if (_activeIncidents.Count > 0)
+{
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mt-4 rz-mb-2">Active Incidents</RadzenText>
+    <RadzenDataGrid Data="@_activeIncidents" TItem="IncidentMapItem"
+                    AllowSorting="true" Style="max-height: 300px;">
+        <Columns>
+            <RadzenDataGridColumn Property="Type" Title="Type" Width="160px" />
+            <RadzenDataGridColumn Property="Severity" Title="Sev" Width="60px" />
+            <RadzenDataGridColumn Property="Status" Title="Status" Width="120px">
+                <Template Context="item">
+                    <RadzenBadge BadgeStyle="@GetBadgeStyle(item.Status)" Text="@item.Status" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Property="Latitude" Title="Location" Width="200px">
+                <Template Context="item">
+                    <RadzenText TextStyle="TextStyle.Caption">@($"{item.Latitude:F4}, {item.Longitude:F4}")</RadzenText>
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Property="CreatedAt" Title="Reported" Width="160px">
+                <Template Context="item">
+                    <RadzenText>@item.CreatedAt.ToString("g")</RadzenText>
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Title="" Width="80px">
+                <Template Context="item">
+                    <RadzenButton Icon="center_focus_strong" ButtonStyle="ButtonStyle.Light"
+                                  Size="ButtonSize.ExtraSmall" Click="@(() => FlyToIncidentAsync(item))"
+                                  title="Zoom to incident" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+}
+
+@code {
+    private WatchMap? _map;
+    private List<IncidentMapItem> _activeIncidents = [];
+    private List<ResponderMapItem> _responders = [];
+    private bool _loaded;
+
+    protected override void OnInitialized()
+    {
+        SignalR.OnIncidentEvent += OnIncidentEvent;
+        SignalR.OnResponderEvent += OnResponderEvent;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_loaded)
+        {
+            _loaded = true;
+            await Task.Delay(500);
+            await LoadAllDataAsync();
+        }
+    }
+
+    private async Task LoadAllDataAsync()
+    {
+        if (_map is null) return;
+
+        var incidentsTask = LoadIncidentsAsync();
+        var respondersTask = LoadRespondersAsync();
+        await Task.WhenAll(incidentsTask, respondersTask);
+
+        if (_activeIncidents.Count + _responders.Count > 0)
+            await _map.FitAllMarkersAsync(0.15);
+
+        StateHasChanged();
+    }
+
+    private async Task LoadIncidentsAsync()
+    {
+        if (_map is null) return;
+
+        try
+        {
+            var baseUrl = ResolveServiceUrl("p2-voiceemergency");
+            var client = HttpClientFactory.CreateClient("microservices");
+            var result = await client.GetFromJsonAsync<IncidentListResult>($"{baseUrl}/api/incidents?pageSize=50");
+
+            if (result?.Items is null) return;
+
+            _activeIncidents = result.Items
+                .Where(i => i.Status is not ("Resolved" or "Archived" or "Cancelled"))
+                .Select(i => new IncidentMapItem(i.Id, i.Type, i.Severity, i.Status,
+                    i.Location?.Latitude ?? 0, i.Location?.Longitude ?? 0, i.CreatedAt))
+                .Where(i => i.Latitude != 0 || i.Longitude != 0)
+                .ToList();
+
+            foreach (var incident in _activeIncidents)
+            {
+                await _map.AddMarkerAsync(
+                    $"incident-{incident.Id}", incident.Latitude, incident.Longitude,
+                    "incident",
+                    $"{incident.Type} (Sev {incident.Severity})",
+                    $"<b>{incident.Type}</b><br/>Severity: {incident.Severity}<br/>Status: {incident.Status}<br/>{incident.CreatedAt:g}");
+
+                var radius = incident.Severity switch { >= 4 => 2000, 3 => 1000, _ => 500 };
+                await _map.AddCircleZoneAsync(
+                    $"zone-{incident.Id}", incident.Latitude, incident.Longitude,
+                    radius, "#e74c3c", 0.1);
+            }
+        }
+        catch { /* P2 offline */ }
+    }
+
+    private async Task LoadRespondersAsync()
+    {
+        if (_map is null) return;
+
+        try
+        {
+            var baseUrl = ResolveServiceUrl("p6-firstresponder");
+            var client = HttpClientFactory.CreateClient("microservices");
+            var result = await client.GetFromJsonAsync<ResponderListResult>($"{baseUrl}/api/responders?pageSize=100");
+
+            if (result?.Items is null) return;
+
+            _responders = result.Items
+                .Where(r => r.LastKnownLocation is not null && r.IsActive)
+                .Select(r => new ResponderMapItem(r.Id, r.Name, r.Type.ToString(), r.Status.ToString(),
+                    r.LastKnownLocation!.Latitude, r.LastKnownLocation.Longitude))
+                .ToList();
+
+            foreach (var r in _responders)
+            {
+                var iconType = r.Status switch
+                {
+                    "Available" => "responder-available",
+                    "EnRoute" => "responder-enroute",
+                    "OnScene" => "responder-onscene",
+                    _ => "responder-busy"
+                };
+
+                await _map.AddMarkerAsync(
+                    $"responder-{r.Id}", r.Latitude, r.Longitude,
+                    iconType, $"{r.Name} ({r.Type})",
+                    $"<b>{r.Name}</b><br/>Type: {r.Type}<br/>Status: {r.Status}");
+            }
+        }
+        catch { /* P6 offline */ }
+    }
+
+    private async Task RefreshAllAsync()
+    {
+        if (_map is null) return;
+        await _map.ClearAllAsync();
+        await LoadAllDataAsync();
+    }
+
+    private async Task FitAllAsync()
+    {
+        if (_map is not null)
+            await _map.FitAllMarkersAsync(0.15);
+    }
+
+    private async Task FlyToIncidentAsync(IncidentMapItem item)
+    {
+        if (_map is not null)
+            await _map.FlyToAsync(item.Latitude, item.Longitude, 15);
+    }
+
+    // === SignalR Real-Time ===
+
+    private void OnIncidentEvent(string action, object data)
+    {
+        // Refresh map when incidents change
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                if (_map is not null)
+                {
+                    await _map.ClearAllAsync();
+                    await LoadAllDataAsync();
+                }
+            }
+            catch { }
+            StateHasChanged();
+        });
+    }
+
+    private void OnResponderEvent(string action, object data)
+    {
+        // Responder location updated — reload responder markers
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                if (_map is not null)
+                    await LoadRespondersAsync();
+            }
+            catch { }
+            StateHasChanged();
+        });
+    }
+
+    private string ResolveServiceUrl(string resourceName)
+    {
+        var httpUrl = Config[$"services:{resourceName}:http:0"];
+        if (!string.IsNullOrEmpty(httpUrl)) return httpUrl;
+        var httpsUrl = Config[$"services:{resourceName}:https:0"];
+        if (!string.IsNullOrEmpty(httpsUrl)) return httpsUrl;
+        return $"https+http://{resourceName}";
+    }
+
+    private static BadgeStyle GetBadgeStyle(string status) => status switch
+    {
+        "Reported" => BadgeStyle.Warning,
+        "Dispatched" => BadgeStyle.Info,
+        "InProgress" => BadgeStyle.Danger,
+        _ => BadgeStyle.Light
+    };
+
+    public void Dispose()
+    {
+        SignalR.OnIncidentEvent -= OnIncidentEvent;
+        SignalR.OnResponderEvent -= OnResponderEvent;
+    }
+
+    // === DTOs for JSON deserialization ===
+
+    private record IncidentListResult(List<IncidentItem> Items, int TotalCount, int Page, int PageSize);
+    private record IncidentItem(Guid Id, string Type, int Severity, string Status, LocationItem? Location, DateTime CreatedAt);
+    private record LocationItem(double Latitude, double Longitude);
+    private record ResponderListResult(List<ResponderItem> Items, int TotalCount, int Page, int PageSize);
+    private record ResponderItem(Guid Id, string Name, ResponderTypeEnum Type, ResponderStatusEnum Status,
+        LocationItem? LastKnownLocation, bool IsActive);
+    private enum ResponderTypeEnum { Police, Fire, EMS, SAR, HazMat, VolunteerMedic, CommunityWatch, Other }
+    private enum ResponderStatusEnum { Available, Busy, EnRoute, OnScene, OffDuty }
+
+    private record IncidentMapItem(Guid Id, string Type, int Severity, string Status,
+        double Latitude, double Longitude, DateTime CreatedAt);
+    private record ResponderMapItem(Guid Id, string Name, string Type, string Status,
+        double Latitude, double Longitude);
+}

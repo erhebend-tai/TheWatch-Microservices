@@ -54,6 +54,9 @@ public static class MauiProgram
         // Push notifications
         builder.Services.AddSingleton<WatchPushNotificationService>();
 
+        // SignalR real-time connections
+        builder.Services.AddSingleton<WatchSignalRService>();
+
         return builder.Build();
     }
 }

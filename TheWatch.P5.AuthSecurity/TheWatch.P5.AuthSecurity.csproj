@@ -13,7 +13,10 @@
     <PackageReference Include="Hangfire.InMemory" Version="0.6.0" />
     <PackageReference Include="Hangfire.Pro" Version="3.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.*-*" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.*-*" />
+    <PackageReference Include="Isopoh.Cryptography.Argon2" Version="2.*" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.*-*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.*-*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.*-*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.*-*">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

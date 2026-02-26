@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using TheWatch.P2.VoiceEmergency.Emergency;
 using TheWatch.Shared.Notifications;
@@ -16,12 +16,13 @@ public interface IDispatchService
 
 public class DispatchService : IDispatchService
 {
-    private readonly ConcurrentDictionary<Guid, Dispatch> _dispatches = new();
+    private readonly IWatchRepository<Dispatch> _dispatches;
     private readonly INotificationService _notifications;
     private readonly ILogger<DispatchService> _logger;
 
-    public DispatchService(INotificationService notifications, ILogger<DispatchService> logger)
+    public DispatchService(IWatchRepository<Dispatch> dispatches, INotificationService notifications, ILogger<DispatchService> logger)
     {
+        _dispatches = dispatches;
         _notifications = notifications;
         _logger = logger;
     }
@@ -35,8 +36,7 @@ public class DispatchService : IDispatchService
             RespondersRequested = request.RespondersRequested
         };
 
-        if (!_dispatches.TryAdd(dispatch.Id, dispatch))
-            throw new InvalidOperationException("Failed to create dispatch.");
+        await _dispatches.AddAsync(dispatch);
 
         // Notify responders about new dispatch
         var notification = NotificationSetup.CreateNotification(
@@ -60,47 +60,46 @@ public class DispatchService : IDispatchService
         return dispatch;
     }
 
-    public Task<Dispatch?> GetDispatchAsync(Guid id)
+    public async Task<Dispatch?> GetDispatchAsync(Guid id)
     {
-        _dispatches.TryGetValue(id, out var dispatch);
-        return Task.FromResult(dispatch);
+        return await _dispatches.GetByIdAsync(id);
     }
 
-    public Task<Dispatch?> ExpandRadiusAsync(Guid id, ExpandRadiusRequest request)
+    public async Task<Dispatch?> ExpandRadiusAsync(Guid id, ExpandRadiusRequest request)
     {
-        if (!_dispatches.TryGetValue(id, out var dispatch))
-            return Task.FromResult<Dispatch?>(null);
+        var dispatch = await _dispatches.GetByIdAsync(id);
+        if (dispatch is null) return null;
 
         dispatch.RadiusKm += request.AdditionalKm;
         dispatch.UpdatedAt = DateTime.UtcNow;
+        await _dispatches.UpdateAsync(dispatch);
 
-        return Task.FromResult<Dispatch?>(dispatch);
+        return dispatch;
     }
 
-    public Task<List<Dispatch>> GetDispatchesForIncidentAsync(Guid incidentId)
+    public async Task<List<Dispatch>> GetDispatchesForIncidentAsync(Guid incidentId)
     {
-        var dispatches = _dispatches.Values
+        return await _dispatches.Query()
             .Where(d => d.IncidentId == incidentId)
             .OrderByDescending(d => d.CreatedAt)
-            .ToList();
-
-        return Task.FromResult(dispatches);
+            .ToListAsync();
     }
 
-    public Task<int> EscalateUnacknowledgedAsync(TimeSpan timeout)
+    public async Task<int> EscalateUnacknowledgedAsync(TimeSpan timeout)
     {
         var cutoff = DateTime.UtcNow - timeout;
-        var toEscalate = _dispatches.Values
+        var toEscalate = await _dispatches.Query()
             .Where(d => d.Status == DispatchStatus.Pending && d.CreatedAt < cutoff)
-            .ToList();
+            .ToListAsync();
 
         foreach (var dispatch in toEscalate)
         {
             dispatch.Status = DispatchStatus.Escalated;
             dispatch.EscalationCount++;
             dispatch.UpdatedAt = DateTime.UtcNow;
+            await _dispatches.UpdateAsync(dispatch);
         }
 
-        return Task.FromResult(toEscalate.Count);
+        return toEscalate.Count;
     }
 }

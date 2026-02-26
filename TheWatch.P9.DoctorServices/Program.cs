@@ -27,14 +27,18 @@ builder.Services.AddHangfire(config =>
 builder.Services.AddHangfireServer();
 
 // Services
-builder.Services.AddSingleton<IDoctorService, DoctorService>();
-builder.Services.AddSingleton<IAppointmentService, AppointmentService>();
+builder.Services.AddScoped<IDoctorService, DoctorService>();
+builder.Services.AddScoped<IAppointmentService, AppointmentService>();
+builder.AddWatchSecurity();
 
 var app = builder.Build();
 
 app.UseCors();
+app.UseWatchSecurity();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
 
 // Recurring Hangfire jobs
@@ -67,19 +71,19 @@ app.MapPost("/api/doctors", async (CreateDoctorProfileRequest request, IDoctorSe
 {
     var doctor = await svc.CreateProfileAsync(request);
     return Results.Created($"/api/doctors/{doctor.Id}", doctor);
-});
+}).RequireAuthorization("DoctorAccess");
 
 app.MapGet("/api/doctors", async (IDoctorService svc, int? page, int? pageSize) =>
 {
     var result = await svc.ListAsync(page ?? 1, pageSize ?? 20);
     return Results.Ok(result);
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapGet("/api/doctors/{id:guid}", async (Guid id, IDoctorService svc) =>
 {
     var doctor = await svc.GetByIdAsync(id);
     return doctor is not null ? Results.Ok(doctor) : Results.NotFound();
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapGet("/api/doctors/search", async (
     IDoctorService svc,
@@ -92,7 +96,7 @@ app.MapGet("/api/doctors/search", async (
     var query = new DoctorSearchQuery(specialization, lat, lon, radiusKm, acceptingOnly);
     var results = await svc.SearchAsync(query);
     return Results.Ok(results);
-});
+}).RequireAuthorization("Authenticated");
 
 // === Appointment Endpoints ===
 
@@ -100,37 +104,37 @@ app.MapPost("/api/appointments", async (BookAppointmentRequest request, IAppoint
 {
     var appt = await svc.BookAsync(request);
     return Results.Created($"/api/appointments/{appt.Id}", appt);
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapGet("/api/appointments/{id:guid}", async (Guid id, IAppointmentService svc) =>
 {
     var appt = await svc.GetByIdAsync(id);
     return appt is not null ? Results.Ok(appt) : Results.NotFound();
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapGet("/api/appointments", async (IAppointmentService svc, Guid? doctorId, Guid? patientId) =>
 {
     var result = await svc.ListUpcomingAsync(doctorId, patientId);
     return Results.Ok(result);
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapPut("/api/appointments/{id:guid}/status", async (Guid id, UpdateAppointmentStatusRequest request, IAppointmentService svc) =>
 {
     var appt = await svc.UpdateStatusAsync(id, request);
     return appt is not null ? Results.Ok(appt) : Results.NotFound();
-});
+}).RequireAuthorization("DoctorAccess");
 
 app.MapPut("/api/appointments/{id:guid}/reschedule", async (Guid id, RescheduleRequest request, IAppointmentService svc) =>
 {
     var appt = await svc.RescheduleAsync(id, request);
     return appt is not null ? Results.Ok(appt) : Results.NotFound();
-});
+}).RequireAuthorization("DoctorAccess");
 
 app.MapPost("/api/appointments/{id:guid}/telehealth", async (Guid id, IAppointmentService svc) =>
 {
     var session = await svc.CreateSessionAsync(id);
     return Results.Created($"/api/telehealth/{session.Id}", session);
-});
+}).RequireAuthorization("DoctorAccess");
 
 app.Run();
 

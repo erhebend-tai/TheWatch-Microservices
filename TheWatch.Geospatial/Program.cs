@@ -33,12 +33,16 @@ builder.Services.AddHangfire(config =>
 builder.Services.AddHangfireServer();
 
 builder.Services.AddScoped<IGeospatialService, PostGisGeospatialService>();
+builder.AddWatchSecurity();
 
 var app = builder.Build();
 
 app.UseCors();
+app.UseWatchSecurity();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
 
 app.MapGet("/health", () => new HealthResponse(

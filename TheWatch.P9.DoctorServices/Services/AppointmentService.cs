@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TheWatch.P9.DoctorServices.Doctors;
 
 namespace TheWatch.P9.DoctorServices.Services;
@@ -16,10 +16,16 @@ public interface IAppointmentService
 
 public class AppointmentService : IAppointmentService
 {
-    private readonly ConcurrentDictionary<Guid, Appointment> _appointments = new();
-    private readonly ConcurrentDictionary<Guid, TelehealthSession> _sessions = new();
+    private readonly IWatchRepository<Appointment> _appointments;
+    private readonly IWatchRepository<TelehealthSession> _sessions;
 
-    public Task<Appointment> BookAsync(BookAppointmentRequest request)
+    public AppointmentService(IWatchRepository<Appointment> appointments, IWatchRepository<TelehealthSession> sessions)
+    {
+        _appointments = appointments;
+        _sessions = sessions;
+    }
+
+    public async Task<Appointment> BookAsync(BookAppointmentRequest request)
     {
         var appt = new Appointment
         {
@@ -31,19 +37,17 @@ public class AppointmentService : IAppointmentService
             Notes = request.Notes
         };
 
-        _appointments[appt.Id] = appt;
-        return Task.FromResult(appt);
+        return await _appointments.AddAsync(appt);
     }
 
-    public Task<Appointment?> GetByIdAsync(Guid id)
+    public async Task<Appointment?> GetByIdAsync(Guid id)
     {
-        _appointments.TryGetValue(id, out var appt);
-        return Task.FromResult(appt);
+        return await _appointments.GetByIdAsync(id);
     }
 
-    public Task<List<Appointment>> ListUpcomingAsync(Guid? doctorId, Guid? patientId)
+    public async Task<List<Appointment>> ListUpcomingAsync(Guid? doctorId, Guid? patientId)
     {
-        var query = _appointments.Values
+        var query = _appointments.Query()
             .Where(a => a.Status != AppointmentStatus.Cancelled && a.Status != AppointmentStatus.NoShow);
 
         if (doctorId.HasValue)
@@ -51,29 +55,31 @@ public class AppointmentService : IAppointmentService
         if (patientId.HasValue)
             query = query.Where(a => a.PatientId == patientId.Value);
 
-        return Task.FromResult(query.OrderBy(a => a.ScheduledAt).ToList());
+        return await query.OrderBy(a => a.ScheduledAt).ToListAsync();
     }
 
-    public Task<Appointment?> UpdateStatusAsync(Guid id, UpdateAppointmentStatusRequest request)
+    public async Task<Appointment?> UpdateStatusAsync(Guid id, UpdateAppointmentStatusRequest request)
     {
-        if (!_appointments.TryGetValue(id, out var appt))
-            return Task.FromResult<Appointment?>(null);
+        var appt = await _appointments.GetByIdAsync(id);
+        if (appt is null) return null;
 
         appt.Status = request.Status;
-        return Task.FromResult<Appointment?>(appt);
+        await _appointments.UpdateAsync(appt);
+        return appt;
     }
 
-    public Task<Appointment?> RescheduleAsync(Guid id, RescheduleRequest request)
+    public async Task<Appointment?> RescheduleAsync(Guid id, RescheduleRequest request)
     {
-        if (!_appointments.TryGetValue(id, out var appt))
-            return Task.FromResult<Appointment?>(null);
+        var appt = await _appointments.GetByIdAsync(id);
+        if (appt is null) return null;
 
         appt.ScheduledAt = request.NewScheduledAt;
         appt.Status = AppointmentStatus.Scheduled;
-        return Task.FromResult<Appointment?>(appt);
+        await _appointments.UpdateAsync(appt);
+        return appt;
     }
 
-    public Task<TelehealthSession> CreateSessionAsync(Guid appointmentId)
+    public async Task<TelehealthSession> CreateSessionAsync(Guid appointmentId)
     {
         var session = new TelehealthSession
         {
@@ -82,18 +88,18 @@ public class AppointmentService : IAppointmentService
             StartedAt = DateTime.UtcNow
         };
 
-        _sessions[session.Id] = session;
-        return Task.FromResult(session);
+        return await _sessions.AddAsync(session);
     }
 
-    public Task CleanupPastAppointmentsAsync(TimeSpan olderThan)
+    public async Task CleanupPastAppointmentsAsync(TimeSpan olderThan)
     {
         var cutoff = DateTime.UtcNow - olderThan;
-        var old = _appointments.Values
+        var oldIds = await _appointments.Query()
             .Where(a => a.ScheduledAt < cutoff && a.Status == AppointmentStatus.Completed)
-            .Select(a => a.Id).ToList();
-        foreach (var id in old)
-            _appointments.TryRemove(id, out _);
-        return Task.CompletedTask;
+            .Select(a => a.Id)
+            .ToListAsync();
+
+        foreach (var id in oldIds)
+            await _appointments.DeleteAsync(id);
     }
 }

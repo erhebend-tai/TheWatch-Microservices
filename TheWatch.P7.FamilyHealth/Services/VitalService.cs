@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TheWatch.P7.FamilyHealth.Family;
 
 namespace TheWatch.P7.FamilyHealth.Services;
@@ -13,8 +13,8 @@ public interface IVitalService
 
 public class VitalService : IVitalService
 {
-    private readonly ConcurrentDictionary<Guid, VitalReading> _readings = new();
-    private readonly ConcurrentDictionary<Guid, MedicalAlert> _alerts = new();
+    private readonly IWatchRepository<VitalReading> _readings;
+    private readonly IWatchRepository<MedicalAlert> _alerts;
 
     // Normal ranges for auto-alert generation
     private static readonly Dictionary<VitalType, (double Low, double High)> NormalRanges = new()
@@ -26,7 +26,13 @@ public class VitalService : IVitalService
         [VitalType.BloodGlucose] = (70, 140),
     };
 
-    public Task<VitalReading> RecordAsync(Guid memberId, RecordVitalRequest request)
+    public VitalService(IWatchRepository<VitalReading> readings, IWatchRepository<MedicalAlert> alerts)
+    {
+        _readings = readings;
+        _alerts = alerts;
+    }
+
+    public async Task<VitalReading> RecordAsync(Guid memberId, RecordVitalRequest request)
     {
         var reading = new VitalReading
         {
@@ -36,7 +42,7 @@ public class VitalService : IVitalService
             Unit = request.Unit
         };
 
-        _readings[reading.Id] = reading;
+        await _readings.AddAsync(reading);
 
         // Auto-generate alert if out of normal range
         if (NormalRanges.TryGetValue(request.Type, out var range))
@@ -54,44 +60,48 @@ public class VitalService : IVitalService
                     Description = $"{request.Type} reading of {request.Value} is outside normal range ({range.Low}-{range.High})",
                     Severity = severity
                 };
-                _alerts[alert.Id] = alert;
+                await _alerts.AddAsync(alert);
             }
         }
 
-        return Task.FromResult(reading);
+        return reading;
     }
 
-    public Task<VitalHistory> GetHistoryAsync(Guid memberId, VitalType? type, int limit)
+    public async Task<VitalHistory> GetHistoryAsync(Guid memberId, VitalType? type, int limit)
     {
-        var query = _readings.Values.Where(r => r.MemberId == memberId);
+        var query = _readings.Query().Where(r => r.MemberId == memberId);
 
         if (type.HasValue)
             query = query.Where(r => r.Type == type.Value);
 
-        var all = query.OrderByDescending(r => r.Timestamp).ToList();
-        var readings = all.Take(limit).ToList();
+        var totalCount = await query.CountAsync();
+        var readings = await query
+            .OrderByDescending(r => r.Timestamp)
+            .Take(limit)
+            .ToListAsync();
 
-        return Task.FromResult(new VitalHistory(readings, all.Count));
+        return new VitalHistory(readings, totalCount);
     }
 
-    public Task<List<MedicalAlert>> GetAlertsAsync(Guid? memberId, bool unacknowledgedOnly)
+    public async Task<List<MedicalAlert>> GetAlertsAsync(Guid? memberId, bool unacknowledgedOnly)
     {
-        var query = _alerts.Values.AsEnumerable();
+        var query = _alerts.Query();
 
         if (memberId.HasValue)
             query = query.Where(a => a.MemberId == memberId.Value);
         if (unacknowledgedOnly)
             query = query.Where(a => !a.Acknowledged);
 
-        return Task.FromResult(query.OrderByDescending(a => a.CreatedAt).ToList());
+        return await query.OrderByDescending(a => a.CreatedAt).ToListAsync();
     }
 
-    public Task<MedicalAlert?> AcknowledgeAlertAsync(Guid alertId)
+    public async Task<MedicalAlert?> AcknowledgeAlertAsync(Guid alertId)
     {
-        if (!_alerts.TryGetValue(alertId, out var alert))
-            return Task.FromResult<MedicalAlert?>(null);
+        var alert = await _alerts.GetByIdAsync(alertId);
+        if (alert is null) return null;
 
         alert.Acknowledged = true;
-        return Task.FromResult<MedicalAlert?>(alert);
+        await _alerts.UpdateAsync(alert);
+        return alert;
     }
 }

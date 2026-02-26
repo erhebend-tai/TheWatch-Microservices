@@ -21,7 +21,7 @@
 - [x] 11. Create `DoctorServicesDbContext` for P9 with DoctorProfile + Appointment + TelehealthSession entities
 - [x] 12. Create `GamificationDbContext` for P10 with Player + Badge + Challenge + Leaderboard entities
 - [x] 13. Add `IEntityTypeConfiguration<T>` for all entities (indexes, constraints, value converters)
-- [ ] 14. Create initial EF migration per service (`dotnet ef migrations add InitialCreate`)
+- [x] 14. Create initial EF migration per service (`dotnet ef migrations add InitialCreate`)
 
 ### 5B. SQL Server Schema
 - [ ] 15. Map P0 `UniversalMeasurementsDB` tables from `00_Schema.sql`–`10_Devices.sql` to EF seed data
@@ -48,9 +48,9 @@
 - [x] 28. Create `DispatchHub` in P2 — responder dispatch status streaming (via SignalRGenerator)
 - [x] 29. Create `ResponderHub` in P6 — live responder GPS streaming (via SignalRGenerator)
 - [x] 30. Create `CheckInHub` in P7 — check-in notifications to family members (via SignalRGenerator)
-- [ ] 31. Add SignalR client to MAUI app (`HubConnectionBuilder`)
-- [ ] 32. Add SignalR client to Dashboard for live incident/health updates
-- [ ] 33. Implement reconnection logic with exponential backoff in both clients
+- [x] 31. Add SignalR client to MAUI app (`HubConnectionBuilder`)
+- [x] 32. Add SignalR client to Dashboard for live incident/health updates
+- [x] 33. Implement reconnection logic with exponential backoff in both clients
 
 ### 6B. Kafka Event Bus
 - [x] 34. Add Kafka container to Aspire AppHost
@@ -88,10 +88,10 @@
 - [x] 56. Add geospatial service to Aspire AppHost orchestration
 
 ### 7C. Client Maps
-- [ ] 57. Add `Microsoft.Maui.Controls.Maps` to MAUI project
-- [ ] 58. Create `MapPage.razor` with responder placement pins and incident zones
-- [ ] 59. Implement real-time responder movement on map (SignalR + map updates)
-- [ ] 60. Add Leaflet map component to Dashboard for incident overview
+- [x] 57. Add Leaflet.js map library to MAUI project (via JS interop — more suitable for Blazor Hybrid than native Maps control)
+- [x] 58. Create `MapPage.razor` with responder placement pins and incident zones
+- [x] 59. Implement real-time responder movement on map (SignalR + map updates)
+- [x] 60. Add Leaflet map component to Dashboard for incident overview
 
 ---
 
@@ -254,4 +254,4 @@
 
 ---
 
-*Last updated: 2026-02-26 (Session 9)*
+*Last updated: 2026-02-26 (Session 13)*

@@ -24,13 +24,17 @@ builder.Services.AddHangfire(config =>
     config.UseInMemoryStorage());
 builder.Services.AddHangfireServer();
 
-builder.Services.AddSingleton<IDeviceService, DeviceService>();
+builder.Services.AddScoped<IDeviceService, DeviceService>();
+builder.AddWatchSecurity();
 
 var app = builder.Build();
 
 app.UseCors();
+app.UseWatchSecurity();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
 
 app.MapGet("/health", () => new HealthResponse(

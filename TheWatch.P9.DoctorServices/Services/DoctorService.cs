@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TheWatch.P9.DoctorServices.Doctors;
 
 namespace TheWatch.P9.DoctorServices.Services;
@@ -13,9 +13,14 @@ public interface IDoctorService
 
 public class DoctorService : IDoctorService
 {
-    private readonly ConcurrentDictionary<Guid, DoctorProfile> _doctors = new();
+    private readonly IWatchRepository<DoctorProfile> _doctors;
 
-    public Task<DoctorProfile> CreateProfileAsync(CreateDoctorProfileRequest request)
+    public DoctorService(IWatchRepository<DoctorProfile> doctors)
+    {
+        _doctors = doctors;
+    }
+
+    public async Task<DoctorProfile> CreateProfileAsync(CreateDoctorProfileRequest request)
     {
         var doctor = new DoctorProfile
         {
@@ -28,34 +33,37 @@ public class DoctorService : IDoctorService
             Longitude = request.Longitude
         };
 
-        _doctors[doctor.Id] = doctor;
-        return Task.FromResult(doctor);
+        return await _doctors.AddAsync(doctor);
     }
 
-    public Task<DoctorProfile?> GetByIdAsync(Guid id)
+    public async Task<DoctorProfile?> GetByIdAsync(Guid id)
     {
-        _doctors.TryGetValue(id, out var doctor);
-        return Task.FromResult(doctor);
+        return await _doctors.GetByIdAsync(id);
     }
 
-    public Task<DoctorListResponse> ListAsync(int page, int pageSize)
+    public async Task<DoctorListResponse> ListAsync(int page, int pageSize)
     {
-        var total = _doctors.Count;
-        var items = _doctors.Values
+        var total = await _doctors.Query().CountAsync();
+        var items = await _doctors.Query()
             .OrderBy(d => d.Name)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ToListAsync();
 
-        return Task.FromResult(new DoctorListResponse(items, total, page, pageSize));
+        return new DoctorListResponse(items, total, page, pageSize);
     }
 
-    public Task<List<DoctorSummary>> SearchAsync(DoctorSearchQuery query)
+    public async Task<List<DoctorSummary>> SearchAsync(DoctorSearchQuery query)
     {
-        var results = _doctors.Values.AsEnumerable();
+        // Load candidates from DB, do Haversine + complex filtering in-memory
+        var dbQuery = _doctors.Query();
 
         if (query.AcceptingOnly == true)
-            results = results.Where(d => d.AcceptingPatients);
+            dbQuery = dbQuery.Where(d => d.AcceptingPatients);
+
+        var candidates = await dbQuery.ToListAsync();
+
+        IEnumerable<DoctorProfile> results = candidates;
 
         if (!string.IsNullOrWhiteSpace(query.Specialization))
             results = results.Where(d => d.Specializations.Any(s =>
@@ -73,7 +81,7 @@ public class DoctorService : IDoctorService
         if (query.RadiusKm.HasValue && query.Latitude.HasValue)
             summaries = summaries.Where(s => s.DistanceKm.HasValue && s.DistanceKm <= query.RadiusKm.Value);
 
-        return Task.FromResult(summaries.OrderBy(s => s.DistanceKm ?? double.MaxValue).ToList());
+        return summaries.OrderBy(s => s.DistanceKm ?? double.MaxValue).ToList();
     }
 
     private static double HaversineKm(double lat1, double lon1, double lat2, double lon2)

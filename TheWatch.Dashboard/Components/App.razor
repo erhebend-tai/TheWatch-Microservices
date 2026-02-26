@@ -6,6 +6,9 @@
     <base href="/" />
     <link rel="stylesheet" href="_content/Radzen.Blazor/css/material-dark.css" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="css/watch-map.css" />
     <link rel="stylesheet" href="css/app.css" />
     <HeadOutlet @rendermode="@RenderMode.InteractiveServer" />
 </head>
@@ -14,5 +17,8 @@
     <Routes @rendermode="@RenderMode.InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="js/watch-map.js"></script>
 </body>
 </html>

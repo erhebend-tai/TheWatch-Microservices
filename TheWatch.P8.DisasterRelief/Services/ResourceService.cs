@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TheWatch.P8.DisasterRelief.Relief;
 
 namespace TheWatch.P8.DisasterRelief.Services;
@@ -14,10 +14,16 @@ public interface IResourceService
 
 public class ResourceService : IResourceService
 {
-    private readonly ConcurrentDictionary<Guid, ResourceItem> _resources = new();
-    private readonly ConcurrentDictionary<Guid, ResourceRequest> _requests = new();
+    private readonly IWatchRepository<ResourceItem> _resources;
+    private readonly IWatchRepository<ResourceRequest> _requests;
 
-    public Task<ResourceItem> DonateAsync(DonateResourceRequest request)
+    public ResourceService(IWatchRepository<ResourceItem> resources, IWatchRepository<ResourceRequest> requests)
+    {
+        _resources = resources;
+        _requests = requests;
+    }
+
+    public async Task<ResourceItem> DonateAsync(DonateResourceRequest request)
     {
         var item = new ResourceItem
         {
@@ -30,11 +36,10 @@ public class ResourceService : IResourceService
             DisasterEventId = request.DisasterEventId
         };
 
-        _resources[item.Id] = item;
-        return Task.FromResult(item);
+        return await _resources.AddAsync(item);
     }
 
-    public Task<ResourceRequest> RequestAsync(CreateResourceRequestRecord request)
+    public async Task<ResourceRequest> RequestAsync(CreateResourceRequestRecord request)
     {
         var req = new ResourceRequest
         {
@@ -46,49 +51,50 @@ public class ResourceService : IResourceService
             DisasterEventId = request.DisasterEventId
         };
 
-        _requests[req.Id] = req;
-        return Task.FromResult(req);
+        return await _requests.AddAsync(req);
     }
 
-    public Task<List<ResourceItem>> ListResourcesAsync(ResourceCategory? category, Guid? disasterEventId)
+    public async Task<List<ResourceItem>> ListResourcesAsync(ResourceCategory? category, Guid? disasterEventId)
     {
-        var query = _resources.Values.AsEnumerable();
+        var query = _resources.Query();
 
         if (category.HasValue)
             query = query.Where(r => r.Category == category.Value);
         if (disasterEventId.HasValue)
             query = query.Where(r => r.DisasterEventId == disasterEventId.Value);
 
-        return Task.FromResult(query.OrderByDescending(r => r.CreatedAt).ToList());
+        return await query.OrderByDescending(r => r.CreatedAt).ToListAsync();
     }
 
-    public Task<List<ResourceRequest>> ListRequestsAsync(RequestStatus? status, Guid? disasterEventId)
+    public async Task<List<ResourceRequest>> ListRequestsAsync(RequestStatus? status, Guid? disasterEventId)
     {
-        var query = _requests.Values.AsEnumerable();
+        var query = _requests.Query();
 
         if (status.HasValue)
             query = query.Where(r => r.Status == status.Value);
         if (disasterEventId.HasValue)
             query = query.Where(r => r.DisasterEventId == disasterEventId.Value);
 
-        return Task.FromResult(query.OrderByDescending(r => r.Priority).ThenBy(r => r.CreatedAt).ToList());
+        return await query.OrderByDescending(r => r.Priority).ThenBy(r => r.CreatedAt).ToListAsync();
     }
 
-    public Task<int> MatchRequestsToResourcesAsync(double maxDistanceKm)
+    public async Task<int> MatchRequestsToResourcesAsync(double maxDistanceKm)
     {
         var matched = 0;
-        var openRequests = _requests.Values
+        var openRequests = await _requests.Query()
             .Where(r => r.Status == RequestStatus.Open)
             .OrderByDescending(r => r.Priority)
             .ThenBy(r => r.CreatedAt)
-            .ToList();
+            .ToListAsync();
+
+        var availableResources = await _resources.Query()
+            .Where(r => r.Status == ResourceStatus.Available)
+            .ToListAsync();
 
         foreach (var req in openRequests)
         {
-            var available = _resources.Values
-                .Where(r => r.Status == ResourceStatus.Available
-                         && r.Category == req.Category
-                         && r.Quantity >= req.Quantity)
+            var best = availableResources
+                .Where(r => r.Category == req.Category && r.Quantity >= req.Quantity)
                 .Select(r => (Resource: r, Distance: HaversineKm(
                     req.Location.Latitude, req.Location.Longitude,
                     r.Location.Latitude, r.Location.Longitude)))
@@ -96,16 +102,18 @@ public class ResourceService : IResourceService
                 .OrderBy(x => x.Distance)
                 .FirstOrDefault();
 
-            if (available.Resource is not null)
+            if (best.Resource is not null)
             {
                 req.Status = RequestStatus.Matched;
-                req.MatchedResourceId = available.Resource.Id;
-                available.Resource.Status = ResourceStatus.Reserved;
+                req.MatchedResourceId = best.Resource.Id;
+                best.Resource.Status = ResourceStatus.Reserved;
+                await _requests.UpdateAsync(req);
+                await _resources.UpdateAsync(best.Resource);
                 matched++;
             }
         }
 
-        return Task.FromResult(matched);
+        return matched;
     }
 
     private static double HaversineKm(double lat1, double lon1, double lat2, double lon2)

@@ -1,0 +1,279 @@
+@page "/map"
+@attribute [Authorize]
+@inject WatchApiClient Api
+@inject WatchSignalRService SignalR
+@inject NotificationService Notification
+@implements IDisposable
+
+<div class="page-content" style="display: flex; flex-direction: column; height: calc(100vh - 80px);">
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                 AlignItems="AlignItems.Center" class="rz-mb-2">
+        <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">Live Map</RadzenText>
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem">
+            <RadzenButton Icon="my_location" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                          Click="@CenterOnUserAsync" title="My Location" />
+            <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                          Click="@RefreshMapDataAsync" title="Refresh" />
+        </RadzenStack>
+    </RadzenStack>
+
+    <!-- Map Legend -->
+    <div class="map-legend">
+        <span class="legend-item"><span class="legend-dot" style="background:#e74c3c"></span> Incident</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#2ecc71"></span> Available</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#f39c12"></span> En Route</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#3498db"></span> On Scene</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#9b59b6"></span> Shelter</span>
+    </div>
+
+    <!-- Map Container -->
+    <div style="flex: 1; min-height: 300px;">
+        <WatchMap @ref="_map" Height="100%" CenterLat="@_userLat" CenterLng="@_userLng" Zoom="12" />
+    </div>
+
+    <!-- Bottom Info Bar -->
+    @if (_incidentCount > 0 || _responderCount > 0)
+    {
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceAround"
+                     class="rz-mt-2" Style="padding: 0.5rem; background: var(--rz-base-800); border-radius: 8px;">
+            <RadzenStack AlignItems="AlignItems.Center">
+                <RadzenText TextStyle="TextStyle.Caption" Style="opacity: 0.6;">Incidents</RadzenText>
+                <RadzenText TextStyle="TextStyle.H6">@_incidentCount</RadzenText>
+            </RadzenStack>
+            <RadzenStack AlignItems="AlignItems.Center">
+                <RadzenText TextStyle="TextStyle.Caption" Style="opacity: 0.6;">Responders</RadzenText>
+                <RadzenText TextStyle="TextStyle.H6">@_responderCount</RadzenText>
+            </RadzenStack>
+            <RadzenStack AlignItems="AlignItems.Center">
+                <RadzenText TextStyle="TextStyle.Caption" Style="opacity: 0.6;">Shelters</RadzenText>
+                <RadzenText TextStyle="TextStyle.H6">@_shelterCount</RadzenText>
+            </RadzenStack>
+        </RadzenStack>
+    }
+</div>
+
+@code {
+    private WatchMap? _map;
+    private double _userLat = 39.8283;
+    private double _userLng = -98.5795;
+    private int _incidentCount;
+    private int _responderCount;
+    private int _shelterCount;
+    private bool _dataLoaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Try to get user location
+        try
+        {
+            var loc = await Geolocation.GetLastKnownLocationAsync();
+            if (loc is not null)
+            {
+                _userLat = loc.Latitude;
+                _userLng = loc.Longitude;
+            }
+        }
+        catch { /* location unavailable */ }
+
+        // Subscribe to SignalR responder events for real-time movement
+        SignalR.OnResponderUpdated += OnResponderUpdated;
+        SignalR.OnIncidentCreated += OnIncidentCreated;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_dataLoaded)
+        {
+            _dataLoaded = true;
+            // Small delay for map initialization
+            await Task.Delay(500);
+            await LoadMapDataAsync();
+        }
+    }
+
+    private async Task LoadMapDataAsync()
+    {
+        if (_map is null) return;
+
+        // Show user location
+        await _map.SetUserLocationAsync(_userLat, _userLng);
+
+        // Load data in parallel
+        var incidentsTask = Api.GetRecentIncidentsAsync(20);
+        var respondersTask = Api.GetNearbyRespondersAsync(_userLat, _userLng, 50);
+        var sheltersTask = Api.GetActiveSheltersAsync();
+
+        await Task.WhenAll(incidentsTask, respondersTask, sheltersTask);
+
+        var incidents = incidentsTask.Result;
+        var responders = respondersTask.Result;
+        var shelters = sheltersTask.Result;
+
+        // Plot incidents
+        foreach (var incident in incidents.Where(i => i.Status != IncidentStatus.Resolved && i.Status != IncidentStatus.Archived))
+        {
+            var lat = incident.Location.Latitude;
+            var lng = incident.Location.Longitude;
+            if (lat == 0 && lng == 0) continue;
+
+            await _map.AddMarkerAsync(
+                $"incident-{incident.Id}",
+                lat, lng,
+                "incident",
+                $"{incident.Type} (Sev {incident.Severity})",
+                $"<b>{incident.Type}</b><br/>Severity: {incident.Severity}<br/>Status: {incident.Status}<br/>{incident.CreatedAt:g}");
+
+            // Add zone around incident
+            var radius = incident.Severity switch
+            {
+                >= 4 => 2000,
+                3 => 1000,
+                _ => 500
+            };
+            await _map.AddCircleZoneAsync(
+                $"zone-{incident.Id}",
+                lat, lng,
+                radius,
+                "#e74c3c",
+                0.1);
+        }
+        _incidentCount = incidents.Count(i => i.Status != IncidentStatus.Resolved && i.Status != IncidentStatus.Archived);
+
+        // Plot responders
+        foreach (var r in responders)
+        {
+            if (r.Location is null) continue;
+
+            var iconType = r.Status switch
+            {
+                "Available" => "responder-available",
+                "EnRoute" => "responder-enroute",
+                "OnScene" => "responder-onscene",
+                _ => "responder-busy"
+            };
+
+            await _map.AddMarkerAsync(
+                $"responder-{r.Id}",
+                r.Location.Latitude, r.Location.Longitude,
+                iconType,
+                $"{r.Name} ({r.Type})",
+                $"<b>{r.Name}</b><br/>Type: {r.Type}<br/>Status: {r.Status}" +
+                (r.DistanceKm.HasValue ? $"<br/>Distance: {r.DistanceKm:F1} km" : ""));
+        }
+        _responderCount = responders.Count;
+
+        // Plot shelters
+        foreach (var s in shelters)
+        {
+            await _map.AddMarkerAsync(
+                $"shelter-{s.Id}",
+                s.Location.Latitude, s.Location.Longitude,
+                "shelter",
+                s.Name,
+                $"<b>{s.Name}</b><br/>{s.Address}<br/>Capacity: {s.CurrentOccupancy}/{s.Capacity}");
+        }
+        _shelterCount = shelters.Count;
+
+        // Fit map to show all markers if we have any
+        if (_incidentCount + _responderCount + _shelterCount > 0)
+        {
+            await _map.FitAllMarkersAsync(0.15);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task RefreshMapDataAsync()
+    {
+        if (_map is null) return;
+        await _map.ClearAllAsync();
+        await LoadMapDataAsync();
+    }
+
+    private async Task CenterOnUserAsync()
+    {
+        try
+        {
+            var loc = await Geolocation.GetLastKnownLocationAsync();
+            if (loc is not null && _map is not null)
+            {
+                _userLat = loc.Latitude;
+                _userLng = loc.Longitude;
+                await _map.SetUserLocationAsync(_userLat, _userLng);
+                await _map.FlyToAsync(_userLat, _userLng, 14);
+            }
+        }
+        catch
+        {
+            Notification.Notify(NotificationSeverity.Warning, "Location", "Unable to get current location.");
+        }
+    }
+
+    // === Real-Time SignalR Handlers ===
+
+    private async void OnResponderUpdated(ResponderEvent evt)
+    {
+        if (_map is null) return;
+
+        try
+        {
+            // evt.Data is a dynamic object from SignalR — extract location info
+            var json = System.Text.Json.JsonSerializer.Serialize(evt.Data);
+            var responder = System.Text.Json.JsonSerializer.Deserialize<ResponderUpdatePayload>(json,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (responder?.LastKnownLocation is null) return;
+
+            var iconType = responder.Status switch
+            {
+                "Available" => "responder-available",
+                "EnRoute" => "responder-enroute",
+                "OnScene" => "responder-onscene",
+                _ => "responder-busy"
+            };
+
+            var markerId = $"responder-{responder.Id}";
+
+            await InvokeAsync(async () =>
+            {
+                // Move marker with animation for smooth GPS tracking
+                await _map.MoveMarkerAsync(markerId,
+                    responder.LastKnownLocation.Latitude,
+                    responder.LastKnownLocation.Longitude,
+                    animate: true);
+            });
+        }
+        catch { /* deserialize failed — ignore */ }
+    }
+
+    private async void OnIncidentCreated(IncidentEvent evt)
+    {
+        // Refresh all map data when a new incident appears
+        await InvokeAsync(async () =>
+        {
+            try { await RefreshMapDataAsync(); } catch { }
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        SignalR.OnResponderUpdated -= OnResponderUpdated;
+        SignalR.OnIncidentCreated -= OnIncidentCreated;
+    }
+
+    // Minimal DTO for deserializing SignalR responder updates
+    private record ResponderUpdatePayload
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = "";
+        public string Status { get; init; } = "";
+        public LocationPayload? LastKnownLocation { get; init; }
+    }
+
+    private record LocationPayload
+    {
+        public double Latitude { get; init; }
+        public double Longitude { get; init; }
+    }
+}

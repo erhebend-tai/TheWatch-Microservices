@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TheWatch.P3.MeshNetwork.Mesh;
 
 namespace TheWatch.P3.MeshNetwork.Services;
@@ -14,10 +14,16 @@ public interface INotificationService
 
 public class NotificationService : INotificationService
 {
-    private readonly ConcurrentDictionary<Guid, MeshMessage> _messages = new();
-    private readonly ConcurrentDictionary<Guid, NotificationChannel> _channels = new();
+    private readonly IWatchRepository<MeshMessage> _messages;
+    private readonly IWatchRepository<NotificationChannel> _channels;
 
-    public Task<MeshMessage> SendAsync(SendMessageRequest request)
+    public NotificationService(IWatchRepository<MeshMessage> messages, IWatchRepository<NotificationChannel> channels)
+    {
+        _messages = messages;
+        _channels = channels;
+    }
+
+    public async Task<MeshMessage> SendAsync(SendMessageRequest request)
     {
         var msg = new MeshMessage
         {
@@ -28,21 +34,19 @@ public class NotificationService : INotificationService
             Priority = request.Priority
         };
 
-        _messages[msg.Id] = msg;
-        return Task.FromResult(msg);
+        return await _messages.AddAsync(msg);
     }
 
-    public Task<List<MeshMessage>> GetMessagesAsync(Guid recipientId, int limit)
+    public async Task<List<MeshMessage>> GetMessagesAsync(Guid recipientId, int limit)
     {
-        var result = _messages.Values
+        return await _messages.Query()
             .Where(m => m.RecipientId == recipientId || m.ChannelId.HasValue)
             .OrderByDescending(m => m.SentAt)
             .Take(limit)
-            .ToList();
-        return Task.FromResult(result);
+            .ToListAsync();
     }
 
-    public Task<NotificationChannel> CreateChannelAsync(CreateChannelRequest request)
+    public async Task<NotificationChannel> CreateChannelAsync(CreateChannelRequest request)
     {
         var channel = new NotificationChannel
         {
@@ -50,23 +54,23 @@ public class NotificationService : INotificationService
             Type = request.Type
         };
 
-        _channels[channel.Id] = channel;
-        return Task.FromResult(channel);
+        return await _channels.AddAsync(channel);
     }
 
-    public Task<List<NotificationChannel>> ListChannelsAsync()
+    public async Task<List<NotificationChannel>> ListChannelsAsync()
     {
-        return Task.FromResult(_channels.Values.OrderBy(c => c.Name).ToList());
+        return await _channels.Query().OrderBy(c => c.Name).ToListAsync();
     }
 
-    public Task<bool> SubscribeAsync(Guid channelId, Guid nodeId)
+    public async Task<bool> SubscribeAsync(Guid channelId, Guid nodeId)
     {
-        if (!_channels.TryGetValue(channelId, out var channel))
-            return Task.FromResult(false);
+        var channel = await _channels.GetByIdAsync(channelId);
+        if (channel is null) return false;
 
         if (!channel.SubscriberIds.Contains(nodeId))
             channel.SubscriberIds.Add(nodeId);
 
-        return Task.FromResult(true);
+        await _channels.UpdateAsync(channel);
+        return true;
     }
 }

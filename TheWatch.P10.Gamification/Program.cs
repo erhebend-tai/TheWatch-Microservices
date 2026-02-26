@@ -24,13 +24,17 @@ builder.Services.AddHangfire(config =>
     config.UseInMemoryStorage());
 builder.Services.AddHangfireServer();
 
-builder.Services.AddSingleton<IGamificationService, GamificationService>();
+builder.Services.AddScoped<IGamificationService, GamificationService>();
+builder.AddWatchSecurity();
 
 var app = builder.Build();
 
 app.UseCors();
+app.UseWatchSecurity();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
 
 // Recurring Hangfire jobs
@@ -58,19 +62,19 @@ app.MapGet("/api/rewards/{userId:guid}", async (Guid userId, IGamificationServic
 {
     var reward = await svc.GetOrCreateRewardAsync(userId);
     return Results.Ok(reward);
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapPost("/api/rewards/points", async (AwardPointsRequest request, IGamificationService svc) =>
 {
     var reward = await svc.AwardPointsAsync(request);
     return Results.Ok(reward);
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapPost("/api/rewards/badges", async (AwardBadgeRequest request, IGamificationService svc) =>
 {
     var reward = await svc.AwardBadgeAsync(request);
     return Results.Ok(reward);
-});
+}).RequireAuthorization("Authenticated");
 
 // === Challenge Endpoints ===
 
@@ -78,13 +82,13 @@ app.MapPost("/api/challenges", async (CreateChallengeRequest request, IGamificat
 {
     var challenge = await svc.CreateChallengeAsync(request);
     return Results.Created($"/api/challenges/{challenge.Id}", challenge);
-});
+}).RequireAuthorization("AdminOnly");
 
 app.MapGet("/api/challenges", async (IGamificationService svc, ChallengeStatus? status) =>
 {
     var challenges = await svc.ListChallengesAsync(status);
     return Results.Ok(challenges);
-});
+}).RequireAuthorization("Authenticated");
 
 // === Leaderboard ===
 
@@ -92,7 +96,7 @@ app.MapGet("/api/leaderboard", async (IGamificationService svc, int? top) =>
 {
     var leaderboard = await svc.GetLeaderboardAsync(top ?? 50);
     return Results.Ok(leaderboard);
-});
+}).RequireAuthorization("Authenticated");
 
 app.Run();
 

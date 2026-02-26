@@ -1,5 +1,7 @@
 namespace TheWatch.P5.AuthSecurity.Auth;
 
+// DTOs — using .Auth namespace to avoid collision with Roslyn-generated .Models types
+
 public record RegisterRequest(
     string Email,
     string Password,
@@ -8,16 +10,22 @@ public record RegisterRequest(
 
 public record LoginRequest(
     string Email,
-    string Password);
+    string Password,
+    string? TotpCode = null,
+    string? MfaToken = null,
+    string? DeviceFingerprint = null);
 
 public record LoginResponse(
     string AccessToken,
     string RefreshToken,
     DateTime ExpiresAt,
-    UserInfo User);
+    UserInfo User,
+    bool MfaRequired = false,
+    string? MfaToken = null);
 
 public record RefreshTokenRequest(
-    string RefreshToken);
+    string RefreshToken,
+    string? DeviceFingerprint = null);
 
 public record UserInfo(
     Guid Id,
@@ -25,34 +33,32 @@ public record UserInfo(
     string DisplayName,
     string? Phone,
     string[] Roles,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    string? AcceptedEulaVersion = null);
 
 public record TokenPair(
     string AccessToken,
     string RefreshToken,
     DateTime ExpiresAt);
 
-public class User
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Email { get; set; } = string.Empty;
-    public string DisplayName { get; set; } = string.Empty;
-    public string? Phone { get; set; }
-    public string PasswordHash { get; set; } = string.Empty;
-    public string[] Roles { get; set; } = ["user"];
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? LastLoginAt { get; set; }
-    public bool IsActive { get; set; } = true;
+public record AssignRoleRequest(
+    Guid UserId,
+    string Role);
 
-    public UserInfo ToUserInfo() => new(Id, Email, DisplayName, Phone, Roles, CreatedAt);
-}
+public record MfaSetupResponse(
+    string SharedKey,
+    string AuthenticatorUri,
+    string[] RecoveryCodes);
 
-public class RefreshToken
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Token { get; set; } = string.Empty;
-    public Guid UserId { get; set; }
-    public DateTime ExpiresAt { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public bool IsRevoked { get; set; }
-}
+public record MfaVerifyRequest(
+    string Code);
+
+public record SmsMfaSendRequest(
+    string PhoneNumber);
+
+public record SmsMfaVerifyRequest(
+    string Code,
+    string PhoneNumber);
+
+public record MagicLinkRequest(
+    string Email);

@@ -34,15 +34,21 @@ builder.Services.AddHangfire(config =>
         .UseBatches());
 builder.Services.AddHangfireServer();
 
+// Security (JWT validation + rate limiting + audit from SecurityGenerator)
+builder.AddWatchSecurity();
+
 // Services
-builder.Services.AddSingleton<IEmergencyService, EmergencyService>();
-builder.Services.AddSingleton<IDispatchService, DispatchService>();
+builder.Services.AddScoped<IEmergencyService, EmergencyService>();
+builder.Services.AddScoped<IDispatchService, DispatchService>();
 
 var app = builder.Build();
 
 app.UseCors();
+app.UseWatchSecurity();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
 
 // Register recurring Hangfire jobs
@@ -108,13 +114,13 @@ app.MapGet("/api/incidents", async (
 {
     var result = await svc.ListIncidentsAsync(page ?? 1, pageSize ?? 20, status, type);
     return Results.Ok(result);
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapGet("/api/incidents/{id:guid}", async (Guid id, IEmergencyService svc) =>
 {
     var incident = await svc.GetIncidentAsync(id);
     return incident is not null ? Results.Ok(incident) : Results.NotFound();
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapPut("/api/incidents/{id:guid}/status", async (Guid id, UpdateIncidentStatusRequest request, IEmergencyService svc, IIncidentBroadcaster hub) =>
 {
@@ -125,7 +131,7 @@ app.MapPut("/api/incidents/{id:guid}/status", async (Guid id, UpdateIncidentStat
         await hub.BroadcastUpdatedAsync(incident, incident.Id.ToString());
     }
     return incident is not null ? Results.Ok(incident) : Results.NotFound();
-});
+}).RequireAuthorization("ResponderAccess");
 
 // === Dispatch Endpoints ===
 
@@ -152,25 +158,25 @@ app.MapPost("/api/dispatch", async (CreateDispatchRequest request, IDispatchServ
     });
 
     return Results.Created($"/api/dispatch/{dispatch.Id}", dispatch);
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapGet("/api/dispatch/{id:guid}", async (Guid id, IDispatchService svc) =>
 {
     var dispatch = await svc.GetDispatchAsync(id);
     return dispatch is not null ? Results.Ok(dispatch) : Results.NotFound();
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapPost("/api/dispatch/{id:guid}/expand", async (Guid id, ExpandRadiusRequest request, IDispatchService svc) =>
 {
     var dispatch = await svc.ExpandRadiusAsync(id, request);
     return dispatch is not null ? Results.Ok(dispatch) : Results.NotFound();
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapGet("/api/incidents/{incidentId:guid}/dispatches", async (Guid incidentId, IDispatchService svc) =>
 {
     var dispatches = await svc.GetDispatchesForIncidentAsync(incidentId);
     return Results.Ok(dispatches);
-});
+}).RequireAuthorization("ResponderAccess");
 
 // SignalR hub endpoints (/hubs/incidents, /hubs/dispatches)
 app.MapWatchHubs();

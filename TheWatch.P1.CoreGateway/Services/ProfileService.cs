@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TheWatch.P1.CoreGateway.Core;
 
 namespace TheWatch.P1.CoreGateway.Services;
@@ -15,9 +15,14 @@ public interface IProfileService
 
 public class ProfileService : IProfileService
 {
-    private readonly ConcurrentDictionary<Guid, UserProfile> _profiles = new();
+    private readonly IWatchRepository<UserProfile> _profiles;
 
-    public Task<UserProfile> CreateAsync(CreateProfileRequest request)
+    public ProfileService(IWatchRepository<UserProfile> profiles)
+    {
+        _profiles = profiles;
+    }
+
+    public async Task<UserProfile> CreateAsync(CreateProfileRequest request)
     {
         var profile = new UserProfile
         {
@@ -27,37 +32,35 @@ public class ProfileService : IProfileService
             Role = request.Role
         };
 
-        _profiles[profile.Id] = profile;
-        return Task.FromResult(profile);
+        return await _profiles.AddAsync(profile);
     }
 
-    public Task<UserProfile?> GetByIdAsync(Guid id)
+    public async Task<UserProfile?> GetByIdAsync(Guid id)
     {
-        _profiles.TryGetValue(id, out var profile);
-        return Task.FromResult(profile);
+        return await _profiles.GetByIdAsync(id);
     }
 
-    public Task<ProfileListResponse> ListAsync(int page, int pageSize, UserRole? role)
+    public async Task<ProfileListResponse> ListAsync(int page, int pageSize, UserRole? role)
     {
-        var query = _profiles.Values.Where(p => p.IsActive).AsEnumerable();
+        var query = _profiles.Query().Where(p => p.IsActive);
 
         if (role.HasValue)
             query = query.Where(p => p.Role == role.Value);
 
-        var total = query.Count();
-        var items = query
+        var total = await query.CountAsync();
+        var items = await query
             .OrderBy(p => p.DisplayName)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ToListAsync();
 
-        return Task.FromResult(new ProfileListResponse(items, total, page, pageSize));
+        return new ProfileListResponse(items, total, page, pageSize);
     }
 
-    public Task<UserProfile?> UpdateAsync(Guid id, UpdateProfileRequest request)
+    public async Task<UserProfile?> UpdateAsync(Guid id, UpdateProfileRequest request)
     {
-        if (!_profiles.TryGetValue(id, out var profile))
-            return Task.FromResult<UserProfile?>(null);
+        var profile = await _profiles.GetByIdAsync(id);
+        if (profile is null) return null;
 
         if (request.DisplayName is not null) profile.DisplayName = request.DisplayName;
         if (request.Phone is not null) profile.Phone = request.Phone;
@@ -65,27 +68,30 @@ public class ProfileService : IProfileService
         if (request.Longitude.HasValue) profile.Longitude = request.Longitude;
         profile.UpdatedAt = DateTime.UtcNow;
 
-        return Task.FromResult<UserProfile?>(profile);
+        await _profiles.UpdateAsync(profile);
+        return profile;
     }
 
-    public Task<UserProfile?> SetPreferenceAsync(Guid id, SetPreferenceRequest request)
+    public async Task<UserProfile?> SetPreferenceAsync(Guid id, SetPreferenceRequest request)
     {
-        if (!_profiles.TryGetValue(id, out var profile))
-            return Task.FromResult<UserProfile?>(null);
+        var profile = await _profiles.GetByIdAsync(id);
+        if (profile is null) return null;
 
         profile.Preferences[request.Key] = request.Value;
         profile.UpdatedAt = DateTime.UtcNow;
 
-        return Task.FromResult<UserProfile?>(profile);
+        await _profiles.UpdateAsync(profile);
+        return profile;
     }
 
-    public Task<bool> DeactivateAsync(Guid id)
+    public async Task<bool> DeactivateAsync(Guid id)
     {
-        if (!_profiles.TryGetValue(id, out var profile))
-            return Task.FromResult(false);
+        var profile = await _profiles.GetByIdAsync(id);
+        if (profile is null) return false;
 
         profile.IsActive = false;
         profile.UpdatedAt = DateTime.UtcNow;
-        return Task.FromResult(true);
+        await _profiles.UpdateAsync(profile);
+        return true;
     }
 }

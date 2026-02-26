@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TheWatch.P6.FirstResponder.Responders;
 
 namespace TheWatch.P6.FirstResponder.Services;
@@ -13,11 +13,12 @@ public interface ICheckInService
 
 public class CheckInService : ICheckInService
 {
-    private readonly ConcurrentDictionary<Guid, CheckIn> _checkIns = new();
+    private readonly IWatchRepository<CheckIn> _checkIns;
     private readonly IResponderService _responderService;
 
-    public CheckInService(IResponderService responderService)
+    public CheckInService(IWatchRepository<CheckIn> checkIns, IResponderService responderService)
     {
+        _checkIns = checkIns;
         _responderService = responderService;
     }
 
@@ -32,7 +33,7 @@ public class CheckInService : ICheckInService
             Notes = request.Notes
         };
 
-        _checkIns[checkIn.Id] = checkIn;
+        await _checkIns.AddAsync(checkIn);
 
         // Update responder location as side-effect
         await _responderService.UpdateLocationAsync(responderId, new UpdateLocationRequest(
@@ -55,30 +56,31 @@ public class CheckInService : ICheckInService
         return checkIn;
     }
 
-    public Task<List<CheckIn>> GetForIncidentAsync(Guid incidentId)
+    public async Task<List<CheckIn>> GetForIncidentAsync(Guid incidentId)
     {
-        var result = _checkIns.Values
+        return await _checkIns.Query()
             .Where(c => c.IncidentId == incidentId)
             .OrderByDescending(c => c.Timestamp)
-            .ToList();
-        return Task.FromResult(result);
+            .ToListAsync();
     }
 
-    public Task<List<CheckIn>> GetForResponderAsync(Guid responderId)
+    public async Task<List<CheckIn>> GetForResponderAsync(Guid responderId)
     {
-        var result = _checkIns.Values
+        return await _checkIns.Query()
             .Where(c => c.ResponderId == responderId)
             .OrderByDescending(c => c.Timestamp)
-            .ToList();
-        return Task.FromResult(result);
+            .ToListAsync();
     }
 
-    public Task CleanupOldCheckInsAsync(TimeSpan olderThan)
+    public async Task CleanupOldCheckInsAsync(TimeSpan olderThan)
     {
         var cutoff = DateTime.UtcNow - olderThan;
-        var old = _checkIns.Values.Where(c => c.Timestamp < cutoff).Select(c => c.Id).ToList();
+        var old = await _checkIns.Query()
+            .Where(c => c.Timestamp < cutoff)
+            .Select(c => c.Id)
+            .ToListAsync();
+
         foreach (var id in old)
-            _checkIns.TryRemove(id, out _);
-        return Task.CompletedTask;
+            await _checkIns.DeleteAsync(id);
     }
 }

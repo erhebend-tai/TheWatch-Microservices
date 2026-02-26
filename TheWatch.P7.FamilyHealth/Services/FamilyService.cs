@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TheWatch.P7.FamilyHealth.Family;
 
 namespace TheWatch.P7.FamilyHealth.Services;
@@ -15,33 +15,39 @@ public interface IFamilyService
 
 public class FamilyService : IFamilyService
 {
-    private readonly ConcurrentDictionary<Guid, FamilyGroup> _groups = new();
-    private readonly ConcurrentDictionary<Guid, FamilyMember> _members = new();
+    private readonly IWatchRepository<FamilyGroup> _groups;
+    private readonly IWatchRepository<FamilyMember> _members;
 
-    public Task<FamilyGroup> CreateGroupAsync(CreateFamilyGroupRequest request)
+    public FamilyService(IWatchRepository<FamilyGroup> groups, IWatchRepository<FamilyMember> members)
+    {
+        _groups = groups;
+        _members = members;
+    }
+
+    public async Task<FamilyGroup> CreateGroupAsync(CreateFamilyGroupRequest request)
     {
         var group = new FamilyGroup { Name = request.Name };
-        _groups[group.Id] = group;
-        return Task.FromResult(group);
+        return await _groups.AddAsync(group);
     }
 
-    public Task<FamilyGroupResponse?> GetGroupAsync(Guid groupId)
+    public async Task<FamilyGroupResponse?> GetGroupAsync(Guid groupId)
     {
-        if (!_groups.TryGetValue(groupId, out var group))
-            return Task.FromResult<FamilyGroupResponse?>(null);
+        var group = await _groups.GetByIdAsync(groupId);
+        if (group is null) return null;
 
-        var members = _members.Values
+        var members = await _members.Query()
             .Where(m => m.FamilyGroupId == groupId)
-            .ToList();
-        return Task.FromResult<FamilyGroupResponse?>(new FamilyGroupResponse(group, members));
+            .ToListAsync();
+
+        return new FamilyGroupResponse(group, members);
     }
 
-    public Task<List<FamilyGroup>> ListGroupsAsync()
+    public async Task<List<FamilyGroup>> ListGroupsAsync()
     {
-        return Task.FromResult(_groups.Values.OrderBy(g => g.Name).ToList());
+        return await _groups.Query().OrderBy(g => g.Name).ToListAsync();
     }
 
-    public Task<FamilyMember> AddMemberAsync(Guid groupId, AddMemberRequest request)
+    public async Task<FamilyMember> AddMemberAsync(Guid groupId, AddMemberRequest request)
     {
         var member = new FamilyMember
         {
@@ -52,28 +58,36 @@ public class FamilyService : IFamilyService
             FamilyGroupId = groupId
         };
 
-        _members[member.Id] = member;
+        await _members.AddAsync(member);
 
-        if (_groups.TryGetValue(groupId, out var group))
+        var group = await _groups.GetByIdAsync(groupId);
+        if (group is not null)
+        {
             group.MemberIds.Add(member.Id);
+            await _groups.UpdateAsync(group);
+        }
 
-        return Task.FromResult(member);
+        return member;
     }
 
-    public Task<FamilyMember?> GetMemberAsync(Guid memberId)
+    public async Task<FamilyMember?> GetMemberAsync(Guid memberId)
     {
-        _members.TryGetValue(memberId, out var member);
-        return Task.FromResult(member);
+        return await _members.GetByIdAsync(memberId);
     }
 
-    public Task<bool> RemoveMemberAsync(Guid memberId)
+    public async Task<bool> RemoveMemberAsync(Guid memberId)
     {
-        if (!_members.TryRemove(memberId, out var member))
-            return Task.FromResult(false);
+        var member = await _members.GetByIdAsync(memberId);
+        if (member is null) return false;
 
-        if (_groups.TryGetValue(member.FamilyGroupId, out var group))
+        var group = await _groups.GetByIdAsync(member.FamilyGroupId);
+        if (group is not null)
+        {
             group.MemberIds.Remove(memberId);
+            await _groups.UpdateAsync(group);
+        }
 
-        return Task.FromResult(true);
+        await _members.DeleteAsync(memberId);
+        return true;
     }
 }

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TheWatch.P3.MeshNetwork.Mesh;
 
 namespace TheWatch.P3.MeshNetwork.Services;
@@ -15,9 +15,14 @@ public interface IMeshService
 
 public class MeshService : IMeshService
 {
-    private readonly ConcurrentDictionary<Guid, MeshNode> _nodes = new();
+    private readonly IWatchRepository<MeshNode> _nodes;
 
-    public Task<MeshNode> RegisterNodeAsync(RegisterNodeRequest request)
+    public MeshService(IWatchRepository<MeshNode> nodes)
+    {
+        _nodes = nodes;
+    }
+
+    public async Task<MeshNode> RegisterNodeAsync(RegisterNodeRequest request)
     {
         var node = new MeshNode
         {
@@ -29,30 +34,28 @@ public class MeshService : IMeshService
             Status = NodeStatus.Online
         };
 
-        _nodes[node.Id] = node;
-        return Task.FromResult(node);
+        return await _nodes.AddAsync(node);
     }
 
-    public Task<MeshNode?> GetNodeAsync(Guid id)
+    public async Task<MeshNode?> GetNodeAsync(Guid id)
     {
-        _nodes.TryGetValue(id, out var node);
-        return Task.FromResult(node);
+        return await _nodes.GetByIdAsync(id);
     }
 
-    public Task<NodeListResponse> ListNodesAsync(NodeStatus? status)
+    public async Task<NodeListResponse> ListNodesAsync(NodeStatus? status)
     {
-        var query = _nodes.Values.AsEnumerable();
+        var query = _nodes.Query();
         if (status.HasValue)
             query = query.Where(n => n.Status == status.Value);
 
-        var items = query.OrderByDescending(n => n.LastSeenAt).ToList();
-        return Task.FromResult(new NodeListResponse(items, items.Count));
+        var items = await query.OrderByDescending(n => n.LastSeenAt).ToListAsync();
+        return new NodeListResponse(items, items.Count);
     }
 
-    public Task<MeshNode?> UpdateNodeStatusAsync(Guid id, UpdateNodeStatusRequest request)
+    public async Task<MeshNode?> UpdateNodeStatusAsync(Guid id, UpdateNodeStatusRequest request)
     {
-        if (!_nodes.TryGetValue(id, out var node))
-            return Task.FromResult<MeshNode?>(null);
+        var node = await _nodes.GetByIdAsync(id);
+        if (node is null) return null;
 
         node.Status = request.Status;
         if (request.Latitude.HasValue) node.Latitude = request.Latitude;
@@ -60,28 +63,36 @@ public class MeshService : IMeshService
         if (request.BatteryPercent.HasValue) node.BatteryPercent = request.BatteryPercent;
         node.LastSeenAt = DateTime.UtcNow;
 
-        return Task.FromResult<MeshNode?>(node);
+        await _nodes.UpdateAsync(node);
+        return node;
     }
 
-    public Task<TopologyResponse> GetTopologyAsync()
+    public async Task<TopologyResponse> GetTopologyAsync()
     {
-        var onlineNodes = _nodes.Values.Where(n => n.Status != NodeStatus.Offline).ToList();
+        var onlineNodes = await _nodes.Query()
+            .Where(n => n.Status != NodeStatus.Offline)
+            .ToListAsync();
+
         var connections = onlineNodes
             .SelectMany(n => n.ConnectedPeers.Select(p => new PeerConnection(n.Id, p)))
             .Distinct()
             .ToList();
 
-        return Task.FromResult(new TopologyResponse(onlineNodes, connections));
+        return new TopologyResponse(onlineNodes, connections);
     }
 
-    public Task CleanupStaleNodesAsync(TimeSpan timeout)
+    public async Task CleanupStaleNodesAsync(TimeSpan timeout)
     {
         var cutoff = DateTime.UtcNow - timeout;
-        foreach (var node in _nodes.Values.Where(n => n.LastSeenAt < cutoff && n.Status != NodeStatus.Offline))
+        var stale = await _nodes.Query()
+            .Where(n => n.LastSeenAt < cutoff && n.Status != NodeStatus.Offline)
+            .ToListAsync();
+
+        foreach (var node in stale)
         {
             node.Status = NodeStatus.Offline;
             node.ConnectedPeers.Clear();
+            await _nodes.UpdateAsync(node);
         }
-        return Task.CompletedTask;
     }
 }

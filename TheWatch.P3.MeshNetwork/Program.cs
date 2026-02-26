@@ -29,14 +29,18 @@ builder.Services.AddHangfire(config =>
 builder.Services.AddHangfireServer();
 
 // Services
-builder.Services.AddSingleton<IMeshService, MeshService>();
-builder.Services.AddSingleton<INotificationService, NotificationService>();
+builder.Services.AddScoped<IMeshService, MeshService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.AddWatchSecurity();
 
 var app = builder.Build();
 
 app.UseCors();
+app.UseWatchSecurity();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
 
 // Recurring Hangfire jobs

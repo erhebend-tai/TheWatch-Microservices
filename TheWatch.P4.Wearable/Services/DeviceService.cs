@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TheWatch.P4.Wearable.Devices;
 
 namespace TheWatch.P4.Wearable.Services;
@@ -17,11 +17,21 @@ public interface IDeviceService
 
 public class DeviceService : IDeviceService
 {
-    private readonly ConcurrentDictionary<Guid, WearableDevice> _devices = new();
-    private readonly ConcurrentDictionary<Guid, HeartbeatReading> _heartbeats = new();
-    private readonly ConcurrentDictionary<Guid, SyncJob> _syncJobs = new();
+    private readonly IWatchRepository<WearableDevice> _devices;
+    private readonly IWatchRepository<HeartbeatReading> _heartbeats;
+    private readonly IWatchRepository<SyncJob> _syncJobs;
 
-    public Task<WearableDevice> RegisterAsync(RegisterDeviceRequest request)
+    public DeviceService(
+        IWatchRepository<WearableDevice> devices,
+        IWatchRepository<HeartbeatReading> heartbeats,
+        IWatchRepository<SyncJob> syncJobs)
+    {
+        _devices = devices;
+        _heartbeats = heartbeats;
+        _syncJobs = syncJobs;
+    }
+
+    public async Task<WearableDevice> RegisterAsync(RegisterDeviceRequest request)
     {
         var device = new WearableDevice
         {
@@ -32,41 +42,40 @@ public class DeviceService : IDeviceService
             FirmwareVersion = request.FirmwareVersion
         };
 
-        _devices[device.Id] = device;
-        return Task.FromResult(device);
+        return await _devices.AddAsync(device);
     }
 
-    public Task<WearableDevice?> GetByIdAsync(Guid id)
+    public async Task<WearableDevice?> GetByIdAsync(Guid id)
     {
-        _devices.TryGetValue(id, out var device);
-        return Task.FromResult(device);
+        return await _devices.GetByIdAsync(id);
     }
 
-    public Task<DeviceListResponse> ListAsync(Guid? ownerId, DevicePlatform? platform)
+    public async Task<DeviceListResponse> ListAsync(Guid? ownerId, DevicePlatform? platform)
     {
-        var query = _devices.Values.AsEnumerable();
+        var query = _devices.Query();
 
         if (ownerId.HasValue)
             query = query.Where(d => d.OwnerId == ownerId.Value);
         if (platform.HasValue)
             query = query.Where(d => d.Platform == platform.Value);
 
-        var items = query.OrderByDescending(d => d.CreatedAt).ToList();
-        return Task.FromResult(new DeviceListResponse(items, items.Count));
+        var items = await query.OrderByDescending(d => d.CreatedAt).ToListAsync();
+        return new DeviceListResponse(items, items.Count);
     }
 
-    public Task<WearableDevice?> UpdateStatusAsync(Guid id, UpdateDeviceStatusRequest request)
+    public async Task<WearableDevice?> UpdateStatusAsync(Guid id, UpdateDeviceStatusRequest request)
     {
-        if (!_devices.TryGetValue(id, out var device))
-            return Task.FromResult<WearableDevice?>(null);
+        var device = await _devices.GetByIdAsync(id);
+        if (device is null) return null;
 
         device.Status = request.Status;
         if (request.BatteryPercent.HasValue) device.BatteryPercent = request.BatteryPercent;
 
-        return Task.FromResult<WearableDevice?>(device);
+        await _devices.UpdateAsync(device);
+        return device;
     }
 
-    public Task<HeartbeatReading> RecordHeartbeatAsync(Guid deviceId, RecordHeartbeatRequest request)
+    public async Task<HeartbeatReading> RecordHeartbeatAsync(Guid deviceId, RecordHeartbeatRequest request)
     {
         var reading = new HeartbeatReading
         {
@@ -76,51 +85,63 @@ public class DeviceService : IDeviceService
             CaloriesBurned = request.CaloriesBurned
         };
 
-        _heartbeats[reading.Id] = reading;
+        await _heartbeats.AddAsync(reading);
 
         // Update device last sync time
-        if (_devices.TryGetValue(deviceId, out var device))
+        var device = await _devices.GetByIdAsync(deviceId);
+        if (device is not null)
+        {
             device.LastSyncAt = DateTime.UtcNow;
+            await _devices.UpdateAsync(device);
+        }
 
-        return Task.FromResult(reading);
+        return reading;
     }
 
-    public Task<HeartbeatHistory> GetHeartbeatHistoryAsync(Guid deviceId, int limit)
+    public async Task<HeartbeatHistory> GetHeartbeatHistoryAsync(Guid deviceId, int limit)
     {
-        var all = _heartbeats.Values.Where(h => h.DeviceId == deviceId)
-            .OrderByDescending(h => h.RecordedAt).ToList();
-        var readings = all.Take(limit).ToList();
-        return Task.FromResult(new HeartbeatHistory(readings, all.Count));
+        var allCount = await _heartbeats.Query().Where(h => h.DeviceId == deviceId).CountAsync();
+        var readings = await _heartbeats.Query()
+            .Where(h => h.DeviceId == deviceId)
+            .OrderByDescending(h => h.RecordedAt)
+            .Take(limit)
+            .ToListAsync();
+
+        return new HeartbeatHistory(readings, allCount);
     }
 
-    public Task<SyncJob> StartSyncAsync(Guid deviceId, StartSyncRequest request)
+    public async Task<SyncJob> StartSyncAsync(Guid deviceId, StartSyncRequest request)
     {
+        var recordCount = await _heartbeats.Query().Where(h => h.DeviceId == deviceId).CountAsync();
+
         var job = new SyncJob
         {
             DeviceId = deviceId,
             Direction = request.Direction,
             Success = true,
             CompletedAt = DateTime.UtcNow,
-            RecordsProcessed = _heartbeats.Values.Count(h => h.DeviceId == deviceId)
+            RecordsProcessed = recordCount
         };
 
-        _syncJobs[job.Id] = job;
+        await _syncJobs.AddAsync(job);
 
-        if (_devices.TryGetValue(deviceId, out var device))
+        var device = await _devices.GetByIdAsync(deviceId);
+        if (device is not null)
         {
             device.LastSyncAt = DateTime.UtcNow;
             device.Status = DeviceStatus.Connected;
+            await _devices.UpdateAsync(device);
         }
 
-        return Task.FromResult(job);
+        return job;
     }
 
-    public Task<List<SyncJob>> GetSyncHistoryAsync(Guid deviceId, int limit)
+    public async Task<List<SyncJob>> GetSyncHistoryAsync(Guid deviceId, int limit)
     {
-        return Task.FromResult(_syncJobs.Values
+        return await _syncJobs.Query()
             .Where(s => s.DeviceId == deviceId)
             .OrderByDescending(s => s.StartedAt)
             .Take(limit)
-            .ToList());
+            .ToListAsync();
     }
 }

@@ -25,6 +25,7 @@ builder.Services.AddAuthorizationCore();
 builder.Services.AddSingleton<MappingDataService>();
 builder.Services.AddSingleton<CatalogDataService>();
 builder.Services.AddSingleton<MicroserviceClient>();
+builder.Services.AddSingleton<DashboardSignalRService>();
 
 // Service discovery + HttpClient for microservice calls
 builder.Services.AddServiceDiscovery();

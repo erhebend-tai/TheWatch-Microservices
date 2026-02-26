@@ -32,14 +32,18 @@ builder.Services.AddHangfire(config =>
 builder.Services.AddHangfireServer();
 
 // Services
-builder.Services.AddSingleton<IResponderService, ResponderService>();
-builder.Services.AddSingleton<ICheckInService, CheckInService>();
+builder.Services.AddScoped<IResponderService, ResponderService>();
+builder.Services.AddScoped<ICheckInService, CheckInService>();
+builder.AddWatchSecurity();
 
 var app = builder.Build();
 
 app.UseCors();
+app.UseWatchSecurity();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
 
 // Recurring Hangfire jobs
@@ -72,7 +76,7 @@ app.MapPost("/api/responders", async (RegisterResponderRequest request, IRespond
 {
     var responder = await svc.RegisterAsync(request);
     return Results.Created($"/api/responders/{responder.Id}", responder);
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapGet("/api/responders", async (
     IResponderService svc,
@@ -83,13 +87,13 @@ app.MapGet("/api/responders", async (
 {
     var result = await svc.ListAsync(page ?? 1, pageSize ?? 20, type, status);
     return Results.Ok(result);
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapGet("/api/responders/{id:guid}", async (Guid id, IResponderService svc) =>
 {
     var responder = await svc.GetByIdAsync(id);
     return responder is not null ? Results.Ok(responder) : Results.NotFound();
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapPut("/api/responders/{id:guid}/location", async (Guid id, UpdateLocationRequest request, IResponderService svc, IResponderBroadcaster hub) =>
 {
@@ -100,7 +104,7 @@ app.MapPut("/api/responders/{id:guid}/location", async (Guid id, UpdateLocationR
         await hub.BroadcastUpdatedAsync(responder);
     }
     return responder is not null ? Results.Ok(responder) : Results.NotFound();
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapPut("/api/responders/{id:guid}/status", async (Guid id, UpdateStatusRequest request, IResponderService svc, IResponderBroadcaster hub) =>
 {
@@ -111,13 +115,13 @@ app.MapPut("/api/responders/{id:guid}/status", async (Guid id, UpdateStatusReque
         await hub.BroadcastUpdatedAsync(responder);
     }
     return responder is not null ? Results.Ok(responder) : Results.NotFound();
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapDelete("/api/responders/{id:guid}", async (Guid id, IResponderService svc) =>
 {
     var ok = await svc.DeactivateAsync(id);
     return ok ? Results.NoContent() : Results.NotFound();
-});
+}).RequireAuthorization("AdminOnly");
 
 // === Nearby Search ===
 
@@ -132,7 +136,7 @@ app.MapGet("/api/responders/nearby", async (
     var query = new NearbyResponderQuery(lat, lon, radiusKm ?? 10.0, type, availableOnly ?? true);
     var results = await svc.FindNearbyAsync(query);
     return Results.Ok(results);
-});
+}).RequireAuthorization("ResponderAccess");
 
 // === Check-In Endpoints ===
 
@@ -142,19 +146,19 @@ app.MapPost("/api/responders/{responderId:guid}/checkins", async (Guid responder
     // Broadcast check-in to clients watching this incident
     await checkInHub.BroadcastCreatedAsync(checkIn, checkIn.IncidentId.ToString());
     return Results.Created($"/api/responders/{responderId}/checkins/{checkIn.Id}", checkIn);
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapGet("/api/responders/{responderId:guid}/checkins", async (Guid responderId, ICheckInService svc) =>
 {
     var checkIns = await svc.GetForResponderAsync(responderId);
     return Results.Ok(checkIns);
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapGet("/api/incidents/{incidentId:guid}/checkins", async (Guid incidentId, ICheckInService svc) =>
 {
     var checkIns = await svc.GetForIncidentAsync(incidentId);
     return Results.Ok(checkIns);
-});
+}).RequireAuthorization("ResponderAccess");
 
 // SignalR hub endpoints (/hubs/responders, /hubs/checkins)
 app.MapWatchHubs();

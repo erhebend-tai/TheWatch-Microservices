@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using TheWatch.P2.VoiceEmergency.Emergency;
 using TheWatch.Shared.Notifications;
@@ -16,12 +16,13 @@ public interface IEmergencyService
 
 public class EmergencyService : IEmergencyService
 {
-    private readonly ConcurrentDictionary<Guid, Incident> _incidents = new();
+    private readonly IWatchRepository<Incident> _incidents;
     private readonly INotificationService _notifications;
     private readonly ILogger<EmergencyService> _logger;
 
-    public EmergencyService(INotificationService notifications, ILogger<EmergencyService> logger)
+    public EmergencyService(IWatchRepository<Incident> incidents, INotificationService notifications, ILogger<EmergencyService> logger)
     {
+        _incidents = incidents;
         _notifications = notifications;
         _logger = logger;
     }
@@ -40,8 +41,7 @@ public class EmergencyService : IEmergencyService
             Tags = request.Tags ?? []
         };
 
-        if (!_incidents.TryAdd(incident.Id, incident))
-            throw new InvalidOperationException("Failed to create incident.");
+        await _incidents.AddAsync(incident);
 
         // Push notification to emergency topic
         var priority = incident.Severity >= 4 ? NotificationPriority.Critical : NotificationPriority.High;
@@ -70,35 +70,37 @@ public class EmergencyService : IEmergencyService
         return incident;
     }
 
-    public Task<Incident?> GetIncidentAsync(Guid id)
+    public async Task<Incident?> GetIncidentAsync(Guid id)
     {
-        _incidents.TryGetValue(id, out var incident);
-        return Task.FromResult(incident);
+        return await _incidents.GetByIdAsync(id);
     }
 
-    public Task<IncidentListResponse> ListIncidentsAsync(
+    public async Task<IncidentListResponse> ListIncidentsAsync(
         int page = 1, int pageSize = 20,
         IncidentStatus? statusFilter = null,
         EmergencyType? typeFilter = null)
     {
-        var query = _incidents.Values.AsEnumerable();
+        var query = _incidents.Query();
 
         if (statusFilter.HasValue)
             query = query.Where(i => i.Status == statusFilter.Value);
         if (typeFilter.HasValue)
             query = query.Where(i => i.Type == typeFilter.Value);
 
-        var ordered = query.OrderByDescending(i => i.CreatedAt).ToList();
-        var totalCount = ordered.Count;
-        var items = ordered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(i => i.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
 
-        return Task.FromResult(new IncidentListResponse(items, totalCount, page, pageSize));
+        return new IncidentListResponse(items, totalCount, page, pageSize);
     }
 
-    public Task<Incident?> UpdateStatusAsync(Guid id, UpdateIncidentStatusRequest request)
+    public async Task<Incident?> UpdateStatusAsync(Guid id, UpdateIncidentStatusRequest request)
     {
-        if (!_incidents.TryGetValue(id, out var incident))
-            return Task.FromResult<Incident?>(null);
+        var incident = await _incidents.GetByIdAsync(id);
+        if (incident is null) return null;
 
         incident.Status = request.Status;
         incident.UpdatedAt = DateTime.UtcNow;
@@ -106,22 +108,24 @@ public class EmergencyService : IEmergencyService
         if (request.Status == IncidentStatus.Resolved)
             incident.ResolvedAt = DateTime.UtcNow;
 
-        return Task.FromResult<Incident?>(incident);
+        await _incidents.UpdateAsync(incident);
+        return incident;
     }
 
-    public Task<int> ArchiveResolvedAsync(TimeSpan olderThan)
+    public async Task<int> ArchiveResolvedAsync(TimeSpan olderThan)
     {
         var cutoff = DateTime.UtcNow - olderThan;
-        var toArchive = _incidents.Values
+        var toArchive = await _incidents.Query()
             .Where(i => i.Status == IncidentStatus.Resolved && i.ResolvedAt < cutoff)
-            .ToList();
+            .ToListAsync();
 
         foreach (var incident in toArchive)
         {
             incident.Status = IncidentStatus.Archived;
             incident.UpdatedAt = DateTime.UtcNow;
+            await _incidents.UpdateAsync(incident);
         }
 
-        return Task.FromResult(toArchive.Count);
+        return toArchive.Count;
     }
 }

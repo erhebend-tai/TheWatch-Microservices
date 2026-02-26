@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TheWatch.P8.DisasterRelief.Relief;
 
 namespace TheWatch.P8.DisasterRelief.Services;
@@ -16,10 +16,16 @@ public interface IDisasterEventService
 
 public class DisasterEventService : IDisasterEventService
 {
-    private readonly ConcurrentDictionary<Guid, DisasterEvent> _events = new();
-    private readonly ConcurrentDictionary<Guid, EvacuationRoute> _routes = new();
+    private readonly IWatchRepository<DisasterEvent> _events;
+    private readonly IWatchRepository<EvacuationRoute> _routes;
 
-    public Task<DisasterEvent> CreateAsync(CreateDisasterEventRequest request)
+    public DisasterEventService(IWatchRepository<DisasterEvent> events, IWatchRepository<EvacuationRoute> routes)
+    {
+        _events = events;
+        _routes = routes;
+    }
+
+    public async Task<DisasterEvent> CreateAsync(CreateDisasterEventRequest request)
     {
         var evt = new DisasterEvent
         {
@@ -31,53 +37,51 @@ public class DisasterEventService : IDisasterEventService
             Severity = request.Severity
         };
 
-        _events[evt.Id] = evt;
-        return Task.FromResult(evt);
+        return await _events.AddAsync(evt);
     }
 
-    public Task<DisasterEvent?> GetByIdAsync(Guid id)
+    public async Task<DisasterEvent?> GetByIdAsync(Guid id)
     {
-        _events.TryGetValue(id, out var evt);
-        return Task.FromResult(evt);
+        return await _events.GetByIdAsync(id);
     }
 
-    public Task<DisasterEventListResponse> ListAsync(int page, int pageSize, EventStatus? status)
+    public async Task<DisasterEventListResponse> ListAsync(int page, int pageSize, EventStatus? status)
     {
-        var query = _events.Values.AsEnumerable();
+        var query = _events.Query();
 
         if (status.HasValue)
             query = query.Where(e => e.Status == status.Value);
 
-        var total = query.Count();
-        var items = query
+        var total = await query.CountAsync();
+        var items = await query
             .OrderByDescending(e => e.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ToListAsync();
 
-        return Task.FromResult(new DisasterEventListResponse(items, total, page, pageSize));
+        return new DisasterEventListResponse(items, total, page, pageSize);
     }
 
-    public Task<DisasterEvent?> UpdateStatusAsync(Guid id, UpdateEventStatusRequest request)
+    public async Task<DisasterEvent?> UpdateStatusAsync(Guid id, UpdateEventStatusRequest request)
     {
-        if (!_events.TryGetValue(id, out var evt))
-            return Task.FromResult<DisasterEvent?>(null);
+        var evt = await _events.GetByIdAsync(id);
+        if (evt is null) return null;
 
         evt.Status = request.Status;
         evt.UpdatedAt = DateTime.UtcNow;
-        return Task.FromResult<DisasterEvent?>(evt);
+        await _events.UpdateAsync(evt);
+        return evt;
     }
 
-    public Task<List<EvacuationRoute>> GetRoutesAsync(Guid eventId)
+    public async Task<List<EvacuationRoute>> GetRoutesAsync(Guid eventId)
     {
-        var routes = _routes.Values
+        return await _routes.Query()
             .Where(r => r.DisasterEventId == eventId && r.IsActive)
             .OrderBy(r => r.EstimatedTimeMinutes)
-            .ToList();
-        return Task.FromResult(routes);
+            .ToListAsync();
     }
 
-    public Task<EvacuationRoute> AddRouteAsync(CreateEvacuationRouteRequest request)
+    public async Task<EvacuationRoute> AddRouteAsync(CreateEvacuationRouteRequest request)
     {
         var route = new EvacuationRoute
         {
@@ -89,18 +93,21 @@ public class DisasterEventService : IDisasterEventService
             Description = request.Description
         };
 
-        _routes[route.Id] = route;
-        return Task.FromResult(route);
+        return await _routes.AddAsync(route);
     }
 
-    public Task ArchiveResolvedEventsAsync(TimeSpan olderThan)
+    public async Task ArchiveResolvedEventsAsync(TimeSpan olderThan)
     {
         var cutoff = DateTime.UtcNow - olderThan;
-        foreach (var evt in _events.Values.Where(e => e.Status == EventStatus.Resolved && e.UpdatedAt < cutoff))
+        var toArchive = await _events.Query()
+            .Where(e => e.Status == EventStatus.Resolved && e.UpdatedAt < cutoff)
+            .ToListAsync();
+
+        foreach (var evt in toArchive)
         {
             evt.Status = EventStatus.Archived;
             evt.UpdatedAt = DateTime.UtcNow;
+            await _events.UpdateAsync(evt);
         }
-        return Task.CompletedTask;
     }
 }

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TheWatch.P8.DisasterRelief.Relief;
 
 namespace TheWatch.P8.DisasterRelief.Services;
@@ -15,9 +15,14 @@ public interface IShelterService
 
 public class ShelterService : IShelterService
 {
-    private readonly ConcurrentDictionary<Guid, Shelter> _shelters = new();
+    private readonly IWatchRepository<Shelter> _shelters;
 
-    public Task<Shelter> CreateAsync(CreateShelterRequest request)
+    public ShelterService(IWatchRepository<Shelter> shelters)
+    {
+        _shelters = shelters;
+    }
+
+    public async Task<Shelter> CreateAsync(CreateShelterRequest request)
     {
         var shelter = new Shelter
         {
@@ -29,33 +34,35 @@ public class ShelterService : IShelterService
             DisasterEventId = request.DisasterEventId
         };
 
-        _shelters[shelter.Id] = shelter;
-        return Task.FromResult(shelter);
+        return await _shelters.AddAsync(shelter);
     }
 
-    public Task<Shelter?> GetByIdAsync(Guid id)
+    public async Task<Shelter?> GetByIdAsync(Guid id)
     {
-        _shelters.TryGetValue(id, out var shelter);
-        return Task.FromResult(shelter);
+        return await _shelters.GetByIdAsync(id);
     }
 
-    public Task<ShelterListResponse> ListAsync(Guid? disasterEventId, ShelterStatus? status)
+    public async Task<ShelterListResponse> ListAsync(Guid? disasterEventId, ShelterStatus? status)
     {
-        var query = _shelters.Values.AsEnumerable();
+        var query = _shelters.Query();
 
         if (disasterEventId.HasValue)
             query = query.Where(s => s.DisasterEventId == disasterEventId.Value);
         if (status.HasValue)
             query = query.Where(s => s.Status == status.Value);
 
-        var items = query.OrderBy(s => s.Name).ToList();
-        return Task.FromResult(new ShelterListResponse(items, items.Count));
+        var items = await query.OrderBy(s => s.Name).ToListAsync();
+        return new ShelterListResponse(items, items.Count);
     }
 
-    public Task<List<ShelterSummary>> FindNearbyAsync(double lat, double lon, double radiusKm)
+    public async Task<List<ShelterSummary>> FindNearbyAsync(double lat, double lon, double radiusKm)
     {
-        var results = _shelters.Values
+        // Load candidates, then compute Haversine in-memory
+        var candidates = await _shelters.Query()
             .Where(s => s.Status != ShelterStatus.Closed)
+            .ToListAsync();
+
+        return candidates
             .Select(s =>
             {
                 var dist = HaversineKm(lat, lon, s.Location.Latitude, s.Location.Longitude);
@@ -71,14 +78,12 @@ public class ShelterService : IShelterService
                 x.Shelter.CurrentOccupancy,
                 Math.Round(x.Distance, 2)))
             .ToList();
-
-        return Task.FromResult(results);
     }
 
-    public Task<Shelter?> UpdateOccupancyAsync(Guid id, UpdateOccupancyRequest request)
+    public async Task<Shelter?> UpdateOccupancyAsync(Guid id, UpdateOccupancyRequest request)
     {
-        if (!_shelters.TryGetValue(id, out var shelter))
-            return Task.FromResult<Shelter?>(null);
+        var shelter = await _shelters.GetByIdAsync(id);
+        if (shelter is null) return null;
 
         shelter.CurrentOccupancy = request.CurrentOccupancy;
         shelter.UpdatedAt = DateTime.UtcNow;
@@ -89,16 +94,19 @@ public class ShelterService : IShelterService
         else if (shelter.Status == ShelterStatus.Full)
             shelter.Status = ShelterStatus.Open;
 
-        return Task.FromResult<Shelter?>(shelter);
+        await _shelters.UpdateAsync(shelter);
+        return shelter;
     }
 
-    public Task<List<Shelter>> GetOverCapacitySheltersAsync(double threshold)
+    public async Task<List<Shelter>> GetOverCapacitySheltersAsync(double threshold)
     {
-        var results = _shelters.Values
+        var shelters = await _shelters.Query()
             .Where(s => s.Status == ShelterStatus.Open && s.Capacity > 0)
+            .ToListAsync();
+
+        return shelters
             .Where(s => (double)s.CurrentOccupancy / s.Capacity >= threshold)
             .ToList();
-        return Task.FromResult(results);
     }
 
     private static double HaversineKm(double lat1, double lon1, double lat2, double lon2)

@@ -2,18 +2,31 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
-using TheWatch.P5.AuthSecurity.Auth;
+using Microsoft.Extensions.DependencyInjection;
+using TheWatch.P5.AuthSecurity.Models;
+using TheWatch.Shared.Auth;
 using Xunit;
+
+using LoginRequest = TheWatch.P5.AuthSecurity.Auth.LoginRequest;
+using LoginResponse = TheWatch.P5.AuthSecurity.Auth.LoginResponse;
+using RegisterRequest = TheWatch.P5.AuthSecurity.Auth.RegisterRequest;
+using RefreshTokenRequest = TheWatch.P5.AuthSecurity.Auth.RefreshTokenRequest;
+using TokenPair = TheWatch.P5.AuthSecurity.Auth.TokenPair;
+using UserInfo = TheWatch.P5.AuthSecurity.Auth.UserInfo;
+using AssignRoleRequest = TheWatch.P5.AuthSecurity.Auth.AssignRoleRequest;
 
 namespace TheWatch.P5.AuthSecurity.Tests;
 
 public class AuthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
 {
+    private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
 
     public AuthEndpointTests(WebApplicationFactory<Program> factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -27,6 +40,15 @@ public class AuthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
         return result!;
     }
 
+    private async Task PromoteToAdminAsync(Guid userId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<WatchUser>>();
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        user.Should().NotBeNull();
+        await userManager.AddToRoleAsync(user!, WatchRoles.Admin);
+    }
+
     [Fact]
     public async Task Register_ReturnsTokensAndUserInfo()
     {
@@ -37,7 +59,7 @@ public class AuthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
         result.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
         result.User.Email.Should().Be("register@thewatch.dev");
         result.User.DisplayName.Should().Be("Test User");
-        result.User.Roles.Should().Contain("user");
+        result.User.Roles.Should().Contain(WatchRoles.Patient);
     }
 
     [Fact]
@@ -46,7 +68,7 @@ public class AuthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
         var email = "dup@thewatch.dev";
         await RegisterTestUserAsync(email);
 
-        var request = new RegisterRequest(email, "AnotherPass!", "Another User");
+        var request = new RegisterRequest(email, "AnotherPass1!", "Another User");
         var response = await _client.PostAsJsonAsync("/api/auth/register", request);
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
@@ -66,15 +88,16 @@ public class AuthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
         result.Should().NotBeNull();
         result!.AccessToken.Should().NotBeNullOrEmpty();
         result.User.Email.Should().Be(email);
+        result.MfaRequired.Should().BeFalse();
     }
 
     [Fact]
     public async Task Login_WrongPassword_ReturnsUnauthorized()
     {
         var email = "wrongpw@thewatch.dev";
-        await RegisterTestUserAsync(email, "CorrectPass!");
+        await RegisterTestUserAsync(email, "CorrectPass1!");
 
-        var loginRequest = new LoginRequest(email, "WrongPass!");
+        var loginRequest = new LoginRequest(email, "WrongPass1!");
         var response = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -82,7 +105,7 @@ public class AuthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Login_NonExistentUser_ReturnsUnauthorized()
     {
-        var loginRequest = new LoginRequest("nobody@thewatch.dev", "whatever");
+        var loginRequest = new LoginRequest("nobody@thewatch.dev", "Whatever1!");
         var response = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -112,7 +135,7 @@ public class AuthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task Refresh_UsedToken_ReturnsUnauthorized()
+    public async Task Refresh_UsedToken_ReturnsUnauthorized_CompromiseDetection()
     {
         var registered = await RegisterTestUserAsync("doublerefresh@thewatch.dev");
 
@@ -121,7 +144,7 @@ public class AuthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
         var response1 = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
         response1.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Second refresh with same token — should fail (revoked)
+        // Second refresh with same token — should fail (revoked, compromise detection)
         var response2 = await _client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
         response2.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -149,13 +172,59 @@ public class AuthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task Users_WithValidJwt_ReturnsUserList()
+    public async Task Users_WithAdminJwt_ReturnsUserList()
     {
-        var registered = await RegisterTestUserAsync("listuser@thewatch.dev");
+        // Register a user and promote to admin
+        var registered = await RegisterTestUserAsync("adminuser@thewatch.dev");
+        await PromoteToAdminAsync(registered.User.Id);
+
+        // Re-login to get JWT with Admin role claim
+        var loginRequest = new LoginRequest("adminuser@thewatch.dev", "SecurePass123!");
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        var adminLogin = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/users");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminLogin!.AccessToken);
+        var response = await _client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Users_WithPatientJwt_ReturnsForbidden()
+    {
+        var registered = await RegisterTestUserAsync("patientuser@thewatch.dev");
 
         var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/users");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", registered.AccessToken);
         var response = await _client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task RoleAssign_WithAdminJwt_AssignsRole()
+    {
+        // Register admin
+        var admin = await RegisterTestUserAsync("roleadmin@thewatch.dev");
+        await PromoteToAdminAsync(admin.User.Id);
+        var adminLogin = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest("roleadmin@thewatch.dev", "SecurePass123!"));
+        var adminTokens = await adminLogin.Content.ReadFromJsonAsync<LoginResponse>();
+
+        // Register target user
+        var target = await RegisterTestUserAsync("roletarget@thewatch.dev");
+
+        // Assign Responder role
+        var assignRequest = new AssignRoleRequest(target.User.Id, WatchRoles.Responder);
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/roles/assign");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminTokens!.AccessToken);
+        request.Content = JsonContent.Create(assignRequest);
+        var response = await _client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task EulaCurrent_ReturnsSeededVersion()
+    {
+        var response = await _client.GetAsync("/api/eula/current");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 }

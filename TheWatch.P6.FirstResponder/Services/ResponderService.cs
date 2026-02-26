@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TheWatch.P6.FirstResponder.Responders;
 
 namespace TheWatch.P6.FirstResponder.Services;
@@ -16,9 +16,14 @@ public interface IResponderService
 
 public class ResponderService : IResponderService
 {
-    private readonly ConcurrentDictionary<Guid, Responder> _responders = new();
+    private readonly IWatchRepository<Responder> _responders;
 
-    public Task<Responder> RegisterAsync(RegisterResponderRequest request)
+    public ResponderService(IWatchRepository<Responder> responders)
+    {
+        _responders = responders;
+    }
+
+    public async Task<Responder> RegisterAsync(RegisterResponderRequest request)
     {
         var responder = new Responder
         {
@@ -31,39 +36,37 @@ public class ResponderService : IResponderService
             MaxResponseRadiusKm = request.MaxResponseRadiusKm
         };
 
-        _responders[responder.Id] = responder;
-        return Task.FromResult(responder);
+        return await _responders.AddAsync(responder);
     }
 
-    public Task<Responder?> GetByIdAsync(Guid id)
+    public async Task<Responder?> GetByIdAsync(Guid id)
     {
-        _responders.TryGetValue(id, out var responder);
-        return Task.FromResult(responder);
+        return await _responders.GetByIdAsync(id);
     }
 
-    public Task<ResponderListResponse> ListAsync(int page, int pageSize, ResponderType? type, ResponderStatus? status)
+    public async Task<ResponderListResponse> ListAsync(int page, int pageSize, ResponderType? type, ResponderStatus? status)
     {
-        var query = _responders.Values.Where(r => r.IsActive).AsEnumerable();
+        var query = _responders.Query().Where(r => r.IsActive);
 
         if (type.HasValue)
             query = query.Where(r => r.Type == type.Value);
         if (status.HasValue)
             query = query.Where(r => r.Status == status.Value);
 
-        var total = query.Count();
-        var items = query
+        var total = await query.CountAsync();
+        var items = await query
             .OrderByDescending(r => r.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ToListAsync();
 
-        return Task.FromResult(new ResponderListResponse(items, total, page, pageSize));
+        return new ResponderListResponse(items, total, page, pageSize);
     }
 
-    public Task<Responder?> UpdateLocationAsync(Guid id, UpdateLocationRequest request)
+    public async Task<Responder?> UpdateLocationAsync(Guid id, UpdateLocationRequest request)
     {
-        if (!_responders.TryGetValue(id, out var responder))
-            return Task.FromResult<Responder?>(null);
+        var responder = await _responders.GetByIdAsync(id);
+        if (responder is null) return null;
 
         responder.LastKnownLocation = new GeoLocation(
             request.Latitude,
@@ -73,26 +76,33 @@ public class ResponderService : IResponderService
         responder.LocationUpdatedAt = DateTime.UtcNow;
         responder.UpdatedAt = DateTime.UtcNow;
 
-        return Task.FromResult<Responder?>(responder);
+        await _responders.UpdateAsync(responder);
+        return responder;
     }
 
-    public Task<Responder?> UpdateStatusAsync(Guid id, UpdateStatusRequest request)
+    public async Task<Responder?> UpdateStatusAsync(Guid id, UpdateStatusRequest request)
     {
-        if (!_responders.TryGetValue(id, out var responder))
-            return Task.FromResult<Responder?>(null);
+        var responder = await _responders.GetByIdAsync(id);
+        if (responder is null) return null;
 
         responder.Status = request.Status;
         responder.UpdatedAt = DateTime.UtcNow;
 
-        return Task.FromResult<Responder?>(responder);
+        await _responders.UpdateAsync(responder);
+        return responder;
     }
 
-    public Task<List<ResponderSummary>> FindNearbyAsync(NearbyResponderQuery query)
+    public async Task<List<ResponderSummary>> FindNearbyAsync(NearbyResponderQuery query)
     {
-        var results = _responders.Values
-            .Where(r => r.IsActive && r.LastKnownLocation is not null)
+        // Load candidates from DB, then do Haversine in-memory
+        var candidates = await _responders.Query()
+            .Where(r => r.IsActive)
             .Where(r => !query.AvailableOnly || r.Status == ResponderStatus.Available)
             .Where(r => !query.Type.HasValue || r.Type == query.Type.Value)
+            .ToListAsync();
+
+        return candidates
+            .Where(r => r.LastKnownLocation is not null)
             .Select(r =>
             {
                 var dist = HaversineKm(
@@ -110,19 +120,18 @@ public class ResponderService : IResponderService
                 Math.Round(x.Distance, 2),
                 x.Responder.LastKnownLocation))
             .ToList();
-
-        return Task.FromResult(results);
     }
 
-    public Task<bool> DeactivateAsync(Guid id)
+    public async Task<bool> DeactivateAsync(Guid id)
     {
-        if (!_responders.TryGetValue(id, out var responder))
-            return Task.FromResult(false);
+        var responder = await _responders.GetByIdAsync(id);
+        if (responder is null) return false;
 
         responder.IsActive = false;
         responder.Status = ResponderStatus.OffDuty;
         responder.UpdatedAt = DateTime.UtcNow;
-        return Task.FromResult(true);
+        await _responders.UpdateAsync(responder);
+        return true;
     }
 
     private static double HaversineKm(double lat1, double lon1, double lat2, double lon2)

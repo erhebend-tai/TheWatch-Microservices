@@ -27,15 +27,19 @@ builder.Services.AddHangfire(config =>
 builder.Services.AddHangfireServer();
 
 // Services
-builder.Services.AddSingleton<IDisasterEventService, DisasterEventService>();
-builder.Services.AddSingleton<IShelterService, ShelterService>();
-builder.Services.AddSingleton<IResourceService, ResourceService>();
+builder.Services.AddScoped<IDisasterEventService, DisasterEventService>();
+builder.Services.AddScoped<IShelterService, ShelterService>();
+builder.Services.AddScoped<IResourceService, ResourceService>();
+builder.AddWatchSecurity();
 
 var app = builder.Build();
 
 app.UseCors();
+app.UseWatchSecurity();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire");
 
 // Recurring Hangfire jobs
@@ -73,37 +77,37 @@ app.MapPost("/api/events", async (CreateDisasterEventRequest request, IDisasterE
 {
     var evt = await svc.CreateAsync(request);
     return Results.Created($"/api/events/{evt.Id}", evt);
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapGet("/api/events", async (IDisasterEventService svc, int? page, int? pageSize, EventStatus? status) =>
 {
     var result = await svc.ListAsync(page ?? 1, pageSize ?? 20, status);
     return Results.Ok(result);
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapGet("/api/events/{id:guid}", async (Guid id, IDisasterEventService svc) =>
 {
     var evt = await svc.GetByIdAsync(id);
     return evt is not null ? Results.Ok(evt) : Results.NotFound();
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapPut("/api/events/{id:guid}/status", async (Guid id, UpdateEventStatusRequest request, IDisasterEventService svc) =>
 {
     var evt = await svc.UpdateStatusAsync(id, request);
     return evt is not null ? Results.Ok(evt) : Results.NotFound();
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapGet("/api/events/{id:guid}/routes", async (Guid id, IDisasterEventService svc) =>
 {
     var routes = await svc.GetRoutesAsync(id);
     return Results.Ok(routes);
-});
+}).RequireAuthorization("Authenticated");
 
 app.MapPost("/api/events/{id:guid}/routes", async (Guid id, CreateEvacuationRouteRequest request, IDisasterEventService svc) =>
 {
     var route = await svc.AddRouteAsync(request with { DisasterEventId = id });
     return Results.Created($"/api/events/{id}/routes/{route.Id}", route);
-});
+}).RequireAuthorization("ResponderAccess");
 
 // === Shelter Endpoints ===
 
@@ -111,7 +115,7 @@ app.MapPost("/api/shelters", async (CreateShelterRequest request, IShelterServic
 {
     var shelter = await svc.CreateAsync(request);
     return Results.Created($"/api/shelters/{shelter.Id}", shelter);
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.MapGet("/api/shelters", async (IShelterService svc, Guid? disasterEventId, ShelterStatus? status) =>
 {
@@ -129,7 +133,7 @@ app.MapPut("/api/shelters/{id:guid}/occupancy", async (Guid id, UpdateOccupancyR
 {
     var shelter = await svc.UpdateOccupancyAsync(id, request);
     return shelter is not null ? Results.Ok(shelter) : Results.NotFound();
-});
+}).RequireAuthorization("ResponderAccess");
 
 // === Resource Endpoints ===
 
@@ -155,7 +159,7 @@ app.MapGet("/api/resources/requests", async (IResourceService svc, RequestStatus
 {
     var requests = await svc.ListRequestsAsync(status, disasterEventId);
     return Results.Ok(requests);
-});
+}).RequireAuthorization("ResponderAccess");
 
 app.Run();
 
