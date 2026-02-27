@@ -1,0 +1,285 @@
+name: Mobile Test Coverage
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "TheWatch.Mobile/**"
+      - "TheWatch.Mobile.Tests/**"
+      - "TheWatch.Generators/MobileTestGenerator.cs"
+  push:
+    branches: [main, develop]
+    paths:
+      - "TheWatch.Mobile/**"
+      - "TheWatch.Mobile.Tests/**"
+      - "TheWatch.Generators/MobileTestGenerator.cs"
+
+concurrency:
+  group: mobile-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  DOTNET_QUALITY: "preview"
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  # ===========================================================
+  # Verify every mobile service has a corresponding test file
+  # ===========================================================
+  coverage-check:
+    name: Test Coverage Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify mobile service test coverage
+        run: |
+          echo "=== Mobile Service Test Coverage Check ==="
+          echo ""
+
+          SERVICES_DIR="TheWatch.Mobile/Services"
+          AUTH_DIR="TheWatch.Mobile/Auth"
+          DATA_DIR="TheWatch.Mobile/Data"
+          HELPERS_DIR="TheWatch.Mobile/Helpers"
+          TESTS_DIR="TheWatch.Mobile.Tests"
+
+          MISSING=()
+          TOTAL=0
+          COVERED=0
+
+          # Helper function: check if test file exists with any naming convention
+          # e.g., BatteryMonitorService.cs → BatteryMonitorServiceTests.cs OR BatteryMonitorTests.cs
+          find_test_file() {
+            local filename="$1"
+            local test_file="$TESTS_DIR/${filename}Tests.cs"
+
+            if [ -f "$test_file" ]; then
+              echo "$test_file"
+              return 0
+            fi
+
+            # Also check without "Service" suffix
+            local alt_name="${filename%Service}"
+            if [ "$alt_name" != "$filename" ]; then
+              local alt_test="$TESTS_DIR/${alt_name}Tests.cs"
+              if [ -f "$alt_test" ]; then
+                echo "$alt_test"
+                return 0
+              fi
+            fi
+
+            return 1
+          }
+
+          # Check Services
+          for service_file in "$SERVICES_DIR"/*.cs; do
+            [ -f "$service_file" ] || continue
+            filename=$(basename "$service_file" .cs)
+
+            # Skip interfaces
+            if [[ "$filename" == I* ]] && grep -q "^public interface" "$service_file"; then
+              continue
+            fi
+
+            TOTAL=$((TOTAL + 1))
+            test_file=$(find_test_file "$filename")
+
+            if [ $? -eq 0 ]; then
+              COVERED=$((COVERED + 1))
+              echo "✅ $filename → $test_file"
+            else
+              MISSING+=("$filename")
+              echo "❌ $filename — MISSING test file"
+            fi
+          done
+
+          # Check Auth
+          for auth_file in "$AUTH_DIR"/*.cs; do
+            [ -f "$auth_file" ] || continue
+            filename=$(basename "$auth_file" .cs)
+            TOTAL=$((TOTAL + 1))
+            test_file=$(find_test_file "$filename")
+
+            if [ $? -eq 0 ]; then
+              COVERED=$((COVERED + 1))
+              echo "✅ $filename → $test_file"
+            else
+              MISSING+=("$filename")
+              echo "❌ $filename — MISSING test file"
+            fi
+          done
+
+          # Check Data
+          for data_file in "$DATA_DIR"/*.cs; do
+            [ -f "$data_file" ] || continue
+            filename=$(basename "$data_file" .cs)
+            TOTAL=$((TOTAL + 1))
+            test_file=$(find_test_file "$filename")
+
+            if [ $? -eq 0 ]; then
+              COVERED=$((COVERED + 1))
+              echo "✅ $filename → $test_file"
+            else
+              MISSING+=("$filename")
+              echo "❌ $filename — MISSING test file"
+            fi
+          done
+
+          # Check Helpers
+          for helper_file in "$HELPERS_DIR"/*.cs; do
+            [ -f "$helper_file" ] || continue
+            filename=$(basename "$helper_file" .cs)
+            TOTAL=$((TOTAL + 1))
+            test_file=$(find_test_file "$filename")
+
+            if [ $? -eq 0 ]; then
+              COVERED=$((COVERED + 1))
+              echo "✅ $filename → $test_file"
+            else
+              MISSING+=("$filename")
+              echo "❌ $filename — MISSING test file"
+            fi
+          done
+
+          echo ""
+          echo "=== Coverage Summary ==="
+          echo "Total source files: $TOTAL"
+          echo "Files with tests:   $COVERED"
+          echo "Missing tests:      ${#MISSING[@]}"
+
+          if [ $TOTAL -gt 0 ]; then
+            PERCENTAGE=$((COVERED * 100 / TOTAL))
+            echo "Coverage:           ${PERCENTAGE}%"
+          fi
+
+          echo ""
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "::error::Missing test files for: ${MISSING[*]}"
+            echo ""
+            echo "To generate test stubs, add the service name to MobileTestGenerator.cs"
+            echo "in TheWatch.Generators and rebuild the test project."
+            exit 1
+          else
+            echo "✅ All mobile services have corresponding test files!"
+          fi
+
+  # ===========================================================
+  # Build and run mobile tests
+  # ===========================================================
+  test:
+    name: Run Mobile Tests
+    runs-on: ubuntu-latest
+    needs: coverage-check
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          dotnet-quality: ${{ env.DOTNET_QUALITY }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config', 'Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Setup Hangfire Pro local source
+        run: |
+          mkdir -p /tmp/hangfire-local
+          echo "Hangfire Pro packages must be cached in CI. Skipping if not available."
+        continue-on-error: true
+
+      - name: Build test project
+        run: dotnet build TheWatch.Mobile.Tests/TheWatch.Mobile.Tests.csproj -c Release
+
+      - name: Run mobile tests
+        run: |
+          dotnet test TheWatch.Mobile.Tests/TheWatch.Mobile.Tests.csproj \
+            --configuration Release \
+            --no-build \
+            --verbosity normal \
+            --logger "trx;LogFileName=mobile-test-results.trx" \
+            --collect:"XPlat Code Coverage"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-test-results
+          path: |
+            **/mobile-test-results.trx
+            **/coverage.cobertura.xml
+          retention-days: 7
+
+  # ===========================================================
+  # Generate test stubs for new services (informational)
+  # ===========================================================
+  generate-report:
+    name: Test Coverage Report
+    runs-on: ubuntu-latest
+    needs: coverage-check
+    if: always()
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate coverage report
+        run: |
+          echo "## 📊 Mobile Test Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          TESTS_DIR="TheWatch.Mobile.Tests"
+          TOTAL=0
+          COVERED=0
+
+          # Helper: find test file with flexible naming
+          find_test() {
+            local name="$1"
+            [ -f "$TESTS_DIR/${name}Tests.cs" ] && echo "${name}Tests.cs" && return 0
+            local alt="${name%Service}"
+            [ "$alt" != "$name" ] && [ -f "$TESTS_DIR/${alt}Tests.cs" ] && echo "${alt}Tests.cs" && return 0
+            return 1
+          }
+
+          echo "| Source File | Test File | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
+
+          for service_file in TheWatch.Mobile/Services/*.cs TheWatch.Mobile/Auth/*.cs TheWatch.Mobile/Data/*.cs TheWatch.Mobile/Helpers/*.cs; do
+            [ -f "$service_file" ] || continue
+            filename=$(basename "$service_file" .cs)
+
+            # Skip interfaces
+            if [[ "$filename" == I* ]] && grep -q "^public interface" "$service_file" 2>/dev/null; then
+              continue
+            fi
+
+            TOTAL=$((TOTAL + 1))
+            test_file=$(find_test "$filename")
+
+            if [ $? -eq 0 ]; then
+              COVERED=$((COVERED + 1))
+              TEST_COUNT=$(grep -c '\[Fact\]\|\[Theory\]' "$TESTS_DIR/$test_file" 2>/dev/null || echo "0")
+              echo "| \`$filename\` | \`$test_file\` | ✅ ($TEST_COUNT tests) |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| \`$filename\` | — | ❌ Missing |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ $TOTAL -gt 0 ]; then
+            PERCENTAGE=$((COVERED * 100 / TOTAL))
+            echo "**Coverage: $COVERED/$TOTAL files ($PERCENTAGE%)**" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Generated by MobileTestGenerator — add new services to \`TheWatch.Generators/MobileTestGenerator.cs\` to auto-track coverage._" >> $GITHUB_STEP_SUMMARY
