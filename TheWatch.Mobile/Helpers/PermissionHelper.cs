@@ -3,9 +3,11 @@ using Microsoft.Extensions.Logging;
 namespace TheWatch.Mobile.Helpers;
 
 /// <summary>
-/// Unified speech and microphone permission handling across platforms.
-/// Android: RECORD_AUDIO manifest permission
-/// iOS: SFSpeechRecognizer.RequestAuthorization() + Microphone
+/// Unified speech, microphone, and location permission handling across platforms.
+/// TheWatch depends on active voice tracking for safety and security — permissions
+/// are requested with rationale explaining this dependency.
+/// Android: RECORD_AUDIO + ACCESS_BACKGROUND_LOCATION manifest permissions
+/// iOS: SFSpeechRecognizer.RequestAuthorization() + Microphone + Location Always
 /// Windows: Speech capability in manifest
 /// </summary>
 public static class PermissionHelper
@@ -23,7 +25,7 @@ public static class PermissionHelper
         {
             if (Permissions.ShouldShowRationale<Permissions.Microphone>())
             {
-                await ShowRationaleAsync();
+                await ShowMicrophoneRationaleAsync();
             }
 
             micStatus = await Permissions.RequestAsync<Permissions.Microphone>();
@@ -54,15 +56,78 @@ public static class PermissionHelper
         return true;
     }
 
-    private static async Task ShowRationaleAsync()
+    /// <summary>
+    /// Request Location Always permission required for continuous safety monitoring.
+    /// TheWatch depends on active voice tracking for safety and security, which
+    /// requires persistent location access even when the app is backgrounded or
+    /// the device is locked.
+    /// </summary>
+    public static async Task<bool> RequestLocationAlwaysPermissionAsync(ILogger? logger = null)
     {
-        // Display explanation of why perpetual listening is needed
+        var status = await Permissions.CheckStatusAsync<Permissions.LocationAlways>();
+
+        if (status != PermissionStatus.Granted)
+        {
+            if (Permissions.ShouldShowRationale<Permissions.LocationAlways>())
+            {
+                await ShowLocationRationaleAsync();
+            }
+
+            status = await Permissions.RequestAsync<Permissions.LocationAlways>();
+        }
+
+        if (status != PermissionStatus.Granted)
+        {
+            logger?.LogWarning("Location Always permission denied");
+            return false;
+        }
+
+        logger?.LogInformation("Location Always permission granted");
+        return true;
+    }
+
+    /// <summary>
+    /// Request all permissions needed for full TheWatch operation: microphone,
+    /// speech recognition, and location always. TheWatch depends on active voice
+    /// tracking for safety and security — all permissions are essential for
+    /// continuous monitoring including from the lockscreen.
+    /// </summary>
+    public static async Task<bool> RequestAllPermissionsAsync(ILogger? logger = null)
+    {
+        var speechGranted = await RequestSpeechPermissionsAsync(logger);
+        var locationGranted = await RequestLocationAlwaysPermissionAsync(logger);
+
+        if (speechGranted && locationGranted)
+        {
+            logger?.LogInformation("All permissions granted for active voice tracking and location monitoring");
+        }
+
+        return speechGranted && locationGranted;
+    }
+
+    private static async Task ShowMicrophoneRationaleAsync()
+    {
         if (Application.Current?.MainPage is not null)
         {
             await Application.Current.MainPage.DisplayAlert(
                 "Microphone Permission Required",
-                "TheWatch needs microphone access to listen for emergency activation phrases. " +
-                "This enables hands-free emergency reporting when you say your configured activation phrase.",
+                "TheWatch depends on active voice tracking for safety and security. " +
+                "Microphone access is needed to listen for emergency activation phrases, " +
+                "enabling hands-free incident reporting even from the lockscreen.",
+                "OK");
+        }
+    }
+
+    private static async Task ShowLocationRationaleAsync()
+    {
+        if (Application.Current?.MainPage is not null)
+        {
+            await Application.Current.MainPage.DisplayAlert(
+                "Location Permission Required",
+                "TheWatch depends on active voice tracking for safety and security. " +
+                "Continuous location access (\"Always\") is required to geo-tag incidents " +
+                "and enable real-time responder positioning during emergencies, " +
+                "including when the app is in the background or the device is locked.",
                 "OK");
         }
     }

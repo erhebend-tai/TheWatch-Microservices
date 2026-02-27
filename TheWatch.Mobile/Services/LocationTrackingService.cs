@@ -52,10 +52,31 @@ public class LocationTrackingService : IDisposable
 
         if (_isTracking) return;
 
-        var status = await Permissions.RequestAsync<Permissions.LocationAlways>();
+        // Location ALWAYS is required — TheWatch depends on active voice tracking
+        // for safety and security, which requires continuous location monitoring
+        // including from the lockscreen and background.
+        var status = await Permissions.CheckStatusAsync<Permissions.LocationAlways>();
         if (status != PermissionStatus.Granted)
         {
-            // Fall back to when-in-use
+            if (Permissions.ShouldShowRationale<Permissions.LocationAlways>())
+            {
+                if (Application.Current?.MainPage is not null)
+                {
+                    await Application.Current.MainPage.DisplayAlert(
+                        "Location Permission Required",
+                        "TheWatch depends on active voice tracking for safety and security. " +
+                        "Continuous location access (\"Always\") is required to geo-tag incidents " +
+                        "and enable real-time responder positioning, including when the device is locked.",
+                        "OK");
+                }
+            }
+
+            status = await Permissions.RequestAsync<Permissions.LocationAlways>();
+        }
+
+        if (status != PermissionStatus.Granted)
+        {
+            _logger.LogWarning("Location Always permission denied — falling back to when-in-use");
             status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
             if (status != PermissionStatus.Granted)
             {

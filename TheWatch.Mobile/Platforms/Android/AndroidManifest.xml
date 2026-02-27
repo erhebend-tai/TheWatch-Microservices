@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <application
+    android:allowBackup="true"
+    android:supportsRtl="true">
+  </application>
+
+  <uses-permission android:name="android.permission.INTERNET" />
+
+  <!--
+    Location permissions — Location ALWAYS is required because TheWatch depends on
+    active voice tracking for safety and security. Continuous background location
+    enables real-time responder positioning during emergencies.
+  -->
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+  <!--
+    Microphone and audio — TheWatch depends on active voice tracking for safety and
+    security. Perpetual microphone access allows hands-free emergency activation
+    phrase detection even when the device is locked.
+  -->
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+  <!--
+    Foreground service permissions — Required for Android 14+ to maintain active
+    voice tracking and location monitoring from the background/lockscreen.
+    These services are essential for continuous safety and security monitoring.
+  -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+  <!-- Keep the device awake for continuous monitoring from lockscreen -->
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <!-- Receive boot events to restart safety monitoring after device reboot -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+</manifest>
