@@ -49,28 +49,28 @@ The authorization boundary encompasses:
 
 | Control | Requirement | Implementation | Status | Evidence |
 |---------|-------------|----------------|--------|----------|
-| **3.1.1** | Limit system access to authorized users | JWT bearer authentication required on all endpoints; anonymous access prohibited except `/login`, `/register`, `/refresh` | **[IMPLEMENTED]** | `TheWatch.Admin.RestAPI/Program.cs`, `TheWatch.Shared/Security/WatchAuthExtensions.cs` |
+| **3.1.1** | Limit system access to authorized users | JWT bearer authentication required on all endpoints; anonymous access prohibited except `/login`, `/register`, `/refresh` | **[IMPLEMENTED]** | `TheWatch.Admin.RestAPI/Program.cs`, `TheWatch.Shared/Auth/WatchAuthExtensions.cs` |
 | **3.1.2** | Limit system access to authorized functions | RBAC with 6 policies: AdminOnly, ResponderAccess, DoctorAccess, FamilyAccess, PatientAccess, Authenticated | **[IMPLEMENTED]** | `TheWatch.Admin.RestAPI/Program.cs` (authorization policies) |
-| **3.1.3** | Control CUI flow per authorizations | CUI marking middleware applies classification headers per route; data classification matrix defines per-entity CUI categories | **[IMPLEMENTED]** | `TheWatch.Shared/Middleware/CuiMarkingMiddleware.cs`, `docs/data-classification-matrix.md` |
+| **3.1.3** | Control CUI flow per authorizations | CUI marking middleware applies classification headers per route; data classification matrix defines per-entity CUI categories | **[IMPLEMENTED]** | `TheWatch.Shared/Security/CuiMarkingMiddleware.cs`, `docs/data-classification-matrix.md` |
 | **3.1.4** | Separate duties of individuals | Role-based separation: Admin, Responder, Doctor, FamilyMember, Patient, ServiceAccount; no single role spans all functions | **[IMPLEMENTED]** | `docs/policies/access-control-policy.md` |
 | **3.1.5** | Employ least privilege | Service accounts scoped per microservice; user tokens contain only assigned roles; IDOR prevention via `CallerCanAccessUser()` | **[IMPLEMENTED]** | `TheWatch.Admin.RestAPI/Controllers/AuthSecurityController.cs` |
 | **3.1.6** | Use non-privileged accounts for non-security functions | Containers run as non-root user `appuser` (UID 1001); service accounts have minimal database permissions | **[IMPLEMENTED]** | `TheWatch.P1.CoreGateway/Dockerfile` (DISA STIG V-222425) |
 | **3.1.7** | Prevent non-privileged users from executing privileged functions | `[Authorize(Policy = "AdminOnly")]` enforced on administrative endpoints; role escalation requires admin approval | **[IMPLEMENTED]** | `TheWatch.Admin.RestAPI/Controllers/` |
 | **3.1.8** | Limit unsuccessful login attempts | 3-attempt lockout (15 min); 10 attempts (60 min); 15+ attempts trigger account deactivation | **[IMPLEMENTED]** | `TheWatch.P5.AuthSecurity/` |
 | **3.1.9** | Provide privacy and security notices | EULA versioned acceptance tracking with IP logging; privacy notice displayed before data collection | **[IMPLEMENTED]** | `TheWatch.P5.AuthSecurity/` (EULA endpoints) |
-| **3.1.10** | Use session lock after inactivity | JWT tokens expire after 30 minutes (sliding window); refresh tokens valid 8 hours; automatic session termination | **[IMPLEMENTED]** | `TheWatch.Shared/Security/WatchAuthExtensions.cs` |
+| **3.1.10** | Use session lock after inactivity | JWT tokens expire after 30 minutes (sliding window); refresh tokens valid 8 hours; automatic session termination | **[IMPLEMENTED]** | `TheWatch.Shared/Auth/WatchAuthExtensions.cs` |
 | **3.1.11** | Terminate sessions after defined conditions | Token revocation on logout; session invalidation on password change; device trust score recalculation | **[IMPLEMENTED]** | `TheWatch.P5.AuthSecurity/` |
-| **3.1.12** | Monitor and control remote access | TLS 1.2+ enforced on all connections; rate limiting (100/min global, 10/min auth); CORS whitelist | **[IMPLEMENTED]** | `TheWatch.Shared/Extensions/KestrelHardeningExtensions.cs` |
-| **3.1.13** | Employ cryptographic mechanisms for remote access | TLS 1.2/1.3 only; no TLS 1.0/1.1; HSTS with 365-day max-age and preload | **[IMPLEMENTED]** | `TheWatch.Shared/Extensions/KestrelHardeningExtensions.cs` |
+| **3.1.12** | Monitor and control remote access | TLS 1.2+ enforced on all connections; rate limiting (100/min global, 10/min auth); CORS whitelist | **[IMPLEMENTED]** | `TheWatch.Shared/Security/WatchKestrelExtensions.cs` |
+| **3.1.13** | Employ cryptographic mechanisms for remote access | TLS 1.2/1.3 only; no TLS 1.0/1.1; HSTS with 365-day max-age and preload | **[IMPLEMENTED]** | `TheWatch.Shared/Security/WatchKestrelExtensions.cs` |
 | **3.1.14** | Route remote access via managed access points | All traffic routes through P1 CoreGateway; no direct microservice access from external networks | **[IMPLEMENTED]** | `TheWatch.P1.CoreGateway/`, `docker-compose.yml` |
 | **3.1.15** | Authorize remote execution of privileged commands | Admin CLI requires authentication; all admin operations logged with user identity | **[IMPLEMENTED]** | `TheWatch.Admin.CLI/` |
 | **3.1.16** | Authorize wireless access | Mobile app authenticates via JWT; BLE mesh requires device registration | **[IMPLEMENTED]** | `TheWatch.Mobile/`, `TheWatch.P3.MeshNetwork/` |
-| **3.1.17** | Protect wireless access using authentication and encryption | TLS 1.2+ for all wireless communications; WPA3 recommended in deployment guide | **[IMPLEMENTED]** | `TheWatch.Shared/Extensions/KestrelHardeningExtensions.cs` |
+| **3.1.17** | Protect wireless access using authentication and encryption | TLS 1.2+ for all wireless communications; WPA3 recommended in deployment guide | **[IMPLEMENTED]** | `TheWatch.Shared/Security/WatchKestrelExtensions.cs` |
 | **3.1.18** | Control connection of mobile devices | Device trust scoring (fingerprint + IP + geolocation); biometric gate for sensitive operations | **[IMPLEMENTED]** | `TheWatch.P5.AuthSecurity/`, `TheWatch.Mobile/Services/BiometricGateService.cs` |
 | **3.1.19** | Encrypt CUI on mobile devices | SQLite local database with encryption; offline queue encrypted at rest | **[PARTIAL]** | `TheWatch.Mobile/Data/WatchLocalDbContext.cs` |
 | **3.1.20** | Verify and control connections to external systems | Typed HTTP clients with explicit endpoint configuration; no dynamic service discovery from untrusted sources | **[IMPLEMENTED]** | `TheWatch.Contracts.*/` |
 | **3.1.21** | Limit use of portable storage | Mobile evidence collection requires chain-of-custody logging; no arbitrary file export | **[IMPLEMENTED]** | `TheWatch.Mobile/Services/ChainOfCustodyService.cs` |
-| **3.1.22** | Control CUI posted to public systems | No public-facing CUI endpoints; all CUI-classified routes require authentication | **[IMPLEMENTED]** | `TheWatch.Shared/Middleware/CuiMarkingMiddleware.cs` |
+| **3.1.22** | Control CUI posted to public systems | No public-facing CUI endpoints; all CUI-classified routes require authentication | **[IMPLEMENTED]** | `TheWatch.Shared/Security/CuiMarkingMiddleware.cs` |
 
 ### 2.2 Awareness and Training (AT) — NIST 800-171 §3.2
 
@@ -88,7 +88,7 @@ The authorization boundary encompasses:
 | **3.3.2** | Ensure actions can be traced to individual users | JWT claims include user ID, roles, device fingerprint; all API calls logged with identity | **[IMPLEMENTED]** | `TheWatch.Admin.RestAPI/Program.cs` |
 | **3.3.3** | Review and analyze audit logs | Audit log page in Admin Portal; weekly/monthly/quarterly review schedule defined | **[IMPLEMENTED]** | `TheWatch.Admin/`, `docs/policies/audit-accountability-policy.md` |
 | **3.3.4** | Alert on audit process failure | Health check endpoints monitor logging pipeline; Hangfire monitors background job execution | **[PARTIAL]** | `TheWatch.Shared/` (health checks) |
-| **3.3.5** | Correlate audit review and analysis | Correlation IDs propagated across service boundaries; structured logging enables cross-service tracing | **[IMPLEMENTED]** | `TheWatch.Shared/Middleware/` (Correlation ID middleware) |
+| **3.3.5** | Correlate audit review and analysis | Correlation IDs propagated across service boundaries; structured logging enables cross-service tracing | **[IMPLEMENTED]** | `TheWatch.Shared/Security/` (Correlation ID middleware) |
 | **3.3.6** | Provide audit record reduction and report generation | Structured JSON logging enables filtering/aggregation; admin dashboard provides summary views | **[IMPLEMENTED]** | `TheWatch.Admin/Pages/AuditLog.razor` |
 | **3.3.7** | Provide system clock synchronization | Container orchestration provides NTP synchronization; UTC timestamps in all audit records | **[IMPLEMENTED]** | Kubernetes/Docker NTP |
 | **3.3.8** | Protect audit information from unauthorized access | Audit logs stored in service databases with RBAC; `AdminOnly` policy on audit endpoints | **[IMPLEMENTED]** | `docs/policies/audit-accountability-policy.md` |
@@ -99,7 +99,7 @@ The authorization boundary encompasses:
 | Control | Requirement | Implementation | Status | Evidence |
 |---------|-------------|----------------|--------|----------|
 | **3.4.1** | Establish and maintain baseline configurations | `Directory.Build.props` defines central build settings; `Directory.Packages.props` for NuGet versioning; Docker base images pinned | **[IMPLEMENTED]** | `Directory.Build.props`, `Directory.Packages.props` |
-| **3.4.2** | Establish and enforce security configuration settings | Kestrel hardening extensions enforce TLS, header limits, timeout settings; DISA STIG-compliant container config | **[IMPLEMENTED]** | `TheWatch.Shared/Extensions/KestrelHardeningExtensions.cs` |
+| **3.4.2** | Establish and enforce security configuration settings | Kestrel hardening extensions enforce TLS, header limits, timeout settings; DISA STIG-compliant container config | **[IMPLEMENTED]** | `TheWatch.Shared/Security/WatchKestrelExtensions.cs` |
 | **3.4.3** | Track, review, approve, and audit changes | GitHub branch protection (2 approvals, signed commits, linear history); CODEOWNERS for security paths | **[IMPLEMENTED]** | `docs/developer-setup.md` |
 | **3.4.4** | Analyze security impact of changes | CodeQL SAST in CI pipeline; dependency review on pull requests; security workflow validates changes | **[IMPLEMENTED]** | `.github/workflows/security.yml` |
 | **3.4.5** | Define, document, approve physical/logical access restrictions | `docs/policies/access-control-policy.md` defines access restrictions; RBAC enforced at application layer | **[IMPLEMENTED]** | `docs/policies/access-control-policy.md` |
@@ -115,13 +115,13 @@ The authorization boundary encompasses:
 | **3.5.1** | Identify system users and processes | Unique user IDs via registration; service accounts per microservice; JWT claims identify actors | **[IMPLEMENTED]** | `TheWatch.P5.AuthSecurity/` |
 | **3.5.2** | Authenticate users and devices | JWT bearer tokens; 4-method MFA (TOTP, FIDO2, SMS, Magic Link); device trust scoring | **[IMPLEMENTED]** | `TheWatch.P5.AuthSecurity/` |
 | **3.5.3** | Use multi-factor authentication | MFA mandatory for Admin, Responder, Doctor roles; 4 methods available (TOTP, FIDO2, SMS, Magic Link) | **[IMPLEMENTED]** | `docs/policies/identification-authentication-policy.md` |
-| **3.5.4** | Employ replay-resistant authentication | JWT tokens include `jti` (unique token ID), `iat` (issued at), `exp` (expiration); TOTP time-based with window | **[IMPLEMENTED]** | `TheWatch.Shared/Security/WatchAuthExtensions.cs` |
+| **3.5.4** | Employ replay-resistant authentication | JWT tokens include `jti` (unique token ID), `iat` (issued at), `exp` (expiration); TOTP time-based with window | **[IMPLEMENTED]** | `TheWatch.Shared/Auth/WatchAuthExtensions.cs` |
 | **3.5.5** | Prevent reuse of identifiers | Unique user IDs enforced at database level; email uniqueness constraint | **[IMPLEMENTED]** | EF Core entity configuration |
 | **3.5.6** | Disable identifiers after inactivity | Account deactivation after 15+ failed attempts; inactive account monitoring | **[PARTIAL]** | `TheWatch.P5.AuthSecurity/` |
 | **3.5.7** | Enforce minimum password complexity | Currently 8-character minimum with complexity (uppercase, lowercase, digit, special) | **[PARTIAL]** | POA&M: Upgrade to 15-character minimum per DISA STIG V-222524 |
 | **3.5.8** | Prohibit password reuse | **[PLANNED]** | POA&M item: Implement 24-generation password history per DISA STIG V-222546 |
 | **3.5.9** | Allow temporary passwords for system login | Initial registration generates temporary credentials; forced password change on first login | **[IMPLEMENTED]** | `TheWatch.P5.AuthSecurity/` |
-| **3.5.10** | Store and transmit only cryptographically protected passwords | Argon2id hashing (default); PBKDF2-SHA512 FIPS fallback (600K iterations); TLS for transmission | **[IMPLEMENTED]** | `TheWatch.Shared/Security/Argon2idPasswordHasher.cs`, `TheWatch.Shared/Security/FipsPbkdf2PasswordHasher.cs` |
+| **3.5.10** | Store and transmit only cryptographically protected passwords | Argon2id hashing (default); PBKDF2-SHA512 FIPS fallback (600K iterations); TLS for transmission | **[IMPLEMENTED]** | `TheWatch.P5.AuthSecurity/Security/Argon2PasswordHasher.cs`, `TheWatch.Shared/Security/FipsPbkdf2PasswordHasher.cs` |
 | **3.5.11** | Obscure feedback of authentication information | Password fields masked; error messages do not reveal account existence | **[IMPLEMENTED]** | `TheWatch.P5.AuthSecurity/` |
 
 ### 2.6 Incident Response (IR) — NIST 800-171 §3.6
@@ -147,12 +147,12 @@ The authorization boundary encompasses:
 
 | Control | Requirement | Implementation | Status | Evidence |
 |---------|-------------|----------------|--------|----------|
-| **3.8.1** | Protect system media (digital and physical) | Database encryption (TDE planned); AES-256-GCM field encryption for CUI columns | **[PARTIAL]** | `TheWatch.Shared/Security/AesGcmFieldEncryptor.cs` |
-| **3.8.2** | Limit access to CUI on system media | RBAC enforced on all data access; CUI marking middleware classifies routes | **[IMPLEMENTED]** | `TheWatch.Shared/Middleware/CuiMarkingMiddleware.cs` |
+| **3.8.1** | Protect system media (digital and physical) | Database encryption (TDE planned); AES-256-GCM field encryption for CUI columns | **[PARTIAL]** | `TheWatch.Shared/Security/FieldEncryptionService.cs` |
+| **3.8.2** | Limit access to CUI on system media | RBAC enforced on all data access; CUI marking middleware classifies routes | **[IMPLEMENTED]** | `TheWatch.Shared/Security/CuiMarkingMiddleware.cs` |
 | **3.8.3** | Sanitize or destroy system media before disposal or reuse | Containers are stateless and destroyed on termination; database backups encrypted | **[PARTIAL]** | Container architecture |
-| **3.8.4** | Mark media with CUI markings and distribution limitations | CUI marking middleware adds classification headers to HTTP responses | **[IMPLEMENTED]** | `TheWatch.Shared/Middleware/CuiMarkingMiddleware.cs` |
+| **3.8.4** | Mark media with CUI markings and distribution limitations | CUI marking middleware adds classification headers to HTTP responses | **[IMPLEMENTED]** | `TheWatch.Shared/Security/CuiMarkingMiddleware.cs` |
 | **3.8.5** | Control access to media containing CUI with controlled areas | Cloud provider physical security; Kubernetes namespace isolation | **[IMPLEMENTED]** | `terraform/`, `helm/` |
-| **3.8.6** | Implement cryptographic mechanisms during transport | TLS 1.2+ enforced; evidence files hashed (SHA-256) during transport | **[IMPLEMENTED]** | `TheWatch.Shared/Extensions/KestrelHardeningExtensions.cs` |
+| **3.8.6** | Implement cryptographic mechanisms during transport | TLS 1.2+ enforced; evidence files hashed (SHA-256) during transport | **[IMPLEMENTED]** | `TheWatch.Shared/Security/WatchKestrelExtensions.cs` |
 | **3.8.7** | Control removable media | Mobile evidence collection requires chain-of-custody; no arbitrary media access | **[IMPLEMENTED]** | `TheWatch.Mobile/Services/ChainOfCustodyService.cs` |
 | **3.8.8** | Prohibit use of portable storage without an identified owner | Evidence files tagged with user ID, device fingerprint, and GPS coordinates | **[IMPLEMENTED]** | `TheWatch.Mobile/Services/ChainOfCustodyService.cs` |
 | **3.8.9** | Protect backup CUI at storage locations | Encrypted backup configurations in Terraform; geo-replicated storage | **[PARTIAL]** | `terraform/azure/main.tf` |
@@ -199,11 +199,11 @@ The authorization boundary encompasses:
 | **3.13.1** | Monitor, control, protect communications at boundaries | P1 CoreGateway serves as boundary protection; rate limiting; CORS whitelist; security headers | **[IMPLEMENTED]** | `TheWatch.P1.CoreGateway/` |
 | **3.13.2** | Employ architectural designs to promote security | Microservices isolation with dedicated databases; event-driven loose coupling; defense in depth | **[IMPLEMENTED]** | Architecture design |
 | **3.13.3** | Separate user functionality from system management | Admin portal and CLI separated from user-facing applications; role-based access | **[IMPLEMENTED]** | `TheWatch.Admin/`, `TheWatch.Admin.CLI/` |
-| **3.13.4** | Prevent unauthorized/unintended information transfer | CUI marking middleware; PII redaction middleware; data classification enforcement | **[IMPLEMENTED]** | `TheWatch.Shared/Middleware/` |
+| **3.13.4** | Prevent unauthorized/unintended information transfer | CUI marking middleware; PII redaction middleware; data classification enforcement | **[IMPLEMENTED]** | `TheWatch.Shared/Security/` |
 | **3.13.5** | Implement subnetworks for publicly accessible components | Kubernetes namespace isolation; Docker network segregation; security groups | **[IMPLEMENTED]** | `helm/`, `terraform/` |
 | **3.13.6** | Deny network traffic by default | Kubernetes NetworkPolicy (planned); Docker network isolation | **[PARTIAL]** | POA&M: Implement network policies |
 | **3.13.7** | Prevent split tunneling for remote devices | Mobile app routes all traffic through CoreGateway; no direct service access | **[IMPLEMENTED]** | `TheWatch.Mobile/` |
-| **3.13.8** | Implement cryptographic mechanisms for CUI in transit | TLS 1.2/1.3 only; HSTS 365-day max-age; certificate pinning for mobile | **[IMPLEMENTED]** | `TheWatch.Shared/Extensions/KestrelHardeningExtensions.cs` |
+| **3.13.8** | Implement cryptographic mechanisms for CUI in transit | TLS 1.2/1.3 only; HSTS 365-day max-age; certificate pinning for mobile | **[IMPLEMENTED]** | `TheWatch.Shared/Security/WatchKestrelExtensions.cs` |
 | **3.13.9** | Terminate network connections at end of sessions | JWT expiration enforced; connection timeout configured; health check-based termination | **[IMPLEMENTED]** | JWT configuration |
 | **3.13.10** | Establish and manage cryptographic keys | RSA-2048 for JWT (production); AES-256 for field encryption; PBKDF2-SHA512 key derivation; Azure Key Vault for production | **[PARTIAL]** | POA&M: Implement HSM-backed key management |
 | **3.13.11** | Employ FIPS-validated cryptography for CUI | PBKDF2-SHA512 (FIPS 140-2 fallback) available; AES-256-GCM for field encryption; .NET FIPS mode configuration available | **[PARTIAL]** | POA&M: Enable FIPS mode, transition from Argon2id |
@@ -211,7 +211,7 @@ The authorization boundary encompasses:
 | **3.13.13** | Control and protect mobile code | Mobile app distributed through managed app stores; MAUI code signed; no arbitrary code execution | **[IMPLEMENTED]** | `TheWatch.Mobile/` |
 | **3.13.14** | Control VoIP | Not applicable — voice emergency ingests voice data but does not provide VoIP services | **N/A** | |
 | **3.13.15** | Protect authenticity of communications sessions | JWT token binding; device trust scoring; correlation ID tracking; HMAC-signed audit records | **[IMPLEMENTED]** | `TheWatch.Shared/Security/` |
-| **3.13.16** | Protect CUI at rest | AES-256-GCM field-level encryption for sensitive columns; SQL Server TDE planned; mobile SQLite encryption | **[PARTIAL]** | `TheWatch.Shared/Security/AesGcmFieldEncryptor.cs`, POA&M |
+| **3.13.16** | Protect CUI at rest | AES-256-GCM field-level encryption for sensitive columns; SQL Server TDE planned; mobile SQLite encryption | **[PARTIAL]** | `TheWatch.Shared/Security/FieldEncryptionService.cs`, POA&M |
 
 ### 2.14 System and Information Integrity (SI) — NIST 800-171 §3.14
 

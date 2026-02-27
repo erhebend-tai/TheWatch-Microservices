@@ -60,7 +60,7 @@ for supply chain security.
 | **PW.6** | Configure the compilation, interpreter, and build processes | Deterministic builds enabled; NuGetAudit treats vulnerabilities as errors in CI; central build configuration | **[IMPLEMENTED]** | `Directory.Build.props` |
 | **PW.7** | Review and test code for vulnerabilities and verify compliance | CodeQL SAST on every push/PR; Trivy container scanning; 12 test projects with xUnit; penetration testing program | **[IMPLEMENTED]** | `.github/workflows/security.yml`, `docs/pentest-program.md` |
 | **PW.8** | Test executable code for vulnerabilities | DoD compliance workflow; DoD readiness workflow; SBOM vulnerability scanning; security scanning pipeline | **[IMPLEMENTED]** | `.github/workflows/dod-compliance.yml`, `.github/workflows/dod-readiness.yml` |
-| **PW.9** | Configure software to have secure settings by default | TLS 1.2+ enforced; Kestrel hardened; HSTS 365d; rate limiting enabled; CORS restricted; no Server header; 30s headers timeout | **[IMPLEMENTED]** | `TheWatch.Shared/Extensions/KestrelHardeningExtensions.cs` |
+| **PW.9** | Configure software to have secure settings by default | TLS 1.2+ enforced; Kestrel hardened; HSTS 365d; rate limiting enabled; CORS restricted; no Server header; 30s headers timeout | **[IMPLEMENTED]** | `TheWatch.Shared/Security/WatchKestrelExtensions.cs` |
 
 ### 2.4 Respond to Vulnerabilities (RV)
 

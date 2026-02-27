@@ -72,7 +72,7 @@ Properties:
 - Base64 encoding for database storage compatibility
 ```
 
-**Evidence:** `TheWatch.Shared/Security/AesGcmFieldEncryptor.cs`
+**Evidence:** `TheWatch.Shared/Security/FieldEncryptionService.cs`
 
 ### 2.2 Encryption in Transit
 
@@ -98,7 +98,7 @@ Enforced Settings:
 - Server header suppressed (AddServerHeader = false)
 ```
 
-**Evidence:** `TheWatch.Shared/Extensions/KestrelHardeningExtensions.cs`
+**Evidence:** `TheWatch.Shared/Security/WatchKestrelExtensions.cs`
 
 ### 2.3 Password Hashing
 
@@ -110,7 +110,7 @@ Enforced Settings:
 **Migration Path:** System detects hash format and can transparently migrate from Argon2id to PBKDF2
 on next authentication. Format detection via `$PBKDF2-SHA512$` prefix.
 
-**Evidence:** `TheWatch.Shared/Security/Argon2idPasswordHasher.cs`, `TheWatch.Shared/Security/FipsPbkdf2PasswordHasher.cs`
+**Evidence:** `TheWatch.P5.AuthSecurity/Security/Argon2PasswordHasher.cs`, `TheWatch.Shared/Security/FipsPbkdf2PasswordHasher.cs`
 
 ### 2.4 Cryptographic Key Management
 
@@ -184,7 +184,7 @@ All endpoints that access user-specific data implement `CallerCanAccessUser()` c
 | **PHI Access Logging** | Dedicated PHI access event logging separate from general audit | HIPAA §164.312(b) |
 | **PII Redaction in Logs** | `PiiRedactionMiddleware` masks SSN, phone, email, credit card in log output | NIST 800-53 AU-3 |
 
-**Evidence:** `TheWatch.Shared/Compliance/HipaaComplianceService.cs`, `TheWatch.Shared/Middleware/PiiRedactionMiddleware.cs`
+**Evidence:** `TheWatch.Shared/Compliance/HipaaComplianceService.cs`, `TheWatch.Shared/Security/PiiRedactionMiddleware.cs`
 
 ---
 
@@ -202,7 +202,7 @@ TheWatch applies CUI markings to HTTP responses via the `CuiMarkingMiddleware`:
 | `/api/geospatial/*`, `/api/location/*` | CUI // SP-GEO | `X-CUI-Category: SP-GEO` |
 | All other `/api/*` routes | CUI // SP-BASIC | `X-CUI-Category: SP-BASIC` |
 
-**Evidence:** `TheWatch.Shared/Middleware/CuiMarkingMiddleware.cs`
+**Evidence:** `TheWatch.Shared/Security/CuiMarkingMiddleware.cs`
 
 ### 5.2 CUI Handling Procedures
 
@@ -273,7 +273,7 @@ The `PiiRedactionMiddleware` applies the following redaction rules to log output
 | Email Address | user@example.com | `***@***.***` |
 | Credit Card | 4111-1111-1111-1111 | `****-****-****-****` |
 
-**Evidence:** `TheWatch.Shared/Middleware/PiiRedactionMiddleware.cs`
+**Evidence:** `TheWatch.Shared/Security/PiiRedactionMiddleware.cs`
 
 ---
 
