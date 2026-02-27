@@ -1,0 +1,628 @@
+name: DoD Compliance — Safety & Security Standards
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  schedule:
+    # Run weekly on Wednesday at 08:00 UTC
+    - cron: "0 8 * * 3"
+  workflow_dispatch:
+
+concurrency:
+  group: dod-compliance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===========================================================
+  # Policy Documents — Verify all required DoD/NIST documents
+  # ===========================================================
+  policy-documents:
+    name: Policy Documents Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required DoD compliance documents
+        id: policy-check
+        run: |
+          echo "## 📋 DoD Policy Documents Compliance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          PASS=0
+          FAIL=0
+          WARN=0
+
+          check_file() {
+            local file="$1"
+            local description="$2"
+            local nist_ref="$3"
+            local required="$4"
+
+            if [ -f "$file" ]; then
+              PASS=$((PASS + 1))
+              echo "| ✅ | $description | \`$nist_ref\` | \`$file\` |" >> $GITHUB_STEP_SUMMARY
+            elif [ "$required" = "true" ]; then
+              FAIL=$((FAIL + 1))
+              echo "| ❌ | $description | \`$nist_ref\` | **MISSING**: \`$file\` |" >> $GITHUB_STEP_SUMMARY
+            else
+              WARN=$((WARN + 1))
+              echo "| ⚠️ | $description | \`$nist_ref\` | Optional — \`$file\` |" >> $GITHUB_STEP_SUMMARY
+            fi
+          }
+
+          echo "| Status | Document | NIST Reference | Path |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|----------|----------------|------|" >> $GITHUB_STEP_SUMMARY
+
+          # Required policy documents (NIST 800-171 / CMMC Level 2)
+          check_file "docs/policies/access-control-policy.md"          "Access Control Policy"              "AC-1"    "true"
+          check_file "docs/policies/audit-accountability-policy.md"    "Audit & Accountability Policy"      "AU-1"    "true"
+          check_file "docs/policies/identification-authentication-policy.md" "Identification & Auth Policy" "IA-1"    "true"
+          check_file "docs/incident-response-plan.md"                  "Incident Response Plan"             "IR-1, IR-8" "true"
+          check_file "docs/vulnerability-management-policy.md"         "Vulnerability Management Policy"    "SI-2, RA-5" "true"
+          check_file "docs/data-classification-matrix.md"              "Data Classification Matrix"         "SC-28, MP-4" "true"
+          check_file "docs/POA&M.md"                                   "Plan of Action & Milestones"        "CA-5"    "true"
+          check_file "docs/ssdf-attestation.md"                        "SSDF Attestation"                   "SSDF v1.1" "true"
+          check_file "docs/pentest-program.md"                         "Penetration Testing Program"        "CA-8"    "true"
+          check_file "DOD_SECURITY_ANALYSIS.md"                        "DoD Security Gap Analysis"          "N/A"     "true"
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Results**: ✅ $PASS passed | ❌ $FAIL failed | ⚠️ $WARN warnings" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "pass=$PASS" >> $GITHUB_OUTPUT
+          echo "fail=$FAIL" >> $GITHUB_OUTPUT
+
+          if [ "$FAIL" -gt 0 ]; then
+            echo "::error::$FAIL required DoD compliance document(s) missing"
+            exit 1
+          fi
+
+  # ===========================================================
+  # Data Retention — Verify retention policies are documented
+  # ===========================================================
+  data-retention:
+    name: Data Retention Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check data retention configuration
+        run: |
+          echo "## 🗄️ Data Retention Compliance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          PASS=0
+          FAIL=0
+
+          # Check artifact retention in workflows (NIST AU-11)
+          echo "### Workflow Artifact Retention" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | Workflow | Retention Setting |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|----------|-------------------|" >> $GITHUB_STEP_SUMMARY
+
+          for workflow in .github/workflows/*.yml; do
+            name=$(basename "$workflow")
+            if grep -q "retention-days" "$workflow"; then
+              days=$(grep -oP 'retention-days:\s*\K\d+' "$workflow" | head -1)
+              PASS=$((PASS + 1))
+              echo "| ✅ | \`$name\` | ${days} days |" >> $GITHUB_STEP_SUMMARY
+            elif grep -q "upload-artifact" "$workflow"; then
+              FAIL=$((FAIL + 1))
+              echo "| ❌ | \`$name\` | **No retention-days set** (uses default) |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check audit log retention references (NIST AU-11)
+          echo "### Audit Log Retention" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if grep -rq "retention\|RetentionDays\|log.*retention\|audit.*retention" docs/ 2>/dev/null; then
+            echo "✅ Audit log retention policy referenced in documentation." >> $GITHUB_STEP_SUMMARY
+            PASS=$((PASS + 1))
+          else
+            echo "⚠️ No explicit audit log retention policy found in docs/." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check data classification includes retention guidance
+          if [ -f "docs/data-classification-matrix.md" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Data Classification Retention" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Data classification matrix exists for CUI data handling." >> $GITHUB_STEP_SUMMARY
+            PASS=$((PASS + 1))
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Results**: ✅ $PASS passed | ❌ $FAIL failed" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$FAIL" -gt 0 ]; then
+            echo "::warning::$FAIL workflow artifact(s) missing explicit retention-days"
+          fi
+
+  # ===========================================================
+  # Container Security — Dockerfiles and compose hardening
+  # ===========================================================
+  container-security:
+    name: Container Security Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Dockerfiles for security best practices
+        run: |
+          echo "## 🐳 Container Security Compliance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          PASS=0
+          FAIL=0
+          WARN=0
+
+          echo "### Dockerfile Checks (DISA STIG)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | Dockerfile | Check |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+
+          for dockerfile in $(find . -name "Dockerfile" -not -path "./.git/*"); do
+            name=$(echo "$dockerfile" | sed 's|./||')
+
+            # Check for non-root USER directive (STIG V-235867)
+            if grep -qiE "^USER\s+(app|nonroot|dotnet|[1-9])" "$dockerfile"; then
+              PASS=$((PASS + 1))
+              echo "| ✅ | \`$name\` | Non-root USER directive |" >> $GITHUB_STEP_SUMMARY
+            else
+              WARN=$((WARN + 1))
+              echo "| ⚠️ | \`$name\` | No explicit non-root USER directive |" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            # Check for HEALTHCHECK directive
+            if grep -q "^HEALTHCHECK" "$dockerfile"; then
+              PASS=$((PASS + 1))
+              echo "| ✅ | \`$name\` | HEALTHCHECK defined |" >> $GITHUB_STEP_SUMMARY
+            else
+              WARN=$((WARN + 1))
+              echo "| ⚠️ | \`$name\` | No HEALTHCHECK directive |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check docker-compose for hardcoded secrets
+          echo "### Docker Compose Secret Management" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | Check | Detail |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          for compose_file in docker-compose*.yml; do
+            [ -f "$compose_file" ] || continue
+            if grep -PiqE '(password|secret|key)\s*[:=]\s*"?[a-zA-Z0-9_]{4,}"?' "$compose_file" | grep -vqE '\$\{'; then
+              :
+            fi
+
+            # Check if passwords are parameterized (using ${VAR} syntax)
+            hardcoded=$(grep -PinE '(password|secret)\s*[:=]\s*"?[a-zA-Z0-9]{8,}"?' "$compose_file" | grep -cvE '\$\{' || true)
+            if [ "$hardcoded" -gt 0 ] 2>/dev/null; then
+              FAIL=$((FAIL + 1))
+              echo "| ❌ | \`$compose_file\` | $hardcoded potential hardcoded secret(s) found |" >> $GITHUB_STEP_SUMMARY
+            else
+              PASS=$((PASS + 1))
+              echo "| ✅ | \`$compose_file\` | Secrets use environment variable substitution |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Results**: ✅ $PASS passed | ❌ $FAIL failed | ⚠️ $WARN warnings" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$FAIL" -gt 0 ]; then
+            echo "::error::$FAIL container security check(s) failed"
+            exit 1
+          fi
+
+  # ===========================================================
+  # Encryption & FIPS — TLS, encryption-at-rest configuration
+  # ===========================================================
+  encryption-compliance:
+    name: Encryption & FIPS Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check encryption configuration
+        run: |
+          echo "## 🔐 Encryption & FIPS Compliance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          PASS=0
+          WARN=0
+
+          echo "| Status | Check | NIST Reference | Detail |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|----------------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Check for TLS configuration references (SC-8)
+          if grep -rq "TLS\|Https\|UseHttpsRedirection\|SslProtocols" --include="*.cs" --include="*.json" . 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | TLS / HTTPS enforcement | \`SC-8\` | TLS references found in source |" >> $GITHUB_STEP_SUMMARY
+          else
+            WARN=$((WARN + 1))
+            echo "| ⚠️ | TLS / HTTPS enforcement | \`SC-8\` | No TLS configuration found |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for FIPS mode references (SC-13)
+          if grep -rq "Fips\|FIPS\|FipsAlgorithm\|CryptoConfig" --include="*.cs" --include="*.json" . 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | FIPS 140-2 mode | \`SC-13\` | FIPS configuration references found |" >> $GITHUB_STEP_SUMMARY
+          else
+            WARN=$((WARN + 1))
+            echo "| ⚠️ | FIPS 140-2 mode | \`SC-13\` | No FIPS configuration found (see DOD_SECURITY_ANALYSIS.md) |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for encryption at rest (SC-28)
+          if grep -rq "Encrypt\|DataProtection\|FieldEncryption\|Always Encrypted\|AES\|Argon2" --include="*.cs" --include="*.md" . 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | Encryption at rest | \`SC-28\` | Encryption references found |" >> $GITHUB_STEP_SUMMARY
+          else
+            WARN=$((WARN + 1))
+            echo "| ⚠️ | Encryption at rest | \`SC-28\` | No encryption at rest configuration found |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for key management references (SC-12)
+          if grep -rq "ENCRYPTION_KEY\|SigningKey\|KeyVault\|key.*management\|key.*rotation" --include="*.cs" --include="*.json" --include="*.md" --include="*.yml" . 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | Key management | \`SC-12\` | Key management references found |" >> $GITHUB_STEP_SUMMARY
+          else
+            WARN=$((WARN + 1))
+            echo "| ⚠️ | Key management | \`SC-12\` | No key management configuration found |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Results**: ✅ $PASS passed | ⚠️ $WARN warnings" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================
+  # Supply Chain Security — SBOM, signing, provenance
+  # ===========================================================
+  supply-chain:
+    name: Supply Chain Security Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check supply chain security controls
+        run: |
+          echo "## 🔗 Supply Chain Security Compliance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          PASS=0
+          FAIL=0
+
+          echo "| Status | Control | NIST/SSDF Reference | Detail |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|---------|---------------------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Check SBOM generation (EO 14028, SSDF PS.3)
+          if grep -rq "sbom\|cyclonedx\|spdx" .github/workflows/ 2>/dev/null || [ -f "generate-sbom.sh" ]; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | SBOM generation | \`SSDF PS.3\` | SBOM workflow/script configured |" >> $GITHUB_STEP_SUMMARY
+          else
+            FAIL=$((FAIL + 1))
+            echo "| ❌ | SBOM generation | \`SSDF PS.3\` | No SBOM generation found |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check container image signing (SSDF PS.2)
+          if grep -rq "cosign\|sigstore\|notation" .github/workflows/ 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | Image signing | \`SSDF PS.2\` | Cosign/Sigstore signing configured |" >> $GITHUB_STEP_SUMMARY
+          else
+            FAIL=$((FAIL + 1))
+            echo "| ❌ | Image signing | \`SSDF PS.2\` | No image signing configured |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check SLSA provenance (SSDF PS.2)
+          if grep -rq "slsa\|provenance\|attest-build-provenance" .github/workflows/ 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | SLSA provenance | \`SSDF PS.2\` | Build provenance workflow configured |" >> $GITHUB_STEP_SUMMARY
+          else
+            FAIL=$((FAIL + 1))
+            echo "| ❌ | SLSA provenance | \`SSDF PS.2\` | No SLSA provenance configured |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check dependency review (SSDF PW.4)
+          if grep -rq "dependency-review" .github/workflows/ 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | Dependency review | \`SSDF PW.4\` | Dependency review action configured |" >> $GITHUB_STEP_SUMMARY
+          else
+            FAIL=$((FAIL + 1))
+            echo "| ❌ | Dependency review | \`SSDF PW.4\` | No dependency review configured |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check container vulnerability scanning (SSDF RV.1)
+          if grep -rq "trivy\|grype\|snyk\|aquasecurity" .github/workflows/ 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | Container scanning | \`SSDF RV.1\` | Trivy/Grype vulnerability scanning configured |" >> $GITHUB_STEP_SUMMARY
+          else
+            FAIL=$((FAIL + 1))
+            echo "| ❌ | Container scanning | \`SSDF RV.1\` | No container vulnerability scanning |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Results**: ✅ $PASS passed | ❌ $FAIL failed" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$FAIL" -gt 0 ]; then
+            echo "::error::$FAIL supply chain security control(s) missing"
+            exit 1
+          fi
+
+  # ===========================================================
+  # Secret Detection Config — Gitleaks + CI pipeline checks
+  # ===========================================================
+  secret-detection:
+    name: Secret Detection Config Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secret detection configuration
+        run: |
+          echo "## 🔑 Secret Detection Compliance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          PASS=0
+          FAIL=0
+          WARN=0
+
+          echo "| Status | Check | Detail |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Check Gitleaks configuration
+          if [ -f ".gitleaks.toml" ]; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | Gitleaks config | \`.gitleaks.toml\` present with custom rules |" >> $GITHUB_STEP_SUMMARY
+          else
+            FAIL=$((FAIL + 1))
+            echo "| ❌ | Gitleaks config | \`.gitleaks.toml\` missing |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check secret scanning in CI pipeline
+          if grep -rq "gitleaks" .github/workflows/ 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | CI secret scanning | Gitleaks integrated in CI pipeline |" >> $GITHUB_STEP_SUMMARY
+          else
+            FAIL=$((FAIL + 1))
+            echo "| ❌ | CI secret scanning | No secret scanning in CI pipeline |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check .env.example exists (no real secrets checked in)
+          if [ -f ".env.example" ]; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | .env.example | Template file present for safe secret management |" >> $GITHUB_STEP_SUMMARY
+          else
+            FAIL=$((FAIL + 1))
+            echo "| ❌ | .env.example | No \`.env.example\` template for secret management |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check .env is gitignored
+          if grep -q "\.env$\|\.env\b" .gitignore 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | .env gitignored | \`.env\` is excluded from version control |" >> $GITHUB_STEP_SUMMARY
+          else
+            WARN=$((WARN + 1))
+            echo "| ⚠️ | .env gitignored | \`.env\` not explicitly in \`.gitignore\` — recommend adding |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Results**: ✅ $PASS passed | ❌ $FAIL failed | ⚠️ $WARN warnings" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$FAIL" -gt 0 ]; then
+            echo "::error::$FAIL secret detection check(s) failed"
+            exit 1
+          fi
+
+  # ===========================================================
+  # SAST & Code Analysis — Verify static analysis is configured
+  # ===========================================================
+  sast-config:
+    name: SAST Configuration Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check SAST and code analysis configuration
+        run: |
+          echo "## 🛡️ SAST & Code Analysis Compliance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          PASS=0
+          FAIL=0
+
+          echo "| Status | Check | NIST Reference | Detail |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|----------------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Check CodeQL is configured (SSDF PW.7)
+          if grep -rq "codeql" .github/workflows/ 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | CodeQL SAST | \`SSDF PW.7\` | CodeQL analysis configured |" >> $GITHUB_STEP_SUMMARY
+          else
+            FAIL=$((FAIL + 1))
+            echo "| ❌ | CodeQL SAST | \`SSDF PW.7\` | No CodeQL configuration found |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check DAST / ZAP scanning (CA-8)
+          if grep -rq "zap\|owasp.*zap\|dast" .github/workflows/ 2>/dev/null || [ -d ".zap" ]; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | DAST scanning | \`CA-8\` | OWASP ZAP / DAST scanning configured |" >> $GITHUB_STEP_SUMMARY
+          else
+            FAIL=$((FAIL + 1))
+            echo "| ❌ | DAST scanning | \`CA-8\` | No DAST scanning configured |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check NuGet vulnerability audit (SI-2)
+          if grep -rq "vulnerable\|nuget.*audit\|package.*vulnerable" .github/workflows/ 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | NuGet audit | \`SI-2\` | NuGet vulnerability audit configured |" >> $GITHUB_STEP_SUMMARY
+          else
+            FAIL=$((FAIL + 1))
+            echo "| ❌ | NuGet audit | \`SI-2\` | No NuGet vulnerability audit configured |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check license compliance (deny restricted licenses)
+          if grep -rq "deny-licenses\|deny.*license" .github/workflows/ 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | License compliance | \`IP/Legal\` | Restricted license deny-list configured |" >> $GITHUB_STEP_SUMMARY
+          else
+            FAIL=$((FAIL + 1))
+            echo "| ❌ | License compliance | \`IP/Legal\` | No license compliance checks configured |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Results**: ✅ $PASS passed | ❌ $FAIL failed" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$FAIL" -gt 0 ]; then
+            echo "::error::$FAIL SAST configuration check(s) failed"
+            exit 1
+          fi
+
+  # ===========================================================
+  # Access Control & Auth — RBAC, MFA, password policy checks
+  # ===========================================================
+  access-control:
+    name: Access Control Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check access control configuration
+        run: |
+          echo "## 🔒 Access Control & Authentication Compliance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          PASS=0
+          WARN=0
+
+          echo "| Status | Check | NIST Reference | Detail |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|----------------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Check RBAC / authorization (AC-3)
+          if grep -rq "Authorize\|[Rr]ole\|RBAC\|Policy\|Claim" --include="*.cs" . 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | Role-based access control | \`AC-3\` | Authorization attributes found in source |" >> $GITHUB_STEP_SUMMARY
+          else
+            WARN=$((WARN + 1))
+            echo "| ⚠️ | Role-based access control | \`AC-3\` | No RBAC references found |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check MFA (IA-2(1))
+          if grep -rq "MFA\|MultiFactorAuth\|TwoFactor\|TOTP\|Authenticator" --include="*.cs" --include="*.md" . 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | Multi-factor authentication | \`IA-2(1)\` | MFA references found |" >> $GITHUB_STEP_SUMMARY
+          else
+            WARN=$((WARN + 1))
+            echo "| ⚠️ | Multi-factor authentication | \`IA-2(1)\` | No MFA implementation references found |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check password hashing (IA-5)
+          if grep -rq "Argon2\|PBKDF2\|BCrypt\|PasswordHash" --include="*.cs" . 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | Password hashing | \`IA-5\` | Secure password hashing algorithm used |" >> $GITHUB_STEP_SUMMARY
+          else
+            WARN=$((WARN + 1))
+            echo "| ⚠️ | Password hashing | \`IA-5\` | No secure password hashing references found |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check JWT / token auth (IA-2)
+          if grep -rq "JwtBearer\|Bearer\|AddAuthentication\|TokenValidation" --include="*.cs" . 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | Token-based authentication | \`IA-2\` | JWT Bearer auth configured |" >> $GITHUB_STEP_SUMMARY
+          else
+            WARN=$((WARN + 1))
+            echo "| ⚠️ | Token-based authentication | \`IA-2\` | No token authentication found |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check rate limiting (SC-5)
+          if grep -rq "RateLimiting\|RateLimit\|AddRateLimiter\|UseRateLimiter" --include="*.cs" . 2>/dev/null; then
+            PASS=$((PASS + 1))
+            echo "| ✅ | Rate limiting | \`SC-5\` | Rate limiting configured |" >> $GITHUB_STEP_SUMMARY
+          else
+            WARN=$((WARN + 1))
+            echo "| ⚠️ | Rate limiting | \`SC-5\` | No rate limiting configuration found |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Results**: ✅ $PASS passed | ⚠️ $WARN warnings" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================
+  # Compliance Summary — aggregate results from all jobs
+  # ===========================================================
+  compliance-summary:
+    name: DoD Compliance Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - policy-documents
+      - data-retention
+      - container-security
+      - encryption-compliance
+      - supply-chain
+      - secret-detection
+      - sast-config
+      - access-control
+
+    steps:
+      - name: Generate compliance summary
+        run: |
+          echo "## 📊 DoD Compliance Summary Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scan Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch**: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Category | Status | Standard |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Policy Documents | ${{ needs.policy-documents.result == 'success' && '✅ PASS' || '❌ FAIL' }} | NIST 800-171 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Data Retention | ${{ needs.data-retention.result == 'success' && '✅ PASS' || '⚠️ REVIEW' }} | NIST AU-11 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Security | ${{ needs.container-security.result == 'success' && '✅ PASS' || '❌ FAIL' }} | DISA STIG |" >> $GITHUB_STEP_SUMMARY
+          echo "| Encryption & FIPS | ${{ needs.encryption-compliance.result == 'success' && '✅ PASS' || '⚠️ REVIEW' }} | NIST SC-13, SC-28 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Supply Chain | ${{ needs.supply-chain.result == 'success' && '✅ PASS' || '❌ FAIL' }} | EO 14028, SSDF |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Detection | ${{ needs.secret-detection.result == 'success' && '✅ PASS' || '❌ FAIL' }} | NIST IA-5 |" >> $GITHUB_STEP_SUMMARY
+          echo "| SAST Config | ${{ needs.sast-config.result == 'success' && '✅ PASS' || '❌ FAIL' }} | SSDF PW.7 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Access Control | ${{ needs.access-control.result == 'success' && '✅ PASS' || '⚠️ REVIEW' }} | NIST AC-3, IA-2 |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Compliance Frameworks Covered" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **CMMC Level 2** — NIST SP 800-171 Rev 2 controls" >> $GITHUB_STEP_SUMMARY
+          echo "- **NIST SP 800-218** — Secure Software Development Framework (SSDF)" >> $GITHUB_STEP_SUMMARY
+          echo "- **EO 14028** — Executive Order on Improving Cybersecurity (SBOM, supply chain)" >> $GITHUB_STEP_SUMMARY
+          echo "- **DISA STIG** — Container and application hardening" >> $GITHUB_STEP_SUMMARY
+          echo "- **DFARS 252.204-7012** — Safeguarding Covered Defense Information" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Generated by DoD Compliance — Safety & Security Standards workflow*" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check overall compliance status
+        if: |
+          needs.policy-documents.result == 'failure' ||
+          needs.container-security.result == 'failure' ||
+          needs.supply-chain.result == 'failure' ||
+          needs.secret-detection.result == 'failure' ||
+          needs.sast-config.result == 'failure'
+        run: |
+          echo "::error::DoD compliance checks failed. Review the summary for details."
+          exit 1
