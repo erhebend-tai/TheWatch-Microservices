@@ -1,5 +1,6 @@
 @using Microsoft.JSInterop
 @inject IJSRuntime JS
+@inject IConfiguration Config
 @implements IAsyncDisposable
 
 <div id="@_mapElementId" class="watch-map-container" style="height: @Height;"></div>
@@ -13,11 +14,31 @@
     [Parameter] public double CenterLng { get; set; } = -98.5795;
     [Parameter] public int Zoom { get; set; } = 4;
 
+    /// <summary>
+    /// Map tile provider override. When null, reads from Mapping:TileProvider in appsettings.
+    /// Valid values: osm, osm-hot, tiger, custom, azure, google, apple
+    /// </summary>
+    [Parameter] public string? Provider { get; set; }
+
+    private string EffectiveProvider =>
+        Provider ?? Config["Mapping:TileProvider"] ?? "osm";
+
+    private object BuildProviderOptions() => EffectiveProvider switch
+    {
+        "azure"  => new { azureKey          = Config["Azure:MapsSubscriptionKey"]      ?? "" },
+        "custom" => new { customTileUrl     = Config["Mapping:CustomTileUrl"]           ?? "",
+                          customAttribution = Config["Mapping:CustomTileAttribution"]   ?? "" },
+        "google" => new { googleApiKey      = Config["Mapping:GoogleMapsApiKey"]        ?? "" },
+        "apple"  => new { appleToken        = Config["Mapping:AppleMapsToken"]          ?? "" },
+        _        => (object)new { }
+    };
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await JS.InvokeVoidAsync("WatchMap.init", _mapElementId, CenterLat, CenterLng, Zoom);
+            await JS.InvokeVoidAsync("WatchMap.init", _mapElementId, CenterLat, CenterLng, Zoom,
+                EffectiveProvider, BuildProviderOptions());
             _initialized = true;
         }
     }

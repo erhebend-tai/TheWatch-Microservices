@@ -20,6 +20,12 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
+        // Load appsettings.json from embedded resources
+        using var stream = typeof(MauiProgram).Assembly
+            .GetManifestResourceStream("TheWatch.Mobile.appsettings.json");
+        if (stream is not null)
+            builder.Configuration.AddJsonStream(stream);
+
         builder.Services.AddMauiBlazorWebView();
 
 #if DEBUG
