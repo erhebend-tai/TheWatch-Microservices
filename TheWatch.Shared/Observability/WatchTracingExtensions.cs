@@ -96,21 +96,15 @@ public static class WatchTracingExtensions
                     // SQL Client instrumentation for database query tracing
                     .AddSqlClientInstrumentation(options =>
                     {
-                        options.SetDbStatementForText = true;
                         options.RecordException = true;
                     })
 
-                    // Register the custom Watch span processor
-                    .AddProcessor(sp => sp.GetRequiredService<WatchActivityProcessor>())
-
-                    // Set the service name as a resource attribute
-                    .SetResourceBuilder(
-                        OpenTelemetry.Resources.ResourceBuilder.CreateDefault()
-                            .AddService(
-                                serviceName: serviceName,
-                                serviceVersion: serviceVersion
-                                    ?? typeof(WatchTracingExtensions).Assembly.GetName().Version?.ToString()
-                                    ?? "0.0.0"));
+                    // Register the custom Watch span processor.
+                    // The processor enriches every span with service.name and service.version
+                    // tags via the WatchActivityEnricher, so we do not need SetResourceBuilder here.
+                    // When used with Aspire ServiceDefaults, the resource builder is already
+                    // configured via ConfigureOpenTelemetry() in Extensions.cs.
+                    .AddProcessor(sp => sp.GetRequiredService<WatchActivityProcessor>());
             });
 
         return services;

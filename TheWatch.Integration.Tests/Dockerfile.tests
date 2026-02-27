@@ -1,0 +1,44 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
+WORKDIR /src
+
+# Copy solution and project files for restore
+COPY *.sln Directory.* nuget.config ./
+COPY TheWatch.Integration.Tests/*.csproj TheWatch.Integration.Tests/
+COPY TheWatch.Contracts.Abstractions/*.csproj TheWatch.Contracts.Abstractions/
+COPY TheWatch.Contracts.AuthSecurity/*.csproj TheWatch.Contracts.AuthSecurity/
+COPY TheWatch.Contracts.VoiceEmergency/*.csproj TheWatch.Contracts.VoiceEmergency/
+COPY TheWatch.Contracts.FirstResponder/*.csproj TheWatch.Contracts.FirstResponder/
+COPY TheWatch.Contracts.FamilyHealth/*.csproj TheWatch.Contracts.FamilyHealth/
+COPY TheWatch.Contracts.DoctorServices/*.csproj TheWatch.Contracts.DoctorServices/
+COPY TheWatch.Contracts.DisasterRelief/*.csproj TheWatch.Contracts.DisasterRelief/
+COPY TheWatch.Contracts.MeshNetwork/*.csproj TheWatch.Contracts.MeshNetwork/
+COPY TheWatch.Contracts.Surveillance/*.csproj TheWatch.Contracts.Surveillance/
+COPY TheWatch.Contracts.Geospatial/*.csproj TheWatch.Contracts.Geospatial/
+COPY TheWatch.Shared/*.csproj TheWatch.Shared/
+COPY TheWatch.Generators/*.csproj TheWatch.Generators/
+
+RUN dotnet restore TheWatch.Integration.Tests/TheWatch.Integration.Tests.csproj
+
+# Copy source and build
+COPY TheWatch.Integration.Tests/ TheWatch.Integration.Tests/
+COPY TheWatch.Contracts.Abstractions/ TheWatch.Contracts.Abstractions/
+COPY TheWatch.Contracts.AuthSecurity/ TheWatch.Contracts.AuthSecurity/
+COPY TheWatch.Contracts.VoiceEmergency/ TheWatch.Contracts.VoiceEmergency/
+COPY TheWatch.Contracts.FirstResponder/ TheWatch.Contracts.FirstResponder/
+COPY TheWatch.Contracts.FamilyHealth/ TheWatch.Contracts.FamilyHealth/
+COPY TheWatch.Contracts.DoctorServices/ TheWatch.Contracts.DoctorServices/
+COPY TheWatch.Contracts.DisasterRelief/ TheWatch.Contracts.DisasterRelief/
+COPY TheWatch.Contracts.MeshNetwork/ TheWatch.Contracts.MeshNetwork/
+COPY TheWatch.Contracts.Surveillance/ TheWatch.Contracts.Surveillance/
+COPY TheWatch.Contracts.Geospatial/ TheWatch.Contracts.Geospatial/
+COPY TheWatch.Shared/ TheWatch.Shared/
+COPY TheWatch.Generators/ TheWatch.Generators/
+COPY _mapping.json .
+
+RUN dotnet build TheWatch.Integration.Tests/TheWatch.Integration.Tests.csproj -c Release --no-restore
+
+ENTRYPOINT ["dotnet", "test", "TheWatch.Integration.Tests/TheWatch.Integration.Tests.csproj", \
+    "--configuration", "Release", "--no-build", \
+    "--filter", "Category=Integration", \
+    "--logger", "trx;LogFileName=integration-results.trx", \
+    "--verbosity", "normal"]

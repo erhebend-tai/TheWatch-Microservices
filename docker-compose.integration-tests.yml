@@ -1,0 +1,50 @@
+# TheWatch — Integration Test Stack
+# Usage: docker compose -f docker-compose.yml -f docker-compose.integration-tests.yml up -d
+# Then:  dotnet test TheWatch.Integration.Tests --filter "Category=Integration"
+# Teardown: docker compose -f docker-compose.yml -f docker-compose.integration-tests.yml down -v
+
+services:
+  # Override infrastructure for test isolation
+  sqlserver:
+    environment:
+      MSSQL_SA_PASSWORD: "${SQL_SA_PASSWORD:-IntTest@Str0ng2024!}"
+    tmpfs:
+      - /var/opt/mssql:rw  # RAM-backed for speed
+
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-IntTest@Geo2024!}"
+    tmpfs:
+      - /var/lib/postgresql/data:rw
+
+  redis:
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+
+  # Test runner service (optional — for CI-only execution inside Docker)
+  integration-tests:
+    build:
+      context: .
+      dockerfile: TheWatch.Integration.Tests/Dockerfile.tests
+    environment:
+      WATCH_AUTH_URL: http://p5-authsecurity:8080
+      WATCH_VOICE_URL: http://p2-voiceemergency:8080
+      WATCH_RESPONDER_URL: http://p6-firstresponder:8080
+      WATCH_FAMILY_URL: http://p7-familyhealth:8080
+      WATCH_DOCTOR_URL: http://p9-doctorservices:8080
+      WATCH_DISASTER_URL: http://p8-disasterrelief:8080
+      WATCH_MESH_URL: http://p3-meshnetwork:8080
+      WATCH_SURVEILLANCE_URL: http://p11-surveillance:8080
+      WATCH_GEO_URL: http://geospatial:8080
+      WATCH_CORE_URL: http://p1-coregateway:8080
+      WATCH_INTEGRATION_TEARDOWN: "false"
+    depends_on:
+      p5-authsecurity:
+        condition: service_healthy
+      p2-voiceemergency:
+        condition: service_healthy
+      p6-firstresponder:
+        condition: service_healthy
+      p7-familyhealth:
+        condition: service_healthy
+    profiles:
+      - test

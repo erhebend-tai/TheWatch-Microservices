@@ -393,13 +393,13 @@
 > P11.Surveillance microservice was added in Session 34 but never fully integrated into infrastructure, monitoring, or testing. These items close that gap.
 
 ### 14A. P11 Infrastructure Wiring
-- [ ] 181. Add P11.Surveillance service definition to `docker-compose.yml` (port 5112, depends_on sql-server + kafka + redis, environment variables matching P1-P10 pattern)
-- [ ] 182. Add `WatchSurveillanceDB` to `docker-compose.yml` sql-init sidecar database creation script
-- [ ] 183. Add `p11-surveillance` to Azure Terraform `locals.container_apps` in `terraform/main.tf` (cpu=0.5, memory=1Gi, min=1, max=10) and `WatchSurveillanceDB` to `locals.databases` (tier=standard)
-- [ ] 184. Add `p11-surveillance` to AWS Terraform ECS task definitions, ALB path routing (`/api/surveillance/*`), and RDS database list
-- [ ] 185. Add `p11-surveillance` to GCP Terraform Cloud Run service definitions
-- [ ] 186. Add P11 service entry to Helm `values.yaml` services map, HPA config, and ingress path rules
-- [ ] 187. Add `footage-submitted` and `crime-location-reported` Kafka topics to Azure Service Bus and AWS MSK Terraform modules
+- [x] 181. Add P11.Surveillance service definition to `docker-compose.yml` (port 5112, depends_on sql-server + kafka + redis, environment variables matching P1-P10 pattern)
+- [x] 182. Add `WatchSurveillanceDB` to `docker-compose.yml` sql-init sidecar database creation script
+- [x] 183. Add `p11-surveillance` to Azure Terraform `locals.container_apps` in `terraform/main.tf` (cpu=0.5, memory=1Gi, min=1, max=10) and `WatchSurveillanceDB` to `locals.databases` (tier=standard)
+- [x] 184. Add `p11-surveillance` to AWS Terraform ECS task definitions, ALB path routing (`/api/surveillance/*`), and RDS database list
+- [x] 185. Add `p11-surveillance` to GCP Terraform Cloud Run service definitions
+- [x] 186. Add P11 service entry to Helm `values.yaml` services map, HPA config, and ingress path rules
+- [x] 187. Add `footage-submitted` and `crime-location-reported` Kafka topics to Azure Service Bus and AWS MSK Terraform modules
 
 ### 14B. P11 Monitoring & Testing
 - [ ] 188. Add `ISurveillanceClient` to `HealthController.cs` parallel health check array (currently only 11 services checked)
@@ -642,13 +642,13 @@
 - [x] 317. Add FluentValidation to P11 Surveillance + Geospatial — validators for camera registration, footage submission, crime location reporting, spatial queries. Validate coordinate systems, bounding box sanity, video file size limits. Files: P11/Geospatial `.csproj`, new `Validators/`, P11/Geospatial `Program.cs`. [STIG V-222606] **HIGH**
 
 ### 22B. Global Exception Handling
-- [ ] 318. Create shared `WatchProblemDetailsMiddleware` — implement RFC 9457 Problem Details middleware in `TheWatch.Shared/Security/`. Map common exceptions: `ValidationException` → 400, `UnauthorizedAccessException` → 401, `KeyNotFoundException` → 404, `InvalidOperationException` → 409, unhandled → 500. Never expose stack traces, type names, or connection strings. Include `traceId` from correlation ID. Files: new `WatchProblemDetailsMiddleware.cs` in Shared. [STIG V-222610, V-222656, OWASP A05] **HIGH**
-- [ ] 319. Wire `WatchProblemDetailsMiddleware` into all 12 services — add `app.UseMiddleware<WatchProblemDetailsMiddleware>()` to all `Program.cs` files (P1-P11 + Geospatial). Place after authentication but before endpoint routing. Admin.RestAPI already has `GlobalExceptionMiddleware` — verify it produces RFC 9457 format. Files: 12 `Program.cs` files. [STIG V-222610] **HIGH**
+- [x] 318. Create shared `WatchProblemDetailsMiddleware` — implement RFC 9457 Problem Details middleware in `TheWatch.Shared/Security/`. Map common exceptions: `ValidationException` → 400, `UnauthorizedAccessException` → 401, `KeyNotFoundException` → 404, `InvalidOperationException` → 409, unhandled → 500. Never expose stack traces, type names, or connection strings. Include `traceId` from correlation ID. Files: new `WatchProblemDetailsMiddleware.cs` in Shared. [STIG V-222610, V-222656, OWASP A05] **HIGH**
+- [x] 319. Wire `WatchProblemDetailsMiddleware` into all 12 services — add `app.UseMiddleware<WatchProblemDetailsMiddleware>()` to all `Program.cs` files (P1-P11 + Geospatial). Place after authentication but before endpoint routing. Admin.RestAPI already has `GlobalExceptionMiddleware` — verify it produces RFC 9457 format. Files: 12 `Program.cs` files. [STIG V-222610] **HIGH**
 - [ ] 320. Suppress detailed error responses in production — configure `builder.Services.AddProblemDetails()` with custom `ProblemDetailsOptions.CustomizeProblemDetails` that strips exception details when `IHostEnvironment.IsProduction()`. Verify `ASPNETCORE_ENVIRONMENT` is set to `Production` in all Dockerfiles and deploy manifests. Files: shared configuration, Dockerfiles, deploy manifests. [STIG V-222656, OWASP A05] **MEDIUM**
 
 ### 22C. Request Size & SSRF Protection
-- [ ] 321. Apply consistent Kestrel request limits to all services — create shared `ConfigureWatchKestrel()` extension: `MaxRequestBodySize = 10_485_760` (10MB), `MaxRequestHeadersTotalSize = 32_768` (32KB), `MaxRequestLineSize = 8_192` (8KB), `RequestHeadersTimeout = TimeSpan.FromSeconds(30)`, suppress Server header. Apply to all 12 services (Admin.RestAPI already has this). Files: new shared extension, 12 `Program.cs`. [NIST SC-5, STIG V-222602] **MEDIUM**
-- [ ] 322. Implement SSRF protection — create `SafeHttpClientHandler` that blocks requests to: private IP ranges (10.x, 172.16-31.x, 192.168.x), link-local (169.254.x — cloud metadata endpoint), localhost. Apply to all `HttpClient` instances that fetch user-supplied URLs (evidence processing, webhook delivery). Files: new `SafeHttpClientHandler.cs` in Shared. [OWASP A10] **MEDIUM**
+- [x] 321. Apply consistent Kestrel request limits to all services — create shared `ConfigureWatchKestrel()` extension: `MaxRequestBodySize = 10_485_760` (10MB), `MaxRequestHeadersTotalSize = 32_768` (32KB), `MaxRequestLineSize = 8_192` (8KB), `RequestHeadersTimeout = TimeSpan.FromSeconds(30)`, suppress Server header. Apply to all 12 services (Admin.RestAPI already has this). Files: new shared extension, 12 `Program.cs`. [NIST SC-5, STIG V-222602] **MEDIUM**
+- [x] 322. Implement SSRF protection — create `SafeHttpClientHandler` that blocks requests to: private IP ranges (10.x, 172.16-31.x, 192.168.x), link-local (169.254.x — cloud metadata endpoint), localhost. Apply to all `HttpClient` instances that fetch user-supplied URLs (evidence processing, webhook delivery). Files: new `SafeHttpClientHandler.cs` in Shared. [OWASP A10] **MEDIUM**
 - [ ] 323. Validate all query string parameters against allowlists — audit all `MapGet`/`MapPost` endpoints accepting query parameters. Replace raw `string` parameters with typed enums or validated DTOs. Specifically fix P5 `/api/onboarding/complete-step` which accepts raw `string step` — change to request body with validated enum. Files: affected endpoints across all services. [STIG V-222606, OWASP A03] **MEDIUM**
 
 ### 22D. CORS & CSRF
