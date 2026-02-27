@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -22,6 +23,7 @@ using TheWatch.Contracts.Gamification;
 using TheWatch.Contracts.Geospatial;
 using TheWatch.Contracts.Surveillance;
 using TheWatch.Contracts.Notifications;
+using TheWatch.Shared.Api;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -238,6 +240,9 @@ ConfigureClient(builder.Services.AddGeospatialClient(), "geospatial");
 ConfigureClient(builder.Services.AddSurveillanceClient(), "p11-surveillance");
 ConfigureClient(builder.Services.AddNotificationsClient(), "p12-notifications");
 
+// Item 226: FluentValidation registration [STIG V-222606, OWASP A03]
+builder.Services.AddValidatorsFromAssemblyContaining<Program>(lifetime: ServiceLifetime.Scoped);
+
 // ──────── App Pipeline (Security+ 3.1: Defense in Depth layers) ─────
 var app = builder.Build();
 
@@ -268,5 +273,8 @@ if (app.Environment.IsDevelopment())
 
 app.MapControllers();
 app.MapDefaultEndpoints();
+// Item 231/249: ETag support and canary endpoints
+app.UseWatchETagSupport();
+app.MapWatchCanaryEndpoints("TheWatch.Admin.RestAPI");
 
 app.Run();
