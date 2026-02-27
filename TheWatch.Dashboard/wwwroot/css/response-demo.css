@@ -1,0 +1,197 @@
+/* Response Demo — map & UI styles */
+
+.response-demo-map-wrapper {
+    position: relative;
+    width: 100%;
+    height: 550px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.response-demo-map-wrapper > div {
+    width: 100%;
+    height: 100%;
+}
+
+/* Stat cards with colored left borders */
+.stat-card {
+    position: relative;
+    padding-left: 1rem;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    border-radius: 4px 0 0 4px;
+}
+
+.stat-card-patrol::before {
+    background: #e74c3c;
+}
+
+.stat-card-neighbor::before {
+    background: #2ecc71;
+}
+
+.stat-card-distance::before {
+    background: #3498db;
+}
+
+.stat-card-saved::before {
+    background: #f1c40f;
+}
+
+.stat-card .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.stat-card .stat-label {
+    opacity: 0.6;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Pulse animation for arrived state */
+.stat-arrived {
+    animation: stat-pulse 1.5s ease-in-out 3;
+}
+
+@keyframes stat-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Map markers */
+.demo-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    transform: translate(-50%, -50%);
+}
+
+.demo-marker .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.demo-marker-residence {
+    background: #e74c3c;
+    animation: marker-pulse 2s ease-in-out infinite;
+}
+
+@keyframes marker-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.6); }
+    50% { box-shadow: 0 0 0 14px rgba(231, 76, 60, 0); }
+}
+
+.demo-marker-police {
+    background: #3498db;
+}
+
+.demo-marker-neighbor {
+    background: #2ecc71;
+}
+
+.demo-marker-patrol-moving {
+    background: #e74c3c;
+    width: 32px;
+    height: 32px;
+}
+
+.demo-marker-neighbor-moving {
+    background: #2ecc71;
+    width: 32px;
+    height: 32px;
+}
+
+/* Map legend overlay */
+.demo-legend {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(30, 30, 30, 0.9);
+    border-radius: 6px;
+    padding: 8px 12px;
+    z-index: 10;
+    font-size: 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.demo-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.demo-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Insight cards */
+.insight-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.insight-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.insight-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.insight-label {
+    opacity: 0.6;
+    font-size: 0.85rem;
+}
+
+/* Progress bar overrides */
+.progress-patrol .rz-progressbar-value {
+    background: #e74c3c !important;
+}
+
+.progress-neighbor .rz-progressbar-value {
+    background: #2ecc71 !important;
+}
+
+/* Speed slider label */
+.speed-label {
+    min-width: 3rem;
+    text-align: center;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* No-key warning */
+.no-key-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(30, 30, 30, 0.85);
+    z-index: 20;
+    border-radius: 8px;
+}

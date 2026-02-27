@@ -199,6 +199,18 @@ public class WatchApiClient
         catch { return []; }
     }
 
+    // === Raw HTTP (used by SyncEngine for offline queue replay) ===
+
+    /// <summary>
+    /// Send a raw HttpRequestMessage through the underlying HttpClient.
+    /// The AuthDelegatingHandler in the pipeline will automatically attach
+    /// the current Bearer token. Used by SyncEngine to replay queued requests.
+    /// </summary>
+    public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
+    {
+        return await _http.SendAsync(request, cancellationToken);
+    }
+
     // Local DTO for vital history response
     private record VitalHistory(List<VitalReadingDto> Readings, int TotalCount);
 }

@@ -1,19 +1,21 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TheWatch.P5.AuthSecurity.Auth;
 
 // DTOs — using .Auth namespace to avoid collision with Roslyn-generated .Models types
 
 public record RegisterRequest(
-    string Email,
-    string Password,
-    string DisplayName,
-    string? Phone = null);
+    [property: Required, EmailAddress, MaxLength(256)] string Email,
+    [property: Required, MinLength(15), MaxLength(128)] string Password,
+    [property: Required, MaxLength(255)] string DisplayName,
+    [property: MaxLength(20)] string? Phone = null);
 
 public record LoginRequest(
-    string Email,
-    string Password,
-    string? TotpCode = null,
-    string? MfaToken = null,
-    string? DeviceFingerprint = null);
+    [property: Required, EmailAddress, MaxLength(256)] string Email,
+    [property: Required, MinLength(1)] string Password,
+    [property: MaxLength(6)] string? TotpCode = null,
+    [property: MaxLength(500)] string? MfaToken = null,
+    [property: MaxLength(500)] string? DeviceFingerprint = null);
 
 public record LoginResponse(
     string AccessToken,
@@ -21,11 +23,12 @@ public record LoginResponse(
     DateTime ExpiresAt,
     UserInfo User,
     bool MfaRequired = false,
-    string? MfaToken = null);
+    string? MfaToken = null,
+    bool PasswordExpired = false);
 
 public record RefreshTokenRequest(
-    string RefreshToken,
-    string? DeviceFingerprint = null);
+    [property: Required, MinLength(10)] string RefreshToken,
+    [property: MaxLength(500)] string? DeviceFingerprint = null);
 
 public record UserInfo(
     Guid Id,
@@ -42,8 +45,8 @@ public record TokenPair(
     DateTime ExpiresAt);
 
 public record AssignRoleRequest(
-    Guid UserId,
-    string Role);
+    [property: Required] Guid UserId,
+    [property: Required, MaxLength(50)] string Role);
 
 public record MfaSetupResponse(
     string SharedKey,
@@ -51,14 +54,14 @@ public record MfaSetupResponse(
     string[] RecoveryCodes);
 
 public record MfaVerifyRequest(
-    string Code);
+    [property: Required, MaxLength(6)] string Code);
 
 public record SmsMfaSendRequest(
-    string PhoneNumber);
+    [property: Required, Phone, MaxLength(20)] string PhoneNumber);
 
 public record SmsMfaVerifyRequest(
-    string Code,
-    string PhoneNumber);
+    [property: Required, MaxLength(6)] string Code,
+    [property: Required, Phone, MaxLength(20)] string PhoneNumber);
 
 public record MagicLinkRequest(
-    string Email);
+    [property: Required, EmailAddress, MaxLength(256)] string Email);

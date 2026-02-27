@@ -8,6 +8,7 @@ using TheWatch.Geospatial;
 using TheWatch.Geospatial.Services;
 using TheWatch.Geospatial.Spatial;
 using TheWatch.Shared.Contracts;
+using TheWatch.Shared.Security;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -22,11 +23,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new GeoJsonConverterFactory());
 });
 
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
-});
+builder.Services.AddWatchCors(builder.Configuration);
 
 builder.Services.AddHangfire(config =>
     config.UseInMemoryStorage());
@@ -45,7 +42,11 @@ app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseHangfireDashboard("/hangfire");
+app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
+{
+    Authorization = [new TheWatch.Shared.Security.HangfireDashboardAuthFilter()],
+    IsReadOnlyFunc = _ => true
+});
 app.MapWatchControllers();
 
 app.MapGet("/health", () => new HealthResponse(

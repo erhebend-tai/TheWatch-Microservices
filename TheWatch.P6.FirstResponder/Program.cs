@@ -5,9 +5,15 @@ using TheWatch.P6.FirstResponder;
 using TheWatch.P6.FirstResponder.Responders;
 using TheWatch.P6.FirstResponder.Services;
 using TheWatch.Shared.Contracts;
+using TheWatch.Shared.Events;
 using TheWatch.P6.FirstResponder.Data.Seeders;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
+using TheWatch.Shared.Security;
+using TheWatch.Contracts.Abstractions;
+using TheWatch.Contracts.VoiceEmergency;
+using TheWatch.Contracts.Geospatial;
+using TheWatch.Contracts.DisasterRelief;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -18,15 +24,12 @@ builder.AddWatchPersistenceAspire();
 builder.ConfigureWatchNotifications();
 builder.AddWatchKafka();
 builder.AddWatchKafkaConsumer<IncidentCreatedConsumer>();
+builder.AddWatchKafkaConsumer<CrimeLocationReportedConsumer>();
 builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
 builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
-// CORS (configured for SignalR — requires AllowCredentials)
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-        policy.SetIsOriginAllowed(_ => true).AllowAnyMethod().AllowAnyHeader().AllowCredentials());
-});
+// CORS (SignalR — requires AllowCredentials)
+builder.Services.AddWatchCors(builder.Configuration, requiresSignalR: true);
 
 // SignalR real-time hubs (ResponderHub, CheckInHub)
 builder.Services.AddWatchSignalR();
@@ -35,6 +38,22 @@ builder.Services.AddWatchSignalR();
 builder.Services.AddHangfire(config =>
     config.UseInMemoryStorage());
 builder.Services.AddHangfireServer();
+
+// ── Inter-service typed HTTP clients (Items 208, 211, 214) ──
+// Shared delegating handlers for correlation ID + API key auth (Items 218, 219)
+builder.Services.AddWatchClientHandlers();
+
+// Item 208: IVoiceEmergencyClient — look up incidents during dispatch coordination
+builder.Services.AddVoiceEmergencyClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:VoiceEmergency"] ?? "https+http://p2-voiceemergency");
+
+// Item 211: IGeospatialClient — spatial queries for responder dispatch (nearest responders, incident zones)
+builder.Services.AddGeospatialClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:Geospatial"] ?? "https+http://geospatial");
+
+// Item 214: IDisasterReliefClient — shelter/evacuation coordination during disaster events
+builder.Services.AddDisasterReliefClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:DisasterRelief"] ?? "https+http://p8-disasterrelief");
 
 // Services
 builder.Services.AddScoped<IResponderService, ResponderService>();
@@ -52,7 +71,11 @@ app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseHangfireDashboard("/hangfire");
+app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
+{
+    Authorization = [new TheWatch.Shared.Security.HangfireDashboardAuthFilter()],
+    IsReadOnlyFunc = _ => true
+});
 app.MapWatchControllers();
 
 // Recurring Hangfire jobs

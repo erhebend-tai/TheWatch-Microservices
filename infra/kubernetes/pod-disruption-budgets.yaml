@@ -1,0 +1,94 @@
+# TheWatch Pod Disruption Budgets
+# Ensures minimum availability during node upgrades, drains, and voluntary disruptions
+# Deploy: kubectl apply -f pod-disruption-budgets.yaml
+
+# Critical services: minimum 2 pods always available
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: p2-voiceemergency-pdb
+  namespace: thewatch
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: p2-voiceemergency
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: p5-authsecurity-pdb
+  namespace: thewatch
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: p5-authsecurity
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: p6-firstresponder-pdb
+  namespace: thewatch
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: p6-firstresponder
+---
+# High-priority services: at most 1 pod unavailable
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: p1-coregateway-pdb
+  namespace: thewatch
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: p1-coregateway
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: geospatial-pdb
+  namespace: thewatch
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: geospatial
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: p8-disasterrelief-pdb
+  namespace: thewatch
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: p8-disasterrelief
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: p11-surveillance-pdb
+  namespace: thewatch
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: p11-surveillance
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dashboard-pdb
+  namespace: thewatch
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dashboard

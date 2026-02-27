@@ -392,12 +392,12 @@ public class ConflictResolvedEventArgs : EventArgs
 public static class WatchApiClientSyncExtensions
 {
     /// <summary>
-    /// Send a raw HTTP request (used by SyncEngine for queued requests)
+    /// Send a raw HTTP request (used by SyncEngine for queued requests).
+    /// Delegates to the instance method on WatchApiClient which sends
+    /// through the underlying HttpClient (with AuthDelegatingHandler in the pipeline).
     /// </summary>
     public static async Task<HttpResponseMessage> SendAsync(this WatchApiClient client, HttpRequestMessage request)
     {
-        // This would need to be implemented in WatchApiClient or we need access to its HttpClient
-        // For now, this is a placeholder that would need proper implementation
-        throw new NotImplementedException("SendAsync method needs to be implemented in WatchApiClient");
+        return await client.SendAsync(request, CancellationToken.None);
     }
 }

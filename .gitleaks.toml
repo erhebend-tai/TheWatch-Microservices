@@ -1,0 +1,33 @@
+# TheWatch — Gitleaks Configuration
+# Custom rules for detecting secrets in the codebase
+
+title = "TheWatch Gitleaks Config"
+
+[allowlist]
+  description = "Global allowlist"
+  paths = [
+    '''\.env\.example$''',
+    '''docs/.*\.md$''',
+    '''appsettings\..*\.template\.json$''',
+    '''DOD_SECURITY_ANALYSIS\.md$''',
+  ]
+
+[[rules]]
+  id = "thewatch-jwt-key"
+  description = "TheWatch JWT signing key"
+  regex = '''(?i)(jwt[_\s]*key|signing[_\s]*key)\s*[:=]\s*["']([^"']{16,})["']'''
+  tags = ["key", "JWT"]
+
+[[rules]]
+  id = "thewatch-connection-string"
+  description = "SQL Server connection string with password"
+  regex = '''(?i)password\s*=\s*([^;]{8,})'''
+  tags = ["database", "connection-string"]
+  [rules.allowlist]
+    paths = ['''\.env\.example$''', '''docker-compose.*\.yml$''']
+
+[[rules]]
+  id = "thewatch-api-key"
+  description = "API key pattern"
+  regex = '''(?i)(api[_\s]*key|apikey)\s*[:=]\s*["']([^"']{16,})["']'''
+  tags = ["key", "API"]

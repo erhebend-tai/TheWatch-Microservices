@@ -1,0 +1,858 @@
+# TheWatch — Kubernetes Network Policies (Zero Trust)
+# NIST AC-4: Information Flow Enforcement
+# NIST SC-7: Boundary Protection
+# DISA STIG V-222531: Network segmentation for containerized workloads
+#
+# Default: deny all ingress and egress.
+# Each service gets explicit allow rules for only the traffic it needs.
+
+# ============================================================
+# 1. Default Deny All — namespace-wide
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+    security.thewatch.io/policy: zero-trust
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# ============================================================
+# 2. Allow DNS egress for all pods (required for service discovery)
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# ============================================================
+# 3. P1 CoreGateway — API Gateway can reach all services
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: p1-coregateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: p1-coregateway
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Accept from ingress controller / load balancer
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+    # Accept from dashboard
+    - from:
+        - podSelector:
+            matchLabels:
+              app: dashboard
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Can reach all P* services
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: thewatch
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Can reach SQL Server
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sqlserver
+      ports:
+        - protocol: TCP
+          port: 1433
+    # Can reach Kafka
+    - to:
+        - podSelector:
+            matchLabels:
+              app: kafka
+      ports:
+        - protocol: TCP
+          port: 29092
+
+---
+# ============================================================
+# 4. P2 VoiceEmergency — can reach P5 (auth), P6 (dispatch), Kafka, SQL
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: p2-voiceemergency
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: p2-voiceemergency
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: p1-coregateway
+        - podSelector:
+            matchLabels:
+              app: p6-firstresponder
+        - podSelector:
+            matchLabels:
+              app: p11-surveillance
+        - podSelector:
+            matchLabels:
+              app: dashboard
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p5-authsecurity
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p6-firstresponder
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: kafka
+      ports:
+        - protocol: TCP
+          port: 29092
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sqlserver
+      ports:
+        - protocol: TCP
+          port: 1433
+
+---
+# ============================================================
+# 5. P3 MeshNetwork — can reach P5 (auth), Kafka, SQL
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: p3-meshnetwork
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: p3-meshnetwork
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: p1-coregateway
+        - podSelector:
+            matchLabels:
+              app: dashboard
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p5-authsecurity
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: kafka
+      ports:
+        - protocol: TCP
+          port: 29092
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sqlserver
+      ports:
+        - protocol: TCP
+          port: 1433
+
+---
+# ============================================================
+# 6. P4 Wearable — can reach P5 (auth), SQL
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: p4-wearable
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: p4-wearable
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: p1-coregateway
+        - podSelector:
+            matchLabels:
+              app: dashboard
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p5-authsecurity
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sqlserver
+      ports:
+        - protocol: TCP
+          port: 1433
+
+---
+# ============================================================
+# 7. P5 AuthSecurity — can reach SQL only (no other services)
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: p5-authsecurity
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: p5-authsecurity
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # All services can reach P5 for auth validation
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: thewatch
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sqlserver
+      ports:
+        - protocol: TCP
+          port: 1433
+
+---
+# ============================================================
+# 8. P6 FirstResponder — can reach P2 (incidents), P5 (auth), Kafka, SQL
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: p6-firstresponder
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: p6-firstresponder
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: p1-coregateway
+        - podSelector:
+            matchLabels:
+              app: p2-voiceemergency
+        - podSelector:
+            matchLabels:
+              app: dashboard
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p2-voiceemergency
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p5-authsecurity
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: kafka
+      ports:
+        - protocol: TCP
+          port: 29092
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sqlserver
+      ports:
+        - protocol: TCP
+          port: 1433
+
+---
+# ============================================================
+# 9. P7 FamilyHealth — can reach P9 (doctor), P5 (auth), SQL
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: p7-familyhealth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: p7-familyhealth
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: p1-coregateway
+        - podSelector:
+            matchLabels:
+              app: dashboard
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p9-doctorservices
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p5-authsecurity
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sqlserver
+      ports:
+        - protocol: TCP
+          port: 1433
+
+---
+# ============================================================
+# 10. P8 DisasterRelief — can reach P5 (auth), SQL
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: p8-disasterrelief
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: p8-disasterrelief
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: p1-coregateway
+        - podSelector:
+            matchLabels:
+              app: dashboard
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p5-authsecurity
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sqlserver
+      ports:
+        - protocol: TCP
+          port: 1433
+
+---
+# ============================================================
+# 11. P9 DoctorServices — can reach P5 (auth), P7 (health data), SQL
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: p9-doctorservices
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: p9-doctorservices
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: p1-coregateway
+        - podSelector:
+            matchLabels:
+              app: p7-familyhealth
+        - podSelector:
+            matchLabels:
+              app: dashboard
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p5-authsecurity
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p7-familyhealth
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sqlserver
+      ports:
+        - protocol: TCP
+          port: 1433
+
+---
+# ============================================================
+# 12. P10 Gamification — can reach P5 (auth), SQL
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: p10-gamification
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: p10-gamification
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: p1-coregateway
+        - podSelector:
+            matchLabels:
+              app: dashboard
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p5-authsecurity
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sqlserver
+      ports:
+        - protocol: TCP
+          port: 1433
+
+---
+# ============================================================
+# 13. P11 Surveillance — can reach P2 (incidents), Kafka, SQL
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: p11-surveillance
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: p11-surveillance
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: p1-coregateway
+        - podSelector:
+            matchLabels:
+              app: dashboard
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p2-voiceemergency
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p5-authsecurity
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: kafka
+      ports:
+        - protocol: TCP
+          port: 29092
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sqlserver
+      ports:
+        - protocol: TCP
+          port: 1433
+
+---
+# ============================================================
+# 14. Geospatial — can reach P5 (auth), PostgreSQL/PostGIS
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: geospatial
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: geospatial
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: p1-coregateway
+        - podSelector:
+            matchLabels:
+              app: dashboard
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p5-authsecurity
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# ============================================================
+# 15. Dashboard — can reach all P* services (read-only UI)
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dashboard
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: dashboard
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Accept from ingress controller / load balancer
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Can reach all P* services + geospatial
+    - to:
+        - podSelector:
+            matchLabels:
+              app: p1-coregateway
+        - podSelector:
+            matchLabels:
+              app: p2-voiceemergency
+        - podSelector:
+            matchLabels:
+              app: p3-meshnetwork
+        - podSelector:
+            matchLabels:
+              app: p4-wearable
+        - podSelector:
+            matchLabels:
+              app: p5-authsecurity
+        - podSelector:
+            matchLabels:
+              app: p6-firstresponder
+        - podSelector:
+            matchLabels:
+              app: p7-familyhealth
+        - podSelector:
+            matchLabels:
+              app: p8-disasterrelief
+        - podSelector:
+            matchLabels:
+              app: p9-doctorservices
+        - podSelector:
+            matchLabels:
+              app: p10-gamification
+        - podSelector:
+            matchLabels:
+              app: p11-surveillance
+        - podSelector:
+            matchLabels:
+              app: geospatial
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# ============================================================
+# 16. SQL Server — ingress from services only, no egress to internet
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sqlserver
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: sqlserver
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: thewatch
+      ports:
+        - protocol: TCP
+          port: 1433
+  # No egress rules = no outbound traffic allowed (beyond DNS from default)
+
+---
+# ============================================================
+# 17. PostgreSQL/PostGIS — ingress from geospatial only, no egress
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: geospatial
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# ============================================================
+# 18. Redis — ingress from services only, no egress
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: thewatch
+      ports:
+        - protocol: TCP
+          port: 6379
+
+---
+# ============================================================
+# 19. Kafka — ingress from services only, no egress to internet
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: thewatch
+spec:
+  podSelector:
+    matchLabels:
+      app: kafka
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: thewatch
+      ports:
+        - protocol: TCP
+          port: 29092
+        - protocol: TCP
+          port: 29093
+  egress:
+    # Kafka controller needs to talk to itself (KRaft)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: kafka
+      ports:
+        - protocol: TCP
+          port: 29093
+        - protocol: TCP
+          port: 29092

@@ -4,6 +4,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>TheWatch.Contracts.AuthSecurity</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackageId>TheWatch.Contracts.AuthSecurity</PackageId>
+    <Description>Typed client and DTOs for the TheWatch Auth and Security service.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\TheWatch.Contracts.Abstractions\TheWatch.Contracts.Abstractions.csproj" />

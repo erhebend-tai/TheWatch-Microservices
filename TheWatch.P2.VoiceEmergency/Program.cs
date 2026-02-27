@@ -10,6 +10,11 @@ using TheWatch.Shared.Events;
 using TheWatch.P2.VoiceEmergency.Data.Seeders;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
+using TheWatch.Shared.Security;
+using TheWatch.Contracts.Abstractions;
+using TheWatch.Contracts.CoreGateway;
+using TheWatch.Contracts.FirstResponder;
+using TheWatch.Contracts.Surveillance;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -18,16 +23,13 @@ builder.ConfigureWatchSerilog();
 builder.ConfigureWatchOpenApi();
 builder.AddWatchPersistenceAspire();
 builder.AddWatchKafka();
+builder.AddWatchKafkaConsumer<TheWatch.P2.VoiceEmergency.Services.FootageSubmittedConsumer>();
 builder.ConfigureWatchNotifications();
 builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
 builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
-// CORS (configured for SignalR — requires AllowCredentials)
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-        policy.SetIsOriginAllowed(_ => true).AllowAnyMethod().AllowAnyHeader().AllowCredentials());
-});
+// CORS (SignalR — requires AllowCredentials)
+builder.Services.AddWatchCors(builder.Configuration, requiresSignalR: true);
 
 // SignalR real-time hubs (IncidentHub, DispatchHub)
 builder.Services.AddWatchSignalR();
@@ -41,6 +43,22 @@ builder.Services.AddHangfireServer();
 
 // Security (JWT validation + rate limiting + audit from SecurityGenerator)
 builder.AddWatchSecurity();
+
+// ── Inter-service typed HTTP clients (Items 209, 210, 215) ──
+// Shared delegating handlers for correlation ID + API key auth (Items 218, 219)
+builder.Services.AddWatchClientHandlers();
+
+// Item 209: ICoreGatewayClient — user profile lookups during incident creation
+builder.Services.AddCoreGatewayClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:CoreGateway"] ?? "https+http://p1-coregateway");
+
+// Item 210: IFirstResponderClient — responder dispatch coordination (find nearby, update status)
+builder.Services.AddFirstResponderClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:FirstResponder"] ?? "https+http://p6-firstresponder");
+
+// Item 215: ISurveillanceClient — nearby camera/footage lookup during active incidents
+builder.Services.AddSurveillanceClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:Surveillance"] ?? "https+http://p11-surveillance");
 
 // Services
 builder.Services.AddScoped<IEmergencyService, EmergencyService>();
@@ -57,7 +75,11 @@ app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseHangfireDashboard("/hangfire");
+app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
+{
+    Authorization = [new TheWatch.Shared.Security.HangfireDashboardAuthFilter()],
+    IsReadOnlyFunc = _ => true
+});
 app.MapWatchControllers();
 
 // Register recurring Hangfire jobs

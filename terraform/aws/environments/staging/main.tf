@@ -49,11 +49,12 @@ locals {
     "p8-disasterrelief",
     "p9-doctorservices",
     "p10-gamification",
+    "p11-surveillance",
     "geospatial",
     "dashboard",
   ]
 
-  # -- Database catalogue (RDS SQL Server holds all ten) ----------------------
+  # -- Database catalogue (RDS SQL Server holds all eleven) ----------------------
   databases = {
     "WatchCoreGatewayDB"    = { service = "p1-coregateway", tier = "standard" }
     "WatchVoiceEmergencyDB" = { service = "p2-voiceemergency", tier = "critical" }
@@ -65,6 +66,7 @@ locals {
     "WatchDisasterReliefDB" = { service = "p8-disasterrelief", tier = "standard" }
     "WatchDoctorServicesDB" = { service = "p9-doctorservices", tier = "standard" }
     "WatchGamificationDB"   = { service = "p10-gamification", tier = "standard" }
+    "WatchSurveillanceDB"   = { service = "p11-surveillance", tier = "standard" }
   }
 
   # -- ECS Fargate sizing — STAGING tier --------------------------------------
@@ -179,6 +181,17 @@ locals {
       dns_name       = "p10-gamification"
       path_pattern   = "/api/v1/gamification/*"
     }
+    "p11-surveillance" = {
+      cpu            = 1024
+      memory         = 2048
+      desired_count  = 1
+      min_capacity   = 1
+      max_capacity   = 5
+      port           = 8080
+      image          = "${module.ecr.repository_urls["p11-surveillance"]}:latest"
+      dns_name       = "p11-surveillance"
+      path_pattern   = "/api/v1/surveillance/*"
+    }
     "geospatial" = {
       cpu            = 1024
       memory         = 2048
@@ -211,8 +224,10 @@ locals {
     "checkin-completed"  = { partitions = 3,  replication_factor = 3, retention_ms = 604800000 }
     "vital-alert"        = { partitions = 6,  replication_factor = 3, retention_ms = 604800000 }
     "evidence-uploaded"  = { partitions = 3,  replication_factor = 3, retention_ms = 604800000 }
-    "disaster-declared"  = { partitions = 3,  replication_factor = 3, retention_ms = 604800000 }
-    "dead-letter"        = { partitions = 1,  replication_factor = 3, retention_ms = 2592000000 }
+    "disaster-declared"       = { partitions = 3,  replication_factor = 3, retention_ms = 604800000 }
+    "footage-submitted"       = { partitions = 3,  replication_factor = 3, retention_ms = 604800000 }
+    "crime-location-reported" = { partitions = 3,  replication_factor = 3, retention_ms = 604800000 }
+    "dead-letter"             = { partitions = 1,  replication_factor = 3, retention_ms = 2592000000 }
   }
 }
 

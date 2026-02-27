@@ -7,24 +7,26 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.AppHost" Version="9.2.0" Condition="false" />
-    <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="9.2.*" />
-    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.*" />
-    <PackageReference Include="Hangfire.InMemory" Version="0.6.0" />
-    <PackageReference Include="Hangfire.Pro" Version="3.0.4" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.*-*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.*-*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.*-*">
+    <PackageReference Include="Aspire.Hosting.AppHost" Condition="false" />
+    <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Hangfire.AspNetCore" />
+    <PackageReference Include="Hangfire.InMemory" />
+    <PackageReference Include="Hangfire.Pro" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Scalar.AspNetCore" Version="2.*" />
-    <PackageReference Include="Serilog.AspNetCore" Version="9.*" />
+    <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="Serilog.AspNetCore" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\TheWatch.Shared\TheWatch.Shared.csproj" />
     <ProjectReference Include="..\TheWatch.Generators\TheWatch.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <!-- Item 213: IFamilyHealthClient for patient family health data during appointments -->
+    <ProjectReference Include="..\TheWatch.Contracts.FamilyHealth\TheWatch.Contracts.FamilyHealth.csproj" />
   </ItemGroup>
 
   <ItemGroup>

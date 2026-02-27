@@ -62,7 +62,7 @@ function Assert-WatchPrerequisite {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('docker', 'terraform', 'helm', 'kubectl', 'dotnet')]
+        [ValidateSet('docker', 'terraform', 'helm', 'kubectl', 'dotnet', 'cloudflared')]
         [string]$Tool,
 
         [string]$MinVersion
@@ -101,6 +101,12 @@ function Assert-WatchPrerequisite {
             }
             'dotnet' {
                 $versionString = & dotnet --version 2>&1
+            }
+            'cloudflared' {
+                $result = & cloudflared --version 2>&1
+                if ($result -match '(\d+\.\d+\.\d+)') {
+                    $versionString = $Matches[1]
+                }
             }
         }
     }

@@ -140,40 +140,23 @@ jobs:
           fi
 
   # ===========================================================
-  # Secret scanning (detect accidentally committed secrets)
+  # Secret Detection (Gitleaks — entropy + regex patterns)
   # ===========================================================
   secrets-scan:
-    name: Secret Detection
+    name: Secret Detection (Gitleaks)
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     timeout-minutes: 10
+
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Detect secrets in PR diff
-        run: |
-          echo "## Secret Detection" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          # Check for common secret patterns in the diff
-          PATTERNS=(
-            'password\s*=\s*"[^"]{8,}'
-            'secret\s*=\s*"[^"]{8,}'
-            'api[_-]?key\s*=\s*"[^"]{8,}'
-            'connectionstring.*password=[^;]{8,}'
-            'BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY'
-          )
-          FOUND=0
-          for pattern in "${PATTERNS[@]}"; do
-            if git diff origin/${{ github.base_ref }}..HEAD -- ':(exclude)*.md' ':(exclude)*.yml' ':(exclude)*.yaml' | grep -iP "$pattern" > /dev/null 2>&1; then
-              echo "::warning::Potential secret pattern detected: $pattern"
-              FOUND=1
-            fi
-          done
-          if [ "$FOUND" -eq 0 ]; then
-            echo "No secrets detected in PR diff." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "::warning::Potential secrets detected — please review" >> $GITHUB_STEP_SUMMARY
-          fi
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -97,6 +97,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P11.Surveillance",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.Surveillance", "TheWatch.Contracts.Surveillance\TheWatch.Contracts.Surveillance.csproj", "{0ECCFBD4-C306-4900-AA11-393358503F78}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P11.Surveillance.Tests", "TheWatch.P11.Surveillance.Tests\TheWatch.P11.Surveillance.Tests.csproj", "{D66F88A0-E63F-4E64-9D4C-CC91477798B7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -647,6 +649,18 @@ Global
 		{0ECCFBD4-C306-4900-AA11-393358503F78}.Release|x64.Build.0 = Release|Any CPU
 		{0ECCFBD4-C306-4900-AA11-393358503F78}.Release|x86.ActiveCfg = Release|Any CPU
 		{0ECCFBD4-C306-4900-AA11-393358503F78}.Release|x86.Build.0 = Release|Any CPU
+		{D66F88A0-E63F-4E64-9D4C-CC91477798B7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D66F88A0-E63F-4E64-9D4C-CC91477798B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D66F88A0-E63F-4E64-9D4C-CC91477798B7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D66F88A0-E63F-4E64-9D4C-CC91477798B7}.Debug|x64.Build.0 = Debug|Any CPU
+		{D66F88A0-E63F-4E64-9D4C-CC91477798B7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D66F88A0-E63F-4E64-9D4C-CC91477798B7}.Debug|x86.Build.0 = Debug|Any CPU
+		{D66F88A0-E63F-4E64-9D4C-CC91477798B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D66F88A0-E63F-4E64-9D4C-CC91477798B7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D66F88A0-E63F-4E64-9D4C-CC91477798B7}.Release|x64.ActiveCfg = Release|Any CPU
+		{D66F88A0-E63F-4E64-9D4C-CC91477798B7}.Release|x64.Build.0 = Release|Any CPU
+		{D66F88A0-E63F-4E64-9D4C-CC91477798B7}.Release|x86.ActiveCfg = Release|Any CPU
+		{D66F88A0-E63F-4E64-9D4C-CC91477798B7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

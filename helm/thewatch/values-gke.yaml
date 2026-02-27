@@ -1,0 +1,167 @@
+# TheWatch Helm Values — Google Kubernetes Engine (GKE Autopilot)
+# Usage: helm upgrade --install thewatch ./helm/thewatch -f helm/thewatch/values-gke.yaml
+#
+# GKE Autopilot: resource requests = what you pay for (no node management)
+# Right-size requests carefully — over-requesting wastes money
+
+global:
+  environment: Production
+
+image:
+  registry: us-docker.pkg.dev/thewatch-prod/thewatch
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# Cloud SQL for SQL Server
+sqlserver:
+  enabled: true
+  host: "/cloudsql/thewatch-prod:us-central1:thewatch-sql"
+  port: 1433
+  user: "watchadmin"
+
+# AlloyDB for PostgreSQL (PostGIS)
+postgres:
+  enabled: true
+  host: "10.x.x.x"  # AlloyDB private IP
+  port: 5432
+  user: "postgres"
+  database: "WatchGeospatialDB"
+
+# Pub/Sub (replaces Kafka — GCP native)
+kafka:
+  enabled: false
+
+# Memorystore Redis
+redis:
+  enabled: true
+  host: "10.x.x.x"  # Memorystore private IP
+  port: 6379
+
+services:
+  p1-coregateway:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p1-coregateway
+    # Autopilot: requests are what you pay for — right-size carefully
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+        ephemeral-storage: 256Mi
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+    hpa:
+      enabled: false  # KEDA
+
+  p2-voiceemergency:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: thewatch-p2-voiceemergency
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+        ephemeral-storage: 256Mi
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+    hpa:
+      enabled: false  # KEDA
+    # Autopilot Spot pod annotation
+    annotations:
+      cloud.google.com/gke-spot: "true"
+
+  p5-authsecurity:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p5-authsecurity
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+        ephemeral-storage: 256Mi
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+
+  p6-firstresponder:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: thewatch-p6-firstresponder
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+        ephemeral-storage: 256Mi
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+    hpa:
+      enabled: false  # KEDA
+
+  p8-disasterrelief:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: thewatch-p8-disasterrelief
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+        ephemeral-storage: 256Mi
+      limits:
+        cpu: "1"
+        memory: "2Gi"
+
+  p11-surveillance:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p11-surveillance
+    resources:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+        nvidia.com/gpu: "1"
+        ephemeral-storage: "1Gi"
+      limits:
+        cpu: "4"
+        memory: "4Gi"
+        nvidia.com/gpu: "1"
+    nodeSelector:
+      cloud.google.com/gke-accelerator: nvidia-tesla-t4
+
+  geospatial:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-geospatial
+    resources:
+      requests:
+        cpu: 500m
+        memory: "1Gi"
+        ephemeral-storage: 512Mi
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+
+ingress:
+  enabled: true
+  className: gce
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: "thewatch-ip"
+    networking.gke.io/managed-certificates: "thewatch-cert"
+    # Cloud Armor WAF policy
+    networking.gke.io/v1beta1.FrontendConfig: "thewatch-frontend"
+  hosts:
+    - host: api.thewatch.app
+      paths: []
+  tls:
+    - secretName: thewatch-tls
+      hosts:
+        - api.thewatch.app

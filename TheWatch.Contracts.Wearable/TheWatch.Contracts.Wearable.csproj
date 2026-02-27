@@ -4,6 +4,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>TheWatch.Contracts.Wearable</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackageId>TheWatch.Contracts.Wearable</PackageId>
+    <Description>Typed client and DTOs for the TheWatch Wearable service.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\TheWatch.Contracts.Abstractions\TheWatch.Contracts.Abstractions.csproj" />

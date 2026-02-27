@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TheWatch.P2.VoiceEmergency.Emergency;
 
 public enum EmergencyType
@@ -57,6 +59,9 @@ public class Incident
     public DateTime? ResolvedAt { get; set; }
     public List<string> Tags { get; set; } = [];
     public List<string> MediaUrls { get; set; } = [];
+
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = [];
 }
 
 public record CreateIncidentRequest(
@@ -92,6 +97,9 @@ public class Dispatch
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? AcknowledgedAt { get; set; }
     public int EscalationCount { get; set; }
+
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = [];
 }
 
 public record CreateDispatchRequest(

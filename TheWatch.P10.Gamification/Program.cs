@@ -8,6 +8,7 @@ using TheWatch.Shared.Contracts;
 using TheWatch.P10.Gamification.Data.Seeders;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
+using TheWatch.Shared.Security;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -19,11 +20,7 @@ builder.ConfigureWatchNotifications();
 builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
 builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
-});
+builder.Services.AddWatchCors(builder.Configuration);
 
 builder.Services.AddHangfire(config =>
     config.UseInMemoryStorage());
@@ -43,7 +40,11 @@ app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseHangfireDashboard("/hangfire");
+app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
+{
+    Authorization = [new TheWatch.Shared.Security.HangfireDashboardAuthFilter()],
+    IsReadOnlyFunc = _ => true
+});
 app.MapWatchControllers();
 
 // Recurring Hangfire jobs

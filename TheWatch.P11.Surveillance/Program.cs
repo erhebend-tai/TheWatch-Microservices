@@ -47,6 +47,7 @@ builder.Services.AddScoped<IFootageService, FootageService>();
 builder.Services.AddScoped<ICrimeLocationService, CrimeLocationService>();
 builder.Services.AddScoped<IVideoAnalysisService, VideoAnalysisService>();
 builder.AddWatchControllers();
+builder.Services.AddScoped<IWatchDataSeeder, TheWatch.P11.Surveillance.Data.Seeders.SurveillanceSeeder>();
 
 var app = builder.Build();
 await app.UseWatchMigrations();

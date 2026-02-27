@@ -5,7 +5,7 @@
     Author            = 'TheWatch Team'
     CompanyName       = 'TheWatch Project'
     Copyright         = '(c) 2026 TheWatch Project. All rights reserved.'
-    Description       = 'PowerShell admin and infrastructure CLI for TheWatch microservices platform. Provides API operations (auth, users, MFA, security) and infrastructure management (Docker Compose, Aspire, Terraform, Helm/Kubernetes).'
+    Description       = 'PowerShell admin and infrastructure CLI for TheWatch microservices platform. Provides API operations (auth, users, MFA, security), infrastructure management (Docker Compose, Aspire, Terraform, Helm/Kubernetes), Cloudflare Tunnel setup, and host/network security auditing.'
 
     PowerShellVersion = '7.0'
 
@@ -78,6 +78,17 @@
         'Remove-WatchHelm'
         'Get-WatchHelmStatus'
         'Get-WatchPod'
+
+        # --- Cloudflare Tunnel (4) ---
+        'Initialize-WatchTunnel'
+        'Start-WatchTunnel'
+        'Stop-WatchTunnel'
+        'Test-WatchTunnelHealth'
+
+        # --- Security Audit (3) ---
+        'Test-WatchHostSecurity'
+        'Test-WatchNetworkSecurity'
+        'Get-WatchSecurityReport'
     )
 
     CmdletsToExport   = @()
@@ -86,9 +97,9 @@
 
     PrivateData = @{
         PSData = @{
-            Tags         = @('TheWatch', 'Microservices', 'Admin', 'Infrastructure', 'Docker', 'Terraform', 'Helm', 'Kubernetes')
+            Tags         = @('TheWatch', 'Microservices', 'Admin', 'Infrastructure', 'Docker', 'Terraform', 'Helm', 'Kubernetes', 'Cloudflare', 'Security')
             ProjectUri   = 'https://github.com/TheWatch-Project'
-            ReleaseNotes = 'Initial release: 47 cmdlets covering API operations and infrastructure management.'
+            ReleaseNotes = '54 cmdlets: API operations, infrastructure management, Cloudflare Tunnel, and security auditing.'
         }
     }
 }

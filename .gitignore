@@ -102,3 +102,6 @@ msbuild.binlog
 
 # Temporary output
 .output.txt
+
+# Generated output files (too large for repo)
+_Outside_Files/

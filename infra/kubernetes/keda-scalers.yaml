@@ -1,0 +1,235 @@
+# TheWatch KEDA Event-Driven Autoscalers
+# Prerequisite: helm repo add kedacore https://kedacore.github.io/charts
+#               helm install keda kedacore/keda --namespace keda --create-namespace
+#
+# Deploy: kubectl apply -f keda-scalers.yaml
+
+# ──────────────────────────────────────────────────────
+# P1 CoreGateway — scales with total platform throughput
+# ──────────────────────────────────────────────────────
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: p1-coregateway-scaler
+  namespace: thewatch
+  labels:
+    app.kubernetes.io/part-of: thewatch
+    app.kubernetes.io/component: autoscaling
+spec:
+  scaleTargetRef:
+    name: p1-coregateway
+  pollingInterval: 15
+  cooldownPeriod: 180
+  minReplicaCount: 2
+  maxReplicaCount: 10
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-server.monitoring:9090
+        metricName: gateway_rps
+        query: sum(rate(http_requests_total{service="p1-coregateway"}[2m]))
+        threshold: "200"
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "70"
+---
+# ──────────────────────────────────────────────────────
+# P2 VoiceEmergency — CRITICAL: Kafka backlog + RPS
+# ──────────────────────────────────────────────────────
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: p2-voiceemergency-scaler
+  namespace: thewatch
+  labels:
+    app.kubernetes.io/part-of: thewatch
+    app.kubernetes.io/component: autoscaling
+spec:
+  scaleTargetRef:
+    name: p2-voiceemergency
+  pollingInterval: 10
+  cooldownPeriod: 120
+  minReplicaCount: 3
+  maxReplicaCount: 30
+  fallback:
+    failureThreshold: 3
+    replicas: 5
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: thewatch-kafka:9092
+        consumerGroup: p2-voiceemergency
+        topic: emergency-events
+        lagThreshold: "50"
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-server.monitoring:9090
+        metricName: emergency_rps
+        query: sum(rate(http_requests_total{service="p2-voiceemergency"}[1m]))
+        threshold: "100"
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "60"
+---
+# ──────────────────────────────────────────────────────
+# P5 AuthSecurity — scale on token issuance rate
+# ──────────────────────────────────────────────────────
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: p5-authsecurity-scaler
+  namespace: thewatch
+  labels:
+    app.kubernetes.io/part-of: thewatch
+    app.kubernetes.io/component: autoscaling
+spec:
+  scaleTargetRef:
+    name: p5-authsecurity
+  pollingInterval: 15
+  cooldownPeriod: 180
+  minReplicaCount: 2
+  maxReplicaCount: 12
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-server.monitoring:9090
+        metricName: auth_token_rps
+        query: sum(rate(auth_token_issued_total[2m]))
+        threshold: "50"
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "60"
+---
+# ──────────────────────────────────────────────────────
+# P6 FirstResponder — CRITICAL: dispatch queue + Kafka
+# ──────────────────────────────────────────────────────
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: p6-firstresponder-scaler
+  namespace: thewatch
+  labels:
+    app.kubernetes.io/part-of: thewatch
+    app.kubernetes.io/component: autoscaling
+spec:
+  scaleTargetRef:
+    name: p6-firstresponder
+  pollingInterval: 10
+  cooldownPeriod: 120
+  minReplicaCount: 3
+  maxReplicaCount: 20
+  fallback:
+    failureThreshold: 3
+    replicas: 5
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: thewatch-kafka:9092
+        consumerGroup: p6-firstresponder
+        topic: dispatch-events
+        lagThreshold: "30"
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-server.monitoring:9090
+        metricName: active_dispatches
+        query: thewatch_active_dispatches
+        threshold: "20"
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "65"
+---
+# ──────────────────────────────────────────────────────
+# P8 DisasterRelief — idle-to-massive scale pattern
+# ──────────────────────────────────────────────────────
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: p8-disasterrelief-scaler
+  namespace: thewatch
+  labels:
+    app.kubernetes.io/part-of: thewatch
+    app.kubernetes.io/component: autoscaling
+spec:
+  scaleTargetRef:
+    name: p8-disasterrelief
+  pollingInterval: 15
+  cooldownPeriod: 300
+  idleReplicaCount: 1
+  minReplicaCount: 2
+  maxReplicaCount: 25
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-server.monitoring:9090
+        metricName: disaster_events
+        query: thewatch_disaster_active_events
+        threshold: "1"
+    # Hurricane season pre-scale (June-November)
+    - type: cron
+      metadata:
+        timezone: America/New_York
+        start: 0 6 1 6 *
+        end: 0 6 1 12 *
+        desiredReplicas: "4"
+---
+# ──────────────────────────────────────────────────────
+# P11 Surveillance — GPU-bound CCTV processing
+# ──────────────────────────────────────────────────────
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: p11-surveillance-scaler
+  namespace: thewatch
+  labels:
+    app.kubernetes.io/part-of: thewatch
+    app.kubernetes.io/component: autoscaling
+spec:
+  scaleTargetRef:
+    name: p11-surveillance
+  pollingInterval: 30
+  cooldownPeriod: 300
+  minReplicaCount: 2
+  maxReplicaCount: 8
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-server.monitoring:9090
+        metricName: frame_backlog
+        query: thewatch_surveillance_frame_queue_depth
+        threshold: "500"
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "75"
+---
+# ──────────────────────────────────────────────────────
+# Geospatial — memory-heavy PostGIS queries
+# ──────────────────────────────────────────────────────
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: geospatial-scaler
+  namespace: thewatch
+  labels:
+    app.kubernetes.io/part-of: thewatch
+    app.kubernetes.io/component: autoscaling
+spec:
+  scaleTargetRef:
+    name: geospatial
+  pollingInterval: 30
+  cooldownPeriod: 300
+  minReplicaCount: 2
+  maxReplicaCount: 8
+  triggers:
+    - type: memory
+      metricType: Utilization
+      metadata:
+        value: "70"
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "65"

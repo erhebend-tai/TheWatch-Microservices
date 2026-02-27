@@ -4,6 +4,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>TheWatch.Contracts.FirstResponder</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackageId>TheWatch.Contracts.FirstResponder</PackageId>
+    <Description>Typed client and DTOs for the TheWatch First Responder service.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\TheWatch.Contracts.Abstractions\TheWatch.Contracts.Abstractions.csproj" />

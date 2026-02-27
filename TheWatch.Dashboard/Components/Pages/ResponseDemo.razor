@@ -1,0 +1,296 @@
+@page "/response-demo"
+@inject IJSRuntime JS
+@inject IConfiguration Config
+@implements IAsyncDisposable
+
+<PageTitle>Response Demo — TheWatch</PageTitle>
+
+<!-- Header -->
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Class="rz-mb-4">
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+        <RadzenIcon Icon="timer" Style="font-size: 2rem; color: var(--rz-primary);" />
+        <RadzenText TextStyle="TextStyle.H4" Style="margin: 0;">Response Time Demo</RadzenText>
+    </RadzenStack>
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+        @if (_neighborArrived)
+        {
+            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Neighbor Arrived" />
+        }
+        @if (_patrolArrived)
+        {
+            <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="Patrol Arrived" />
+        }
+        @if (_demoComplete)
+        {
+            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Demo Complete" />
+        }
+    </RadzenStack>
+</RadzenStack>
+
+<!-- Stat Cards -->
+<RadzenRow Gap="1rem" Class="rz-mb-4">
+    <RadzenColumn Size="3">
+        <RadzenCard Class="@($"stat-card stat-card-patrol {(_patrolArrived ? "stat-arrived" : "")}")">
+            <div class="stat-label">Patrol ETA</div>
+            <div class="stat-value" style="color: #e74c3c;">@FormatTime(_patrolEta)</div>
+        </RadzenCard>
+    </RadzenColumn>
+    <RadzenColumn Size="3">
+        <RadzenCard Class="@($"stat-card stat-card-neighbor {(_neighborArrived ? "stat-arrived" : "")}")">
+            <div class="stat-label">Neighbor ETA</div>
+            <div class="stat-value" style="color: #2ecc71;">@FormatTime(_neighborEta)</div>
+        </RadzenCard>
+    </RadzenColumn>
+    <RadzenColumn Size="3">
+        <RadzenCard Class="stat-card stat-card-distance">
+            <div class="stat-label">Distances</div>
+            <div class="stat-value" style="color: #3498db;">3.8km <span style="font-size: 1rem; opacity: 0.5;">vs</span> 80m</div>
+        </RadzenCard>
+    </RadzenColumn>
+    <RadzenColumn Size="3">
+        <RadzenCard Class="stat-card stat-card-saved">
+            <div class="stat-label">Time Saved</div>
+            <div class="stat-value" style="color: #f1c40f;">@FormatTime(_timeSaved)</div>
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
+
+<!-- Map -->
+<div class="response-demo-map-wrapper rz-mb-4">
+    <div id="response-demo-map"></div>
+
+    @if (!_hasKey)
+    {
+        <div class="no-key-overlay">
+            <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Dark" AllowClose="false" Style="max-width: 500px;">
+                <strong>Azure Maps key not configured.</strong><br />
+                Add your subscription key to <code>appsettings.json</code> under
+                <code>Azure:MapsSubscriptionKey</code> to enable the map.
+                The demo animation will still function without tiles.
+            </RadzenAlert>
+        </div>
+    }
+
+    <div class="demo-legend">
+        <div class="demo-legend-item">
+            <div class="demo-legend-dot" style="background: #e74c3c;"></div>
+            <span>Residence (Emergency)</span>
+        </div>
+        <div class="demo-legend-item">
+            <div class="demo-legend-dot" style="background: #3498db;"></div>
+            <span>Police Station (~3.8 km)</span>
+        </div>
+        <div class="demo-legend-item">
+            <div class="demo-legend-dot" style="background: #2ecc71;"></div>
+            <span>Neighbor (~80 m)</span>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Bars -->
+<RadzenRow Gap="1rem" Class="rz-mb-4">
+    <RadzenColumn Size="6">
+        <RadzenText TextStyle="TextStyle.Body2" Style="opacity: 0.7;">Patrol Unit</RadzenText>
+        <div class="progress-patrol">
+            <RadzenProgressBar Value="@(_patrolProgress * 100)" ShowValue="false" Style="height: 10px;" />
+        </div>
+    </RadzenColumn>
+    <RadzenColumn Size="6">
+        <RadzenText TextStyle="TextStyle.Body2" Style="opacity: 0.7;">Neighbor Responder</RadzenText>
+        <div class="progress-neighbor">
+            <RadzenProgressBar Value="@(_neighborProgress * 100)" ShowValue="false" Style="height: 10px;" />
+        </div>
+    </RadzenColumn>
+</RadzenRow>
+
+<!-- Controls -->
+<RadzenCard Class="rz-mb-4">
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" Wrap="FlexWrap.Wrap">
+        @if (!_isRunning)
+        {
+            <RadzenButton Text="Start" Icon="play_arrow" ButtonStyle="ButtonStyle.Success" Click="OnStart" />
+        }
+        else if (_isPaused)
+        {
+            <RadzenButton Text="Resume" Icon="play_arrow" ButtonStyle="ButtonStyle.Success" Click="OnResume" />
+        }
+        else
+        {
+            <RadzenButton Text="Pause" Icon="pause" ButtonStyle="ButtonStyle.Warning" Click="OnPause" />
+        }
+
+        <RadzenButton Text="Reset" Icon="replay" ButtonStyle="ButtonStyle.Light" Click="OnReset" Disabled="@(!_isRunning && !_demoComplete)" />
+
+        <div style="width: 1px; height: 24px; background: rgba(255,255,255,0.1);"></div>
+
+        <RadzenText TextStyle="TextStyle.Body2" Style="opacity: 0.7; margin: 0;">Speed:</RadzenText>
+        <RadzenSlider @bind-Value="_speed" Min="1" Max="20" Step="1" Style="width: 180px;"
+                      Change="@((int _) => OnSpeedChange())" TValue="int" />
+        <span class="speed-label">@(_speed)x</span>
+    </RadzenStack>
+</RadzenCard>
+
+<!-- Insight Cards -->
+<RadzenRow Gap="1rem">
+    <RadzenColumn Size="4">
+        <RadzenCard Class="insight-card">
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                <RadzenIcon Icon="call" Style="font-size: 2rem; color: #e74c3c;" />
+                <div class="insight-value" style="color: #e74c3c;">7–12 min</div>
+                <div class="insight-label">Average 911 response time in U.S. cities</div>
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
+    <RadzenColumn Size="4">
+        <RadzenCard Class="insight-card">
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                <RadzenIcon Icon="directions_run" Style="font-size: 2rem; color: #2ecc71;" />
+                <div class="insight-value" style="color: #2ecc71;">60–90 sec</div>
+                <div class="insight-label">TheWatch neighbor response time</div>
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
+    <RadzenColumn Size="4">
+        <RadzenCard Class="insight-card">
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                <RadzenIcon Icon="speed" Style="font-size: 2rem; color: #f1c40f;" />
+                <div class="insight-value" style="color: #f1c40f;">Up to 85%</div>
+                <div class="insight-label">Faster first-on-scene with TheWatch</div>
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
+
+@code {
+    private DotNetObjectReference<ResponseDemo>? _dotNetRef;
+    private bool _hasKey;
+    private bool _mapInitialized;
+
+    // Animation state
+    private bool _isRunning;
+    private bool _isPaused;
+    private bool _demoComplete;
+    private double _patrolProgress;
+    private double _neighborProgress;
+    private double _patrolEta = 540;
+    private double _neighborEta = 70;
+    private double _timeSaved;
+    private bool _patrolArrived;
+    private bool _neighborArrived;
+    private int _speed = 10;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var key = Config["Azure:MapsSubscriptionKey"] ?? "";
+            _hasKey = !string.IsNullOrWhiteSpace(key);
+
+            _dotNetRef = DotNetObjectReference.Create(this);
+            _mapInitialized = await JS.InvokeAsync<bool>("ResponseDemoMap.init", "response-demo-map", key, _dotNetRef);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnStart()
+    {
+        _isRunning = true;
+        _isPaused = false;
+        _demoComplete = false;
+        _patrolArrived = false;
+        _neighborArrived = false;
+        _patrolProgress = 0;
+        _neighborProgress = 0;
+        _patrolEta = 540;
+        _neighborEta = 70;
+        _timeSaved = 0;
+        await JS.InvokeVoidAsync("ResponseDemoMap.setSpeed", _speed);
+        await JS.InvokeVoidAsync("ResponseDemoMap.start");
+    }
+
+    private async Task OnPause()
+    {
+        _isPaused = true;
+        await JS.InvokeVoidAsync("ResponseDemoMap.pause");
+    }
+
+    private async Task OnResume()
+    {
+        _isPaused = false;
+        await JS.InvokeVoidAsync("ResponseDemoMap.resume");
+    }
+
+    private async Task OnReset()
+    {
+        await JS.InvokeVoidAsync("ResponseDemoMap.reset");
+    }
+
+    private async Task OnSpeedChange()
+    {
+        await JS.InvokeVoidAsync("ResponseDemoMap.setSpeed", _speed);
+    }
+
+    [JSInvokable]
+    public void OnAnimationProgress(double patrolProgress, double neighborProgress, double patrolEta, double neighborEta, bool neighborArrived, bool patrolArrived)
+    {
+        _patrolProgress = patrolProgress;
+        _neighborProgress = neighborProgress;
+        _patrolEta = patrolEta;
+        _neighborEta = neighborEta;
+        _neighborArrived = neighborArrived;
+        _patrolArrived = patrolArrived;
+        _timeSaved = Math.Max(0, _patrolEta - _neighborEta);
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void OnDemoComplete()
+    {
+        _demoComplete = true;
+        _isRunning = false;
+        _patrolProgress = 1;
+        _neighborProgress = 1;
+        _patrolEta = 0;
+        _neighborEta = 0;
+        _timeSaved = 470; // 540 - 70
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void OnResetCallback()
+    {
+        _isRunning = false;
+        _isPaused = false;
+        _demoComplete = false;
+        _patrolArrived = false;
+        _neighborArrived = false;
+        _patrolProgress = 0;
+        _neighborProgress = 0;
+        _patrolEta = 540;
+        _neighborEta = 70;
+        _timeSaved = 0;
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private static string FormatTime(double seconds)
+    {
+        if (seconds <= 0) return "0:00";
+        var mins = (int)(seconds / 60);
+        var secs = (int)(seconds % 60);
+        return $"{mins}:{secs:D2}";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("ResponseDemoMap.dispose");
+        }
+        catch (JSDisconnectedException) { }
+
+        _dotNetRef?.Dispose();
+    }
+}

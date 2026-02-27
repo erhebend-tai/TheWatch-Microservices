@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TheWatch.Shared.Contracts.Mobile;
 
 // Shared family health DTOs for mobile client consumption.
@@ -60,15 +62,15 @@ public record VitalReadingDto(
     DateTime Timestamp);
 
 public record CreateCheckInRequest(
-    CheckInStatus Status,
-    string? Message = null,
-    double? Latitude = null,
-    double? Longitude = null);
+    [property: Required] CheckInStatus Status,
+    [property: MaxLength(500)] string? Message = null,
+    [property: Range(-90.0, 90.0)] double? Latitude = null,
+    [property: Range(-180.0, 180.0)] double? Longitude = null);
 
 public record RecordVitalRequest(
-    VitalType Type,
-    double Value,
-    string? Unit = null);
+    [property: Required] VitalType Type,
+    [property: Range(0.0, 1000.0)] double Value,
+    [property: MaxLength(50)] string? Unit = null);
 
 public record MedicalAlertDto(
     Guid Id,

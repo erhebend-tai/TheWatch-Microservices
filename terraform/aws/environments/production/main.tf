@@ -62,6 +62,7 @@ locals {
     "p8-disasterrelief",
     "p9-doctorservices",
     "p10-gamification",
+    "p11-surveillance",
     "geospatial",
     "dashboard",
   ]
@@ -77,6 +78,7 @@ locals {
     "WatchDisasterReliefDB" = { service = "p8-disasterrelief", tier = "standard" }
     "WatchDoctorServicesDB" = { service = "p9-doctorservices", tier = "standard" }
     "WatchGamificationDB"   = { service = "p10-gamification", tier = "standard" }
+    "WatchSurveillanceDB"   = { service = "p11-surveillance", tier = "standard" }
   }
 
   ecs_services = {
@@ -180,6 +182,16 @@ locals {
       path_pattern = "/api/gamification/*"
       dns_name     = "gamification.${var.project_name}.local"
     }
+    "p11-surveillance" = {
+      cpu          = 2048
+      memory       = 4096
+      desired      = 2
+      min_capacity = 2
+      max_capacity = 10
+      port         = 8092
+      path_pattern = "/api/surveillance/*"
+      dns_name     = "surveillance.${var.project_name}.local"
+    }
     "geospatial" = {
       cpu          = 2048
       memory       = 4096
@@ -209,8 +221,10 @@ locals {
     "checkin-completed"  = { partitions = 6, replication = 3, consumers = ["p7-familyhealth", "dashboard"] }
     "vital-alert"        = { partitions = 6, replication = 3, consumers = ["p7-familyhealth", "p9-doctorservices"] }
     "evidence-uploaded"  = { partitions = 6, replication = 3, consumers = ["p2-voiceemergency"] }
-    "disaster-declared"  = { partitions = 6, replication = 3, consumers = ["p8-disasterrelief", "p6-firstresponder", "dashboard"] }
-    "dead-letter"        = { partitions = 3, replication = 3, consumers = ["monitoring"] }
+    "disaster-declared"       = { partitions = 6, replication = 3, consumers = ["p8-disasterrelief", "p6-firstresponder", "dashboard"] }
+    "footage-submitted"       = { partitions = 6, replication = 3, consumers = ["p11-surveillance", "p2-voiceemergency"] }
+    "crime-location-reported" = { partitions = 6, replication = 3, consumers = ["p11-surveillance", "p6-firstresponder"] }
+    "dead-letter"             = { partitions = 3, replication = 3, consumers = ["monitoring"] }
   }
 }
 

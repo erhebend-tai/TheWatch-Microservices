@@ -20,22 +20,22 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.*" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.*" />
-    <PackageReference Include="Radzen.Blazor" Version="7.3.*" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.*-*" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.*-*" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.*-*" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.*-*" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.*" />
-    <PackageReference Include="sqlite-net-pcl" Version="1.9.*" />
-    <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.*" />
+    <PackageReference Include="Microsoft.Maui.Controls" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" />
+    <PackageReference Include="Radzen.Blazor" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+    <PackageReference Include="sqlite-net-pcl" />
+    <PackageReference Include="SQLitePCLRaw.bundle_green" />
   </ItemGroup>
 
   <!-- Android-specific packages -->
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
-    <PackageReference Include="Xamarin.AndroidX.Biometric" Version="1.1.*" />
-    <PackageReference Include="Xamarin.Firebase.Messaging" Version="124.*" />
+    <PackageReference Include="Xamarin.AndroidX.Biometric" />
+    <PackageReference Include="Xamarin.Firebase.Messaging" />
   </ItemGroup>
 
   <ItemGroup>

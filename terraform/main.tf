@@ -18,6 +18,7 @@ locals {
     "WatchDisasterReliefDB" = { service = "p8-disasterrelief", tier = "standard" }
     "WatchDoctorServicesDB" = { service = "p9-doctorservices", tier = "standard" }
     "WatchGamificationDB"   = { service = "p10-gamification", tier = "standard" }
+    "WatchSurveillanceDB"   = { service = "p11-surveillance", tier = "standard" }
   }
 
   # Service Bus topics (replacing Kafka in cloud)
@@ -29,6 +30,8 @@ locals {
     "vital-alert"         = { subscriptions = ["p7-familyhealth", "p9-doctorservices"] }
     "evidence-uploaded"   = { subscriptions = ["p2-voiceemergency"] }
     "disaster-declared"   = { subscriptions = ["p8-disasterrelief", "p6-firstresponder", "dashboard"] }
+    "footage-submitted"   = { subscriptions = ["p11-surveillance", "p2-voiceemergency"] }
+    "crime-location-reported" = { subscriptions = ["p11-surveillance", "p6-firstresponder"] }
     "dead-letter"         = { subscriptions = ["monitoring"] }
   }
 
@@ -44,6 +47,7 @@ locals {
     "p8-disasterrelief" = { cpu = 0.25, memory = "0.5Gi", min_replicas = 1, max_replicas = 5 }
     "p9-doctorservices" = { cpu = 0.25, memory = "0.5Gi", min_replicas = 1, max_replicas = 3 }
     "p10-gamification"  = { cpu = 0.25, memory = "0.5Gi", min_replicas = 1, max_replicas = 2 }
+    "p11-surveillance"  = { cpu = 0.5, memory = "1Gi", min_replicas = 1, max_replicas = 10 }
     "geospatial"        = { cpu = 0.5, memory = "1Gi", min_replicas = 1, max_replicas = 5 }
     "dashboard"         = { cpu = 0.25, memory = "0.5Gi", min_replicas = 1, max_replicas = 3 }
   }

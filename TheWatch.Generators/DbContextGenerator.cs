@@ -394,9 +394,9 @@ public class DbContextGenerator : IIncrementalGenerator
         sb.AppendLine("    {");
         sb.AppendLine($"        services.AddDbContext<{ctxName}>(options =>");
         if (isPostgres)
-            sb.AppendLine("            options.UseNpgsql(connectionString, o => o.UseNetTopologySuite()));");
+            sb.AppendLine("            options.UseNpgsql(connectionString, o => { o.UseNetTopologySuite(); o.EnableRetryOnFailure(5, TimeSpan.FromSeconds(30), null); }));");
         else
-            sb.AppendLine("            options.UseSqlServer(connectionString));");
+            sb.AppendLine("            options.UseSqlServer(connectionString, o => o.EnableRetryOnFailure(5, TimeSpan.FromSeconds(30), null)));");
         sb.AppendLine($"        services.AddScoped(typeof(IWatchRepository<>), typeof(EfRepository<>));");
         sb.AppendLine("        return services;");
         sb.AppendLine("    }");
@@ -423,11 +423,12 @@ public class DbContextGenerator : IIncrementalGenerator
         if (isPostgres)
         {
             sb.AppendLine($"        builder.AddNpgsqlDbContext<{ctxName}>(DatabaseName,");
-            sb.AppendLine("            configureDbContextOptions: options => options.UseNpgsql(o => o.UseNetTopologySuite()));");
+            sb.AppendLine("            configureDbContextOptions: options => options.UseNpgsql(o => { o.UseNetTopologySuite(); o.EnableRetryOnFailure(5, TimeSpan.FromSeconds(30), null); }));");
         }
         else
         {
-            sb.AppendLine($"        builder.AddSqlServerDbContext<{ctxName}>(DatabaseName);");
+            sb.AppendLine($"        builder.AddSqlServerDbContext<{ctxName}>(DatabaseName,");
+            sb.AppendLine("            configureDbContextOptions: options => options.UseSqlServer(o => o.EnableRetryOnFailure(5, TimeSpan.FromSeconds(30), null)));");
         }
         sb.AppendLine($"        builder.Services.AddScoped(typeof(IWatchRepository<>), typeof(EfRepository<>));");
         sb.AppendLine("        return builder;");
@@ -453,13 +454,13 @@ public class DbContextGenerator : IIncrementalGenerator
         {
             sb.AppendLine("        var conn = Environment.GetEnvironmentVariable(\"WATCH_POSTGRES_CONN\")");
             sb.AppendLine($"            ?? \"Host=localhost;Database=Watch{shortName}DB;Username=postgres;Password=postgres\";");
-            sb.AppendLine("        optionsBuilder.UseNpgsql(conn, o => o.UseNetTopologySuite());");
+            sb.AppendLine("        optionsBuilder.UseNpgsql(conn, o => { o.UseNetTopologySuite(); o.EnableRetryOnFailure(5, TimeSpan.FromSeconds(30), null); });");
         }
         else
         {
             sb.AppendLine("        var conn = Environment.GetEnvironmentVariable(\"WATCH_SQL_CONN\")");
             sb.AppendLine($"            ?? \"Server=localhost;Database=Watch{shortName}DB;Trusted_Connection=true;TrustServerCertificate=true\";");
-            sb.AppendLine("        optionsBuilder.UseSqlServer(conn);");
+            sb.AppendLine("        optionsBuilder.UseSqlServer(conn, o => o.EnableRetryOnFailure(5, TimeSpan.FromSeconds(30), null));");
         }
         sb.AppendLine("        return new " + ctxName + "(optionsBuilder.Options);");
         sb.AppendLine("    }");

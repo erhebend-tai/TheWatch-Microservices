@@ -242,6 +242,24 @@ services:
         memory: 512Mi
     pathPrefix: /api/p10
 
+  p11-surveillance:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p11-surveillance
+    port: 8080
+    database: WatchSurveillanceDB
+    dbType: sqlserver
+    kafka: true
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+    pathPrefix: /api/p11
+
   geospatial:
     enabled: true
     replicaCount: 2

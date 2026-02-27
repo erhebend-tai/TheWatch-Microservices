@@ -8,6 +8,7 @@ using TheWatch.Shared.Contracts;
 using TheWatch.P7.FamilyHealth.Data.Seeders;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
+using TheWatch.Shared.Security;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -19,12 +20,8 @@ builder.ConfigureWatchNotifications();
 builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
 builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
-// CORS (configured for SignalR — requires AllowCredentials)
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-        policy.SetIsOriginAllowed(_ => true).AllowAnyMethod().AllowAnyHeader().AllowCredentials());
-});
+// CORS (SignalR — requires AllowCredentials)
+builder.Services.AddWatchCors(builder.Configuration, requiresSignalR: true);
 
 // SignalR real-time hubs (CheckInHub, VitalReadingHub, MedicalAlertHub, etc.)
 builder.Services.AddWatchSignalR();
@@ -51,7 +48,11 @@ app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseHangfireDashboard("/hangfire");
+app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
+{
+    Authorization = [new TheWatch.Shared.Security.HangfireDashboardAuthFilter()],
+    IsReadOnlyFunc = _ => true
+});
 app.MapWatchControllers();
 
 // Recurring Hangfire jobs

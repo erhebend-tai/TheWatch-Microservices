@@ -170,6 +170,7 @@ public class SignalRGenerator : IIncrementalGenerator
         sb.AppendLine($"/// SignalR hub for real-time {name} events.");
         sb.AppendLine($"/// Clients join groups to receive targeted updates.");
         sb.AppendLine($"/// </summary>");
+        sb.AppendLine($"[Microsoft.AspNetCore.Authorization.Authorize]");
         sb.AppendLine($"public class {name}Hub : Hub<I{name}HubClient>");
         sb.AppendLine("{");
         sb.AppendLine($"    private readonly ILogger<{name}Hub> _logger;");

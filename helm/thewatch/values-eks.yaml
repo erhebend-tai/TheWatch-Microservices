@@ -1,0 +1,164 @@
+# TheWatch Helm Values — Amazon Elastic Kubernetes Service (EKS)
+# Usage: helm upgrade --install thewatch ./helm/thewatch -f helm/thewatch/values-eks.yaml
+
+global:
+  environment: Production
+
+image:
+  registry: 123456789012.dkr.ecr.us-east-1.amazonaws.com
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# Amazon RDS SQL Server
+sqlserver:
+  enabled: true
+  host: "thewatch-sql.xxxx.us-east-1.rds.amazonaws.com"
+  port: 1433
+  user: "watchadmin"
+
+# Amazon Aurora PostgreSQL (PostGIS)
+postgres:
+  enabled: true
+  host: "thewatch-aurora.cluster-xxxx.us-east-1.rds.amazonaws.com"
+  port: 5432
+  user: "postgres"
+  database: "WatchGeospatialDB"
+
+# Amazon MSK (Managed Kafka)
+kafka:
+  enabled: true
+  bootstrapServers: "b-1.thewatch-msk.xxxx.kafka.us-east-1.amazonaws.com:9092"
+
+# Amazon ElastiCache Redis
+redis:
+  enabled: true
+  host: "thewatch-redis.xxxx.cache.amazonaws.com"
+  port: 6379
+
+services:
+  p1-coregateway:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p1-coregateway
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+    hpa:
+      enabled: false  # KEDA
+
+  p2-voiceemergency:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: thewatch-p2-voiceemergency
+    resources:
+      requests:
+        cpu: 500m
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+    hpa:
+      enabled: false  # KEDA
+    # Karpenter: prefer spot for non-critical replicas
+    tolerations:
+      - key: karpenter.sh/capacity-type
+        operator: Equal
+        value: spot
+        effect: NoSchedule
+
+  p5-authsecurity:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p5-authsecurity
+    resources:
+      requests:
+        cpu: 500m
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+
+  p6-firstresponder:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: thewatch-p6-firstresponder
+    resources:
+      requests:
+        cpu: 500m
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+    hpa:
+      enabled: false  # KEDA
+
+  p8-disasterrelief:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: thewatch-p8-disasterrelief
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: "2Gi"
+
+  p11-surveillance:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p11-surveillance
+    resources:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+        nvidia.com/gpu: "1"
+      limits:
+        cpu: "4"
+        memory: "4Gi"
+        nvidia.com/gpu: "1"
+    nodeSelector:
+      karpenter.sh/capacity-type: on-demand
+      node.kubernetes.io/instance-type: g5.xlarge
+
+  geospatial:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-geospatial
+    resources:
+      requests:
+        cpu: 500m
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:123456789012:certificate/xxxx"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    # WAF integration
+    alb.ingress.kubernetes.io/wafv2-acl-arn: "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/thewatch-waf/xxxx"
+  hosts:
+    - host: api.thewatch.app
+      paths: []
+  tls:
+    - secretName: thewatch-tls
+      hosts:
+        - api.thewatch.app

@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Configuration;
@@ -10,6 +12,7 @@ namespace TheWatch.Shared.Security;
 /// <summary>
 /// Custom authentication handler for inter-service API key authentication.
 /// Services authenticate to each other via pre-shared keys in the X-Api-Key header.
+/// Uses constant-time comparison to prevent timing attacks.
 /// </summary>
 public class ApiKeyAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
@@ -38,12 +41,18 @@ public class ApiKeyAuthHandler : AuthenticationHandler<AuthenticationSchemeOptio
         var expectedKey = _config["Security:ApiKey"];
         if (string.IsNullOrEmpty(expectedKey))
         {
-            // Dev mode: accept any key that starts with "watch-service-"
-            if (!providedKey.StartsWith("watch-service-"))
-                return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
+            // Security+ 1.2: Reject all API key auth when no key is configured (no dev bypass)
+            Logger.LogWarning("[SEC:APIKEY_NOCFG] API key authentication attempted but Security:ApiKey is not configured");
+            return Task.FromResult(AuthenticateResult.Fail("API key authentication is not configured."));
         }
-        else if (!string.Equals(providedKey, expectedKey, StringComparison.Ordinal))
+
+        // Security+ 1.2: Use constant-time comparison to prevent timing attacks
+        var providedBytes = Encoding.UTF8.GetBytes(providedKey);
+        var expectedBytes = Encoding.UTF8.GetBytes(expectedKey);
+        if (!CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes))
         {
+            Logger.LogWarning("[SEC:APIKEY_INVALID] Invalid API key from {IP}",
+                Request.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
             return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
         }
 

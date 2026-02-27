@@ -1,0 +1,49 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits"
+  ],
+  "description": "Item 332 — Pin base images to digest. NIST CM-2 (Baseline Configuration) compliance.",
+  "schedule": ["before 9am on Monday"],
+  "timezone": "America/New_York",
+  "packageRules": [
+    {
+      "description": "Auto-merge patch-level updates",
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
+      "description": "Group all Docker digest updates into a single PR",
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["digest", "pin"],
+      "groupName": "docker-digest-updates",
+      "groupSlug": "docker-digests"
+    },
+    {
+      "description": "Auto-update Docker base image digest pins",
+      "matchDatasources": ["docker"],
+      "enabled": true,
+      "pinDigests": true
+    },
+    {
+      "description": "Auto-update NuGet package versions",
+      "matchDatasources": ["nuget"],
+      "enabled": true
+    },
+    {
+      "description": "Auto-update GitHub Actions versions",
+      "matchManagers": ["github-actions"],
+      "enabled": true,
+      "pinDigests": true
+    }
+  ],
+  "docker": {
+    "pinDigests": true
+  },
+  "commitMessagePrefix": "fix(deps):",
+  "prHourlyLimit": 5,
+  "prConcurrentLimit": 10
+}

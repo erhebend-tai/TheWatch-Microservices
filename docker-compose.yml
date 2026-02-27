@@ -13,7 +13,7 @@ services:
     container_name: thewatch-sql
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!}"
+      MSSQL_SA_PASSWORD: "${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD in .env}"
       MSSQL_PID: Developer
     ports:
       - "1433:1433"
@@ -33,7 +33,7 @@ services:
     container_name: thewatch-postgis
     environment:
       POSTGRES_USER: "${POSTGRES_USER:-postgres}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-Watch@Geo2024!}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
       POSTGRES_DB: WatchGeospatialDB
     ports:
       - "5432:5432"
@@ -100,7 +100,7 @@ services:
       sqlserver:
         condition: service_healthy
     environment:
-      SA_PASSWORD: "${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!}"
+      SA_PASSWORD: "${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD in .env}"
     entrypoint: >
       /bin/bash -c "
       /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P $$SA_PASSWORD -C -N -Q '
@@ -114,8 +114,9 @@ services:
         IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchDisasterReliefDB'\'') CREATE DATABASE WatchDisasterReliefDB;
         IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchDoctorServicesDB'\'') CREATE DATABASE WatchDoctorServicesDB;
         IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchGamificationDB'\'') CREATE DATABASE WatchGamificationDB;
+        IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'\''WatchSurveillanceDB'\'') CREATE DATABASE WatchSurveillanceDB;
       '
-      echo 'All 10 databases created successfully.'
+      echo 'All 11 databases created successfully.'
       "
     restart: "no"
 
@@ -130,8 +131,8 @@ services:
     container_name: thewatch-p1
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__WatchCoreGatewayDB: "Server=sqlserver;Database=WatchCoreGatewayDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
-      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      ConnectionStrings__WatchCoreGatewayDB: "Server=sqlserver;Database=WatchCoreGatewayDB;User Id=sa;Password=${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD in .env};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
       Jwt__Issuer: "thewatch-auth"
       Jwt__Audience: "thewatch-services"
       Kafka__BootstrapServers: "kafka:29092"
@@ -151,8 +152,8 @@ services:
     container_name: thewatch-p2
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__WatchVoiceEmergencyDB: "Server=sqlserver;Database=WatchVoiceEmergencyDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
-      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      ConnectionStrings__WatchVoiceEmergencyDB: "Server=sqlserver;Database=WatchVoiceEmergencyDB;User Id=sa;Password=${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD in .env};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
       Jwt__Issuer: "thewatch-auth"
       Jwt__Audience: "thewatch-services"
       Kafka__BootstrapServers: "kafka:29092"
@@ -174,8 +175,8 @@ services:
     container_name: thewatch-p3
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__WatchMeshNetworkDB: "Server=sqlserver;Database=WatchMeshNetworkDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
-      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      ConnectionStrings__WatchMeshNetworkDB: "Server=sqlserver;Database=WatchMeshNetworkDB;User Id=sa;Password=${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD in .env};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
       Jwt__Issuer: "thewatch-auth"
       Jwt__Audience: "thewatch-services"
       Kafka__BootstrapServers: "kafka:29092"
@@ -197,8 +198,8 @@ services:
     container_name: thewatch-p4
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__WatchWearableDB: "Server=sqlserver;Database=WatchWearableDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
-      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      ConnectionStrings__WatchWearableDB: "Server=sqlserver;Database=WatchWearableDB;User Id=sa;Password=${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD in .env};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
       Jwt__Issuer: "thewatch-auth"
       Jwt__Audience: "thewatch-services"
     ports:
@@ -217,8 +218,8 @@ services:
     container_name: thewatch-p5
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__WatchAuthSecurityDB: "Server=sqlserver;Database=WatchAuthSecurityDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
-      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      ConnectionStrings__WatchAuthSecurityDB: "Server=sqlserver;Database=WatchAuthSecurityDB;User Id=sa;Password=${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD in .env};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
       Jwt__Issuer: "thewatch-auth"
       Jwt__Audience: "thewatch-services"
     ports:
@@ -237,8 +238,8 @@ services:
     container_name: thewatch-p6
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__WatchFirstResponderDB: "Server=sqlserver;Database=WatchFirstResponderDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
-      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      ConnectionStrings__WatchFirstResponderDB: "Server=sqlserver;Database=WatchFirstResponderDB;User Id=sa;Password=${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD in .env};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
       Jwt__Issuer: "thewatch-auth"
       Jwt__Audience: "thewatch-services"
       Kafka__BootstrapServers: "kafka:29092"
@@ -260,8 +261,8 @@ services:
     container_name: thewatch-p7
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__WatchFamilyHealthDB: "Server=sqlserver;Database=WatchFamilyHealthDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
-      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      ConnectionStrings__WatchFamilyHealthDB: "Server=sqlserver;Database=WatchFamilyHealthDB;User Id=sa;Password=${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD in .env};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
       Jwt__Issuer: "thewatch-auth"
       Jwt__Audience: "thewatch-services"
     ports:
@@ -280,8 +281,8 @@ services:
     container_name: thewatch-p8
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__WatchDisasterReliefDB: "Server=sqlserver;Database=WatchDisasterReliefDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
-      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      ConnectionStrings__WatchDisasterReliefDB: "Server=sqlserver;Database=WatchDisasterReliefDB;User Id=sa;Password=${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD in .env};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
       Jwt__Issuer: "thewatch-auth"
       Jwt__Audience: "thewatch-services"
     ports:
@@ -300,8 +301,8 @@ services:
     container_name: thewatch-p9
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__WatchDoctorServicesDB: "Server=sqlserver;Database=WatchDoctorServicesDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
-      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      ConnectionStrings__WatchDoctorServicesDB: "Server=sqlserver;Database=WatchDoctorServicesDB;User Id=sa;Password=${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD in .env};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
       Jwt__Issuer: "thewatch-auth"
       Jwt__Audience: "thewatch-services"
     ports:
@@ -320,8 +321,8 @@ services:
     container_name: thewatch-p10
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__WatchGamificationDB: "Server=sqlserver;Database=WatchGamificationDB;User Id=sa;Password=${SQL_SA_PASSWORD:-Watch@Str0ngP4ss!};TrustServerCertificate=true"
-      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      ConnectionStrings__WatchGamificationDB: "Server=sqlserver;Database=WatchGamificationDB;User Id=sa;Password=${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD in .env};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
       Jwt__Issuer: "thewatch-auth"
       Jwt__Audience: "thewatch-services"
     ports:
@@ -331,6 +332,29 @@ services:
         condition: service_healthy
       sql-init:
         condition: service_completed_successfully
+    restart: unless-stopped
+
+  p11-surveillance:
+    build:
+      context: .
+      dockerfile: TheWatch.P11.Surveillance/Dockerfile
+    container_name: thewatch-p11
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__WatchSurveillanceDB: "Server=sqlserver;Database=WatchSurveillanceDB;User Id=sa;Password=${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD in .env};TrustServerCertificate=true"
+      Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
+      Jwt__Issuer: "thewatch-auth"
+      Jwt__Audience: "thewatch-services"
+      Kafka__BootstrapServers: "kafka:29092"
+    ports:
+      - "5112:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      sql-init:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
     restart: unless-stopped
 
   # ============================================================
@@ -344,8 +368,8 @@ services:
     container_name: thewatch-geo
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__WatchGeospatialDB: "Host=postgres;Port=5432;Database=WatchGeospatialDB;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-Watch@Geo2024!}"
-      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      ConnectionStrings__WatchGeospatialDB: "Host=postgres;Port=5432;Database=WatchGeospatialDB;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+      Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
       Jwt__Issuer: "thewatch-auth"
       Jwt__Audience: "thewatch-services"
     ports:
@@ -376,8 +400,9 @@ services:
       services__p8-disasterrelief__http__0: "http://p8-disasterrelief:8080"
       services__p9-doctorservices__http__0: "http://p9-doctorservices:8080"
       services__p10-gamification__http__0: "http://p10-gamification:8080"
+      services__p11-surveillance__http__0: "http://p11-surveillance:8080"
       services__geospatial__http__0: "http://geospatial:8080"
-      Jwt__Key: "${JWT_SIGNING_KEY:-TheWatch-SuperSecret-JWT-Key-2024-Production!}"
+      Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
       Jwt__Issuer: "thewatch-auth"
       Jwt__Audience: "thewatch-services"
     ports:

@@ -4,6 +4,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>TheWatch.Contracts.MeshNetwork</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackageId>TheWatch.Contracts.MeshNetwork</PackageId>
+    <Description>Typed client and DTOs for the TheWatch Mesh Network service.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\TheWatch.Contracts.Abstractions\TheWatch.Contracts.Abstractions.csproj" />

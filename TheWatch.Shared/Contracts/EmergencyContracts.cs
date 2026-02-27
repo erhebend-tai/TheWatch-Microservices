@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TheWatch.Shared.Contracts.Mobile;
 
 // Shared emergency DTOs for mobile client consumption.
@@ -27,19 +29,19 @@ public enum IncidentStatus
 }
 
 public record LocationDto(
-    double Latitude,
-    double Longitude,
+    [property: Range(-90.0, 90.0)] double Latitude,
+    [property: Range(-180.0, 180.0)] double Longitude,
     double? Accuracy = null,
     DateTime? Timestamp = null);
 
 public record CreateIncidentRequest(
-    EmergencyType Type,
-    string Description,
-    LocationDto Location,
-    Guid ReporterId,
-    string? ReporterName = null,
-    string? ReporterPhone = null,
-    int Severity = 3,
+    [property: Required] EmergencyType Type,
+    [property: Required, MaxLength(2000)] string Description,
+    [property: Required] LocationDto Location,
+    [property: Required] Guid ReporterId,
+    [property: MaxLength(255)] string? ReporterName = null,
+    [property: MaxLength(20)] string? ReporterPhone = null,
+    [property: Range(1, 5)] int Severity = 3,
     List<string>? Tags = null);
 
 public record IncidentDto(
@@ -62,6 +64,6 @@ public record IncidentListResponse(
     int PageSize);
 
 public record CreateDispatchRequest(
-    Guid IncidentId,
-    double RadiusKm = 5.0,
-    int RespondersRequested = 8);
+    [property: Required] Guid IncidentId,
+    [property: Range(0.1, 100.0)] double RadiusKm = 5.0,
+    [property: Range(1, 50)] int RespondersRequested = 8);

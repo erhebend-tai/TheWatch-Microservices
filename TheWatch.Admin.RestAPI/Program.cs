@@ -212,7 +212,8 @@ builder.Services.AddHsts(options =>
     options.Preload = true;
 });
 
-// ──────── Typed HTTP Clients (11 services) ───────────────────────────
+// ──────── Typed HTTP Clients (12 services) ───────────────────────────
+// Item 212: Wire all typed clients with resilience (217), correlation ID (218), and API key auth (219)
 void ConfigureClient(IHttpClientBuilder clientBuilder, string aspireServiceName)
 {
     clientBuilder
@@ -233,7 +234,6 @@ ConfigureClient(builder.Services.AddDisasterReliefClient(), "p8-disasterrelief")
 ConfigureClient(builder.Services.AddDoctorServicesClient(), "p9-doctorservices");
 ConfigureClient(builder.Services.AddGamificationClient(), "p10-gamification");
 ConfigureClient(builder.Services.AddGeospatialClient(), "geospatial");
-ConfigureClient(builder.Services.AddSurveillanceClient(), "p11-surveillance");
 ConfigureClient(builder.Services.AddSurveillanceClient(), "p11-surveillance");
 
 // ──────── App Pipeline (Security+ 3.1: Defense in Depth layers) ─────

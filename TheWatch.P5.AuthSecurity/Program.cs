@@ -24,6 +24,7 @@ using SmsMfaVerifyRequest = TheWatch.P5.AuthSecurity.Auth.SmsMfaVerifyRequest;
 using MagicLinkRequest = TheWatch.P5.AuthSecurity.Auth.MagicLinkRequest;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
+using TheWatch.Shared.Security;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -35,11 +36,7 @@ builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
 builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
 // CORS (SignalR compatible)
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-        policy.SetIsOriginAllowed(_ => true).AllowAnyMethod().AllowAnyHeader().AllowCredentials());
-});
+builder.Services.AddWatchCors(builder.Configuration, requiresSignalR: true);
 
 // === Identity + EF Core ===
 var connectionString = builder.Configuration.GetConnectionString("authsecuritydb");
@@ -62,11 +59,11 @@ builder.Services.AddIdentity<WatchUser, WatchRole>(options =>
     options.Password.RequireLowercase = true;
     options.Password.RequireUppercase = true;
     options.Password.RequireNonAlphanumeric = true;
-    options.Password.RequiredLength = 8;
+    options.Password.RequiredLength = 15;
 
     // Lockout (Item 77: brute force)
     options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
-    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.MaxFailedAccessAttempts = 3;
     options.Lockout.AllowedForNewUsers = true;
 
     // User
@@ -100,6 +97,7 @@ builder.Services.AddScoped<BruteForceDetectionService>();
 builder.Services.AddScoped<DeviceTrustService>();
 builder.Services.AddScoped<EulaService>();
 builder.Services.AddScoped<OnboardingService>();
+builder.Services.AddScoped<SessionManagementService>();
 builder.Services.AddScoped<StrideThreatService>();
 builder.Services.AddScoped<MitreDetectionService>();
 builder.AddWatchControllers();
@@ -122,21 +120,24 @@ app.UseMiddleware<IpThrottlingMiddleware>();
 // Sliding window token middleware (Item 67)
 app.UseMiddleware<SlidingWindowTokenMiddleware>();
 
-app.UseHangfireDashboard("/hangfire");
+app.UseMiddleware<TheWatch.Shared.Security.WatchProblemDetailsMiddleware>();
+app.UseMiddleware<TheWatch.Shared.Security.CuiMarkingMiddleware>();
+
+app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
+{
+    Authorization = [new TheWatch.Shared.Security.HangfireDashboardAuthFilter()],
+    IsReadOnlyFunc = _ => true
+});
 app.MapWatchControllers();
 
 // Schedule recurring security jobs
 RecurringJob.AddOrUpdate<StrideThreatService>("stride-threat-scan", s => s.ScanAsync(), "*/15 * * * *");
 RecurringJob.AddOrUpdate<MitreDetectionService>("mitre-detection-scan", s => s.ScanAsync(), "*/15 * * * *");
 
-// Health endpoint
-app.MapGet("/health", () => new HealthResponse(
-    "TheWatch.P5.AuthSecurity",
-    "P5",
-    "Healthy",
-    DateTime.UtcNow));
+// Health endpoint — stripped of internal details (DISA STIG V-222609)
+app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
-// Service info
+// Service info — admin-only (DISA STIG V-222609: no unauthenticated service metadata)
 app.MapGet("/info", () => new
 {
     Service = "TheWatch.P5.AuthSecurity",
@@ -145,7 +146,7 @@ app.MapGet("/info", () => new
     Description = "Authentication, MFA, JWT, RBAC, security monitoring",
     Icon = "shield",
     Version = "1.0.0"
-});
+}).RequireAuthorization(WatchPolicies.AdminOnly);
 
 // === Auth Endpoints ===
 
@@ -259,7 +260,7 @@ app.MapPost("/api/auth/mfa/sms/send", async (SmsMfaSendRequest request, SmsMfaSe
 {
     var sent = await sms.SendCodeAsync(request.PhoneNumber);
     return sent ? Results.Ok(new { sent = true }) : Results.StatusCode(503);
-});
+}).RequireRateLimiting("MfaLimit");
 
 app.MapPost("/api/auth/mfa/sms/verify", async (SmsMfaVerifyRequest request, SmsMfaService sms) =>
 {
@@ -272,7 +273,7 @@ app.MapPost("/api/auth/magic-link/send", async (MagicLinkRequest request, MagicL
 {
     await magic.SendMagicLinkAsync(request.Email);
     return Results.Ok(new { sent = true });
-});
+}).RequireRateLimiting("MfaLimit");
 
 app.MapGet("/api/auth/magic-link/verify", async (string token, string email, MagicLinkService magic) =>
 {
@@ -348,6 +349,13 @@ app.MapGet("/api/onboarding/progress", async (ClaimsPrincipal user, OnboardingSe
 
 app.MapPost("/api/onboarding/complete-step", async (string step, ClaimsPrincipal user, OnboardingService onboarding) =>
 {
+    var validSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "profile", "eula", "mfa", "emergency-contacts", "notification-preferences", "tutorial"
+    };
+    if (!validSteps.Contains(step))
+        return Results.BadRequest(new { error = "Invalid onboarding step." });
+
     var userId = GetUserId(user);
     if (userId is null) return Results.Unauthorized();
     await onboarding.CompleteStepAsync(userId.Value, step);

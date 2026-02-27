@@ -1,0 +1,156 @@
+# TheWatch Helm Values — Azure Kubernetes Service (AKS)
+# Usage: helm upgrade --install thewatch ./helm/thewatch -f helm/thewatch/values-aks.yaml
+
+global:
+  environment: Production
+
+image:
+  registry: thewatch.azurecr.io
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# Azure SQL Managed Instance
+sqlserver:
+  enabled: true
+  host: "thewatch-sqlmi.database.windows.net"
+  port: 1433
+  user: "watchadmin"
+
+# Azure Cosmos DB for PostgreSQL (PostGIS)
+postgres:
+  enabled: true
+  host: "thewatch-cosmos-pg.postgres.cosmos.azure.com"
+  port: 5432
+  user: "citus"
+  database: "WatchGeospatialDB"
+
+# Azure Service Bus (replaces Kafka for managed offering)
+kafka:
+  enabled: false
+
+# Azure Cache for Redis
+redis:
+  enabled: true
+  host: "thewatch-redis.redis.cache.windows.net"
+  port: 6380
+
+services:
+  p1-coregateway:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p1-coregateway
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+    # KEDA handles scaling — remove static HPA
+    hpa:
+      enabled: false
+
+  p2-voiceemergency:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: thewatch-p2-voiceemergency
+    resources:
+      requests:
+        cpu: 500m
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+    hpa:
+      enabled: false  # KEDA ScaledObject replaces HPA
+
+  p5-authsecurity:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p5-authsecurity
+    resources:
+      requests:
+        cpu: 500m
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+
+  p6-firstresponder:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: thewatch-p6-firstresponder
+    resources:
+      requests:
+        cpu: 500m
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+    hpa:
+      enabled: false  # KEDA ScaledObject replaces HPA
+
+  p8-disasterrelief:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: thewatch-p8-disasterrelief
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: "2Gi"
+
+  p11-surveillance:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p11-surveillance
+    resources:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+        nvidia.com/gpu: "1"
+      limits:
+        cpu: "4"
+        memory: "4Gi"
+        nvidia.com/gpu: "1"
+    nodeSelector:
+      agentpool: gpupool
+
+  geospatial:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-geospatial
+    resources:
+      requests:
+        cpu: 500m
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # Cloudflare Tunnel header validation
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      if ($http_cf_connecting_ip = "") { return 403; }
+  hosts:
+    - host: api.thewatch.app
+      paths: []
+  tls:
+    - secretName: thewatch-tls
+      hosts:
+        - api.thewatch.app

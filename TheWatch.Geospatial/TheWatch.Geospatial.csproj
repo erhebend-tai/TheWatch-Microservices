@@ -12,24 +12,24 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.AppHost" Version="9.2.0" Condition="false" />
-    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.2.*" />
-    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.*" />
-    <PackageReference Include="Hangfire.InMemory" Version="0.6.0" />
-    <PackageReference Include="Hangfire.Pro" Version="3.0.4" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.*-*" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.*-*" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite" Version="10.0.*-*" />
-    <PackageReference Include="NetTopologySuite" Version="2.*" />
-    <PackageReference Include="NetTopologySuite.IO.GeoJSON4STJ" Version="4.*" />
-    <PackageReference Include="Scalar.AspNetCore" Version="2.*" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.*-*" />
-    <PackageReference Include="Serilog.AspNetCore" Version="9.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.*-*">
+    <PackageReference Include="Aspire.Hosting.AppHost" Condition="false" />
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Hangfire.AspNetCore" />
+    <PackageReference Include="Hangfire.InMemory" />
+    <PackageReference Include="Hangfire.Pro" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite" />
+    <PackageReference Include="NetTopologySuite" />
+    <PackageReference Include="NetTopologySuite.IO.GeoJSON4STJ" />
+    <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.*-*">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>

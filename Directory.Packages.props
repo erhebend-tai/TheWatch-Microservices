@@ -1,0 +1,151 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageFloatingVersionsEnabled>true</CentralPackageFloatingVersionsEnabled>
+  </PropertyGroup>
+
+  <ItemGroup Label="Aspire">
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="9.2.0" />
+    <PackageVersion Include="Aspire.Hosting.Kafka" Version="9.2.*" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="9.2.*" />
+    <PackageVersion Include="Aspire.Hosting.SqlServer" Version="9.2.*" />
+    <PackageVersion Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="9.2.*" />
+    <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.2.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Azure">
+    <PackageVersion Include="Azure.Communication.Email" Version="1.*" />
+    <PackageVersion Include="Azure.Communication.Sms" Version="1.*" />
+    <PackageVersion Include="Microsoft.Azure.SignalR" Version="1.*" />
+    <PackageVersion Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Google Cloud">
+    <PackageVersion Include="Google.Apis.CloudHealthcare.v1" Version="1.*" />
+    <PackageVersion Include="Google.Cloud.Speech.V2" Version="1.*" />
+    <PackageVersion Include="Google.Cloud.Vision.V1" Version="3.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Entity Framework Core">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.*-*" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.*-*" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite" Version="10.0.*-*" />
+  </ItemGroup>
+
+  <ItemGroup Label="ASP.NET Core">
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.*" />
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.*-*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Microsoft Extensions">
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="9.*" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.*-*" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="9.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="MAUI">
+    <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Hangfire">
+    <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.*" />
+    <PackageVersion Include="Hangfire.Core" Version="1.8.*" />
+    <PackageVersion Include="Hangfire.InMemory" Version="0.6.0" />
+    <PackageVersion Include="Hangfire.Pro" Version="3.0.4" />
+  </ItemGroup>
+
+  <ItemGroup Label="Serilog">
+    <PackageVersion Include="Serilog" Version="4.*" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="9.*" />
+    <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.*" />
+    <PackageVersion Include="Serilog.Enrichers.Thread" Version="4.*" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.*" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="6.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="OpenTelemetry">
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.*" />
+    <PackageVersion Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.15.0-*" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.*" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.*" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.*" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.*" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.SqlClient" Version="1.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Roslyn (Generators)">
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Security and Auth">
+    <PackageVersion Include="FluentValidation.AspNetCore" Version="11.*" />
+    <PackageVersion Include="Isopoh.Cryptography.Argon2" Version="2.*" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.Certificate" Version="10.0.*-*" />
+    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="API Versioning">
+    <PackageVersion Include="Asp.Versioning.Http" Version="8.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Health Checks">
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.*-*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Data Access">
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.*" />
+    <PackageVersion Include="Npgsql" Version="9.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Messaging and Events">
+    <PackageVersion Include="Confluent.Kafka" Version="2.*" />
+    <PackageVersion Include="FirebaseAdmin" Version="3.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Geospatial">
+    <PackageVersion Include="NetTopologySuite" Version="2.*" />
+    <PackageVersion Include="NetTopologySuite.IO.GeoJSON4STJ" Version="4.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="ML and AI">
+    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="UI">
+    <PackageVersion Include="Radzen.Blazor" Version="7.3.*" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Mobile Platform">
+    <PackageVersion Include="sqlite-net-pcl" Version="1.9.*" />
+    <PackageVersion Include="SQLitePCLRaw.bundle_green" Version="2.1.*" />
+    <PackageVersion Include="Xamarin.AndroidX.Biometric" Version="1.1.*" />
+    <PackageVersion Include="Xamarin.Firebase.Messaging" Version="124.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Testing">
+    <PackageVersion Include="FluentAssertions" Version="8.*" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+    <PackageVersion Include="NSubstitute" Version="5.*" />
+    <PackageVersion Include="xunit" Version="2.9.*" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Serialization">
+    <PackageVersion Include="System.Text.Json" Version="9.0.2" />
+  </ItemGroup>
+</Project>

@@ -33,17 +33,20 @@ locals {
     "WatchDisasterReliefDB" = { service = "p8-disasterrelief", tier = "standard" }
     "WatchDoctorServicesDB" = { service = "p9-doctorservices", tier = "standard" }
     "WatchGamificationDB"   = { service = "p10-gamification", tier = "standard" }
+    "WatchSurveillanceDB"   = { service = "p11-surveillance", tier = "standard" }
   }
 
   pubsub_topics = {
-    "incident-created"   = { subscriptions = ["p6-firstresponder", "p3-meshnetwork", "dashboard"] }
-    "dispatch-requested" = { subscriptions = ["p3-meshnetwork", "p6-firstresponder"] }
-    "responder-located"  = { subscriptions = ["p2-voiceemergency", "dashboard"] }
-    "checkin-completed"  = { subscriptions = ["p7-familyhealth", "dashboard"] }
-    "vital-alert"        = { subscriptions = ["p7-familyhealth", "p9-doctorservices"] }
-    "evidence-uploaded"  = { subscriptions = ["p2-voiceemergency"] }
-    "disaster-declared"  = { subscriptions = ["p8-disasterrelief", "p6-firstresponder", "dashboard"] }
-    "dead-letter"        = { subscriptions = ["monitoring"] }
+    "incident-created"        = { subscriptions = ["p6-firstresponder", "p3-meshnetwork", "dashboard"] }
+    "dispatch-requested"      = { subscriptions = ["p3-meshnetwork", "p6-firstresponder"] }
+    "responder-located"       = { subscriptions = ["p2-voiceemergency", "dashboard"] }
+    "checkin-completed"       = { subscriptions = ["p7-familyhealth", "dashboard"] }
+    "vital-alert"             = { subscriptions = ["p7-familyhealth", "p9-doctorservices"] }
+    "evidence-uploaded"       = { subscriptions = ["p2-voiceemergency"] }
+    "disaster-declared"       = { subscriptions = ["p8-disasterrelief", "p6-firstresponder", "dashboard"] }
+    "footage-submitted"       = { subscriptions = ["p11-surveillance", "p2-voiceemergency"] }
+    "crime-location-reported" = { subscriptions = ["p11-surveillance", "p6-firstresponder"] }
+    "dead-letter"             = { subscriptions = ["monitoring"] }
   }
 
   container_services = {
@@ -57,6 +60,7 @@ locals {
     "p8-disasterrelief" = { cpu = "1", memory = "512Mi", min_instances = 1, max_instances = 5,  image_tag = "latest", env_vars = {}, public = false }
     "p9-doctorservices" = { cpu = "1", memory = "512Mi", min_instances = 1, max_instances = 3,  image_tag = "latest", env_vars = {}, public = false }
     "p10-gamification"  = { cpu = "1", memory = "512Mi", min_instances = 0, max_instances = 2,  image_tag = "latest", env_vars = {}, public = false }
+    "p11-surveillance"  = { cpu = "2", memory = "1Gi",   min_instances = 1, max_instances = 5,  image_tag = "latest", env_vars = {}, public = false }
     "geospatial"        = { cpu = "2", memory = "1Gi",   min_instances = 1, max_instances = 5,  image_tag = "latest", env_vars = {}, public = false }
     "dashboard"         = { cpu = "1", memory = "512Mi", min_instances = 1, max_instances = 3,  image_tag = "latest", env_vars = {}, public = true }
   }

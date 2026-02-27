@@ -1,0 +1,70 @@
+# TheWatch — SIEM Stack (Seq for dev, Elastic for production)
+# Usage: docker compose -f docker-compose.yml -f docker-compose.siem.yml up -d
+# NIST AU-6: Centralized log aggregation and correlation
+
+services:
+  # Seq — Structured log server (development/staging)
+  seq:
+    image: datalust/seq:latest
+    container_name: thewatch-seq
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_API_KEY: "${SEQ_API_KEY:-}"
+    ports:
+      - "5380:80"    # Web UI
+      - "5341:5341"  # Ingestion API
+    volumes:
+      - seq-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+    restart: unless-stopped
+
+  # Elasticsearch — Production SIEM backend
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    container_name: thewatch-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:?Set ELASTIC_PASSWORD in .env}
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    volumes:
+      - elastic-data:/usr/share/elasticsearch/data
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # Kibana — Production SIEM dashboard
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.17.0
+    container_name: thewatch-kibana
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+      ELASTICSEARCH_USERNAME: elastic
+      ELASTICSEARCH_PASSWORD: ${ELASTIC_PASSWORD:?Set ELASTIC_PASSWORD in .env}
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  seq-data:
+    driver: local
+  elastic-data:
+    driver: local

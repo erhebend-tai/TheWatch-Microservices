@@ -46,7 +46,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config', 'Directory.Packages.props') }}
           restore-keys: nuget-${{ runner.os }}-
 
       # Copy Hangfire Pro packages to local source path expected by nuget.config
@@ -78,6 +78,7 @@ jobs:
             TheWatch.P8.DisasterRelief \
             TheWatch.P9.DoctorServices \
             TheWatch.P10.Gamification \
+            TheWatch.P11.Surveillance \
             TheWatch.Geospatial \
             TheWatch.Dashboard; do
             echo "::group::Building $project"
@@ -98,12 +99,39 @@ jobs:
             TheWatch.P8.DisasterRelief.Tests \
             TheWatch.P9.DoctorServices.Tests \
             TheWatch.P10.Gamification.Tests \
+            TheWatch.P11.Surveillance.Tests \
             TheWatch.Geospatial.Tests \
             TheWatch.Mobile.Tests; do
             echo "::group::Building $project"
             dotnet build "$project/$project.csproj" -c Release --no-restore
             echo "::endgroup::"
           done
+
+      - name: Validate NuGet pack (packable projects)
+        run: |
+          PACKABLE_PROJECTS=(
+            "TheWatch.Contracts.Abstractions"
+            "TheWatch.Contracts.CoreGateway"
+            "TheWatch.Contracts.VoiceEmergency"
+            "TheWatch.Contracts.MeshNetwork"
+            "TheWatch.Contracts.Wearable"
+            "TheWatch.Contracts.AuthSecurity"
+            "TheWatch.Contracts.FirstResponder"
+            "TheWatch.Contracts.FamilyHealth"
+            "TheWatch.Contracts.DisasterRelief"
+            "TheWatch.Contracts.DoctorServices"
+            "TheWatch.Contracts.Gamification"
+            "TheWatch.Contracts.Geospatial"
+            "TheWatch.Contracts.Surveillance"
+            "TheWatch.Shared"
+            "TheWatch.Generators"
+          )
+          for project in "${PACKABLE_PROJECTS[@]}"; do
+            echo "::group::Packing $project"
+            dotnet pack "$project/$project.csproj" -c Release --no-restore --no-build -o ./nupkgs
+            echo "::endgroup::"
+          done
+          echo "Packable project validation complete. $(ls ./nupkgs/*.nupkg | wc -l) packages produced."
 
       # Upload build output for test job
       - name: Upload build artifacts
@@ -138,6 +166,7 @@ jobs:
           - TheWatch.P8.DisasterRelief.Tests
           - TheWatch.P9.DoctorServices.Tests
           - TheWatch.P10.Gamification.Tests
+          - TheWatch.P11.Surveillance.Tests
           - TheWatch.Geospatial.Tests
           - TheWatch.Mobile.Tests
 
@@ -154,7 +183,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config', 'Directory.Packages.props') }}
           restore-keys: nuget-${{ runner.os }}-
 
       - name: Download build artifacts
@@ -202,7 +231,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config', 'Directory.Packages.props') }}
           restore-keys: nuget-${{ runner.os }}-
 
       - name: Restore

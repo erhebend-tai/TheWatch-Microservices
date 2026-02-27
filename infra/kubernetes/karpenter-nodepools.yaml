@@ -1,0 +1,205 @@
+# TheWatch Karpenter Node Pools (EKS)
+# Karpenter replaces Cluster Autoscaler — provisions optimal EC2 instances on-demand
+#
+# Prerequisites:
+#   helm install karpenter oci://public.ecr.aws/karpenter/karpenter \
+#     --namespace kube-system --set settings.clusterName=thewatch-eks
+#
+# Deploy: kubectl apply -f karpenter-nodepools.yaml
+
+# ──────────────────────────────────────────────────────
+# General workload pool — CPU services (P1-P10, Dashboard, Geospatial)
+# ──────────────────────────────────────────────────────
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: thewatch-general
+spec:
+  template:
+    metadata:
+      labels:
+        workload-type: general
+    spec:
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand", "spot"]
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            # x86_64 instances
+            - m6i.xlarge     # 4 vCPU, 16 GB
+            - m6i.2xlarge    # 8 vCPU, 32 GB
+            - m7i.xlarge     # 4 vCPU, 16 GB
+            - m7i.2xlarge    # 8 vCPU, 32 GB
+            # Graviton ARM (20% cheaper, .NET 10 supports ARM)
+            - m7g.xlarge     # 4 vCPU, 16 GB
+            - m7g.2xlarge    # 8 vCPU, 32 GB
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["us-east-1a", "us-east-1b", "us-east-1c"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64", "arm64"]
+      nodeClassRef:
+        apiVersion: karpenter.k8s.aws/v1beta1
+        kind: EC2NodeClass
+        name: thewatch-general
+  limits:
+    cpu: "96"
+    memory: 384Gi
+  disruption:
+    consolidationPolicy: WhenUnderutilized
+    expireAfter: 720h  # 30 days — forces node rotation
+  weight: 50
+---
+# ──────────────────────────────────────────────────────
+# Critical services pool — on-demand only (P2, P5, P6)
+# No spot instances for emergency/auth/dispatch workloads
+# ──────────────────────────────────────────────────────
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: thewatch-critical
+spec:
+  template:
+    metadata:
+      labels:
+        workload-type: critical
+    spec:
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]  # No spot for critical services
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - m6i.2xlarge    # 8 vCPU, 32 GB
+            - m7i.2xlarge    # 8 vCPU, 32 GB
+            - m7g.2xlarge    # 8 vCPU, 32 GB (ARM)
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["us-east-1a", "us-east-1b", "us-east-1c"]
+      nodeClassRef:
+        apiVersion: karpenter.k8s.aws/v1beta1
+        kind: EC2NodeClass
+        name: thewatch-general
+      taints:
+        - key: workload-type
+          value: critical
+          effect: NoSchedule
+  limits:
+    cpu: "64"
+    memory: 256Gi
+  disruption:
+    consolidationPolicy: WhenEmpty  # Only consolidate when completely empty
+    expireAfter: 720h
+  weight: 100  # Higher priority than general pool
+---
+# ──────────────────────────────────────────────────────
+# GPU pool — P11 Surveillance (CCTV object recognition)
+# ──────────────────────────────────────────────────────
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: thewatch-gpu
+spec:
+  template:
+    metadata:
+      labels:
+        workload-type: gpu
+    spec:
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]  # GPU spot is unreliable
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - g5.xlarge      # 1 NVIDIA A10G, 4 vCPU, 16 GB
+            - g5.2xlarge     # 1 NVIDIA A10G, 8 vCPU, 32 GB
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["us-east-1a", "us-east-1b"]  # GPU availability varies
+      nodeClassRef:
+        apiVersion: karpenter.k8s.aws/v1beta1
+        kind: EC2NodeClass
+        name: thewatch-gpu
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+  limits:
+    cpu: "32"
+    memory: 128Gi
+    nvidia.com/gpu: "8"
+  disruption:
+    consolidationPolicy: WhenEmpty
+    expireAfter: 168h  # 7 days for GPU nodes
+  weight: 100
+---
+# ──────────────────────────────────────────────────────
+# EC2NodeClass — general purpose (shared AMI, security groups)
+# ──────────────────────────────────────────────────────
+apiVersion: karpenter.k8s.aws/v1beta1
+kind: EC2NodeClass
+metadata:
+  name: thewatch-general
+spec:
+  amiFamily: AL2023
+  role: "KarpenterNodeRole-thewatch-eks"
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "thewatch-eks"
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "thewatch-eks"
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 100Gi
+        volumeType: gp3
+        iops: 3000
+        throughput: 125
+        encrypted: true
+        deleteOnTermination: true
+  tags:
+    Environment: production
+    Project: thewatch
+    ManagedBy: karpenter
+---
+# ──────────────────────────────────────────────────────
+# EC2NodeClass — GPU nodes (NVIDIA driver AMI)
+# ──────────────────────────────────────────────────────
+apiVersion: karpenter.k8s.aws/v1beta1
+kind: EC2NodeClass
+metadata:
+  name: thewatch-gpu
+spec:
+  amiFamily: AL2023
+  role: "KarpenterNodeRole-thewatch-eks"
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "thewatch-eks"
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "thewatch-eks"
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 200Gi
+        volumeType: gp3
+        iops: 3000
+        throughput: 125
+        encrypted: true
+        deleteOnTermination: true
+  userData: |
+    #!/bin/bash
+    # Install NVIDIA container toolkit
+    dnf config-manager --add-repo https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo
+    dnf install -y nvidia-container-toolkit
+  tags:
+    Environment: production
+    Project: thewatch
+    ManagedBy: karpenter
+    WorkloadType: gpu

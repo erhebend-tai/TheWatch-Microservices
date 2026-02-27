@@ -45,6 +45,7 @@ locals {
     "p8-disasterrelief",
     "p9-doctorservices",
     "p10-gamification",
+    "p11-surveillance",
     "geospatial",
     "dashboard",
   ]
@@ -60,6 +61,7 @@ locals {
     "WatchDisasterReliefDB" = { service = "p8-disasterrelief", tier = "standard" }
     "WatchDoctorServicesDB" = { service = "p9-doctorservices", tier = "standard" }
     "WatchGamificationDB"   = { service = "p10-gamification", tier = "standard" }
+    "WatchSurveillanceDB"   = { service = "p11-surveillance", tier = "standard" }
   }
 
   ecs_services = {
@@ -173,6 +175,17 @@ locals {
       dns_name       = "p10-gamification"
       path_pattern   = "/api/v1/gamification/*"
     }
+    "p11-surveillance" = {
+      cpu            = 512
+      memory         = 1024
+      desired_count  = 1
+      min_capacity   = 0
+      max_capacity   = 3
+      port           = 8080
+      image          = "${module.ecr.repository_urls["p11-surveillance"]}:latest"
+      dns_name       = "p11-surveillance"
+      path_pattern   = "/api/v1/surveillance/*"
+    }
     "geospatial" = {
       cpu            = 512
       memory         = 1024
@@ -204,9 +217,11 @@ locals {
     "checkin-completed"  = { partitions = 3, replication_factor = 3 }
     "vital-alert"        = { partitions = 6, replication_factor = 3 }
     "evidence-uploaded"  = { partitions = 3, replication_factor = 3 }
-    "disaster-declared"  = { partitions = 3, replication_factor = 3 }
-    "mesh-broadcast"     = { partitions = 6, replication_factor = 3 }
-    "dead-letter"        = { partitions = 3, replication_factor = 3 }
+    "disaster-declared"      = { partitions = 3, replication_factor = 3 }
+    "footage-submitted"      = { partitions = 3, replication_factor = 3 }
+    "crime-location-reported" = { partitions = 3, replication_factor = 3 }
+    "mesh-broadcast"         = { partitions = 6, replication_factor = 3 }
+    "dead-letter"            = { partitions = 3, replication_factor = 3 }
   }
 
   # ALB routing map — port + path per service

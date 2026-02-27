@@ -4,6 +4,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>TheWatch.Contracts.FamilyHealth</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackageId>TheWatch.Contracts.FamilyHealth</PackageId>
+    <Description>Typed client and DTOs for the TheWatch Family Health service.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\TheWatch.Contracts.Abstractions\TheWatch.Contracts.Abstractions.csproj" />

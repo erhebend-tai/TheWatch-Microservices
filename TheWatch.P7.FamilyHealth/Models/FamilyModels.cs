@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TheWatch.P7.FamilyHealth.Family;
 
 public enum FamilyRole
@@ -52,6 +54,9 @@ public class FamilyMember
     public FamilyRole Role { get; set; }
     public Guid FamilyGroupId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = [];
 }
 
 public class CheckIn

@@ -6,7 +6,7 @@ namespace TheWatch.Admin.RestAPI.Auth;
 /// </summary>
 public class ServiceTokenProvider(IConfiguration configuration)
 {
-    private readonly string _apiKey = configuration["ServiceAuth:ApiKey"] ?? "thewatch-service-key-dev";
+    private readonly string _apiKey = configuration["ServiceAuth:ApiKey"] ?? throw new InvalidOperationException("FATAL: ServiceAuth:ApiKey not configured.");
 
     public string GetServiceApiKey() => _apiKey;
 

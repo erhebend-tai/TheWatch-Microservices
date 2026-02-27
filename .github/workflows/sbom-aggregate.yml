@@ -1,0 +1,336 @@
+# =============================================================================
+# Item 328: Aggregate SBOM Generation & Vulnerability Scanning Workflow
+# =============================================================================
+# Generates a unified CycloneDX + SPDX Software Bill of Materials across all
+# TheWatch microservices, then scans for known vulnerabilities using Grype.
+#
+# Compliance References:
+#   NIST SP 800-53 SI-2  — Flaw Remediation (identify, report, and correct
+#                          software and firmware flaws in a timely manner)
+#   NIST SSDF RV.1       — Identify and confirm vulnerabilities on an ongoing
+#                          basis; gather information about newly discovered
+#                          vulnerabilities and assess their applicability
+# =============================================================================
+
+name: SBOM — Aggregate & Vulnerability Scan
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "helm/**"
+  schedule:
+    # Weekly run — Sunday at 04:00 UTC
+    # SI-2: Continuous flaw remediation requires periodic re-scanning even
+    # without code changes, as new CVEs are published daily
+    - cron: "0 4 * * 0"
+  workflow_dispatch:
+    inputs:
+      fail-on-vulnerabilities:
+        description: "Fail the workflow on CRITICAL/HIGH CVEs"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+concurrency:
+  group: sbom-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  DOTNET_QUALITY: "preview"
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  GRYPE_VERSION: "0.82.0"
+  CYCLONEDX_CLI_VERSION: "0.27.1"
+
+jobs:
+  # ===========================================================
+  # Generate aggregate SBOM for the full TheWatch solution
+  # SI-2 / RV.1: Provenance + vulnerability identification
+  # ===========================================================
+  generate-sbom:
+    name: Generate Aggregate SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git describe version tags
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          dotnet-quality: ${{ env.DOTNET_QUALITY }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config', 'Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      # RV.1: Restore all dependencies so CycloneDX can fully enumerate
+      # the transitive dependency graph for each microservice
+      - name: Restore solution dependencies
+        run: dotnet restore TheWatch.sln
+
+      # -------------------------------------------------------
+      # Install SBOM tooling
+      # -------------------------------------------------------
+      - name: Install dotnet-CycloneDX
+        run: |
+          dotnet tool install --global CycloneDX || dotnet tool update --global CycloneDX
+          echo "CycloneDX version: $(dotnet CycloneDX --version 2>/dev/null || echo 'installed')"
+
+      - name: Install cyclonedx-cli
+        run: |
+          dotnet tool install --global CycloneDX.Cli || dotnet tool update --global CycloneDX.Cli
+          echo "cyclonedx-cli installed"
+
+      # Add dotnet tools to PATH
+      - name: Configure PATH for dotnet tools
+        run: echo "${HOME}/.dotnet/tools" >> $GITHUB_PATH
+
+      # -------------------------------------------------------
+      # Generate SBOMs via generate-sbom.sh
+      # -------------------------------------------------------
+      - name: Make generate-sbom.sh executable
+        run: chmod +x ./generate-sbom.sh
+
+      - name: Generate aggregate SBOM (CycloneDX + SPDX)
+        run: |
+          echo "## SBOM Generation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          ./generate-sbom.sh --verbose 2>&1 | tee sbom-generation.log
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -30 sbom-generation.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      # -------------------------------------------------------
+      # Validate generated SBOMs
+      # -------------------------------------------------------
+      - name: Validate aggregate SBOM
+        run: |
+          AGGREGATE="dist/sbom/thewatch-aggregate-sbom.json"
+          if [[ ! -f "$AGGREGATE" ]]; then
+            echo "::error::Aggregate SBOM not found at ${AGGREGATE}"
+            exit 1
+          fi
+
+          # Validate JSON structure
+          python3 -c "
+          import json, sys
+          with open('${AGGREGATE}') as f:
+              sbom = json.load(f)
+          bom_format = sbom.get('bomFormat', 'unknown')
+          spec_version = sbom.get('specVersion', 'unknown')
+          components = sbom.get('components', [])
+          print(f'Format: {bom_format} {spec_version}')
+          print(f'Components: {len(components)}')
+          if len(components) == 0:
+              print('::warning::Aggregate SBOM has zero components')
+              sys.exit(1)
+          print('Aggregate SBOM validation passed')
+          "
+
+      # -------------------------------------------------------
+      # Vulnerability scanning with Grype
+      # SI-2: Automated flaw identification against known CVE databases
+      # RV.1: Confirm vulnerabilities and assess severity
+      # -------------------------------------------------------
+      - name: Install Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | \
+            sh -s -- -b /usr/local/bin v${{ env.GRYPE_VERSION }}
+          grype version
+
+      - name: Scan aggregate SBOM for vulnerabilities
+        id: grype-scan
+        run: |
+          AGGREGATE="dist/sbom/thewatch-aggregate-sbom.json"
+          REPORT_JSON="dist/sbom/vulnerability-report.json"
+          REPORT_TABLE="dist/sbom/vulnerability-report.txt"
+
+          echo "Scanning aggregate SBOM for known CVEs..."
+          echo ""
+
+          # Generate JSON report (for artifact storage and programmatic analysis)
+          grype sbom:"${AGGREGATE}" \
+            --output json \
+            --file "${REPORT_JSON}" \
+            --add-cpes-if-none \
+            || true
+
+          # Generate human-readable table report
+          grype sbom:"${AGGREGATE}" \
+            --output table \
+            --file "${REPORT_TABLE}" \
+            --add-cpes-if-none \
+            || true
+
+          # Count vulnerabilities by severity
+          if [[ -f "${REPORT_JSON}" ]]; then
+            python3 - "${REPORT_JSON}" <<'PYEOF'
+          import json, sys, os, collections
+
+          with open(sys.argv[1]) as f:
+              report = json.load(f)
+
+          matches = report.get("matches", [])
+          severity_counts = collections.Counter()
+          for match in matches:
+              vuln = match.get("vulnerability", {})
+              sev = vuln.get("severity", "Unknown")
+              severity_counts[sev] += 1
+
+          total = len(matches)
+          critical = severity_counts.get("Critical", 0)
+          high = severity_counts.get("High", 0)
+          medium = severity_counts.get("Medium", 0)
+          low = severity_counts.get("Low", 0)
+          negligible = severity_counts.get("Negligible", 0)
+
+          print(f"Total vulnerabilities found: {total}")
+          print(f"  Critical: {critical}")
+          print(f"  High:     {high}")
+          print(f"  Medium:   {medium}")
+          print(f"  Low:      {low}")
+          print(f"  Other:    {negligible + severity_counts.get('Unknown', 0)}")
+
+          # Write outputs for the GitHub Actions step
+          with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as gho:
+              gho.write(f"total={total}\n")
+              gho.write(f"critical={critical}\n")
+              gho.write(f"high={high}\n")
+              gho.write(f"medium={medium}\n")
+              gho.write(f"low={low}\n")
+              has_blocking = "true" if (critical + high) > 0 else "false"
+              gho.write(f"has-blocking={has_blocking}\n")
+
+          PYEOF
+          else
+            echo "::warning::Vulnerability report was not generated"
+            echo "total=0" >> $GITHUB_OUTPUT
+            echo "critical=0" >> $GITHUB_OUTPUT
+            echo "high=0" >> $GITHUB_OUTPUT
+            echo "has-blocking=false" >> $GITHUB_OUTPUT
+          fi
+
+      # -------------------------------------------------------
+      # Publish vulnerability summary to job summary
+      # -------------------------------------------------------
+      - name: Vulnerability report summary
+        if: always()
+        run: |
+          REPORT_TABLE="dist/sbom/vulnerability-report.txt"
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Vulnerability Scan Results (Grype)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Critical | ${{ steps.grype-scan.outputs.critical || '0' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| High     | ${{ steps.grype-scan.outputs.high || '0' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Medium   | ${{ steps.grype-scan.outputs.medium || '0' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Low      | ${{ steps.grype-scan.outputs.low || '0' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Total** | **${{ steps.grype-scan.outputs.total || '0' }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ -f "${REPORT_TABLE}" ]]; then
+            echo "<details><summary>Full vulnerability table</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            head -200 "${REPORT_TABLE}" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Compliance: NIST SI-2 (Flaw Remediation) | SSDF RV.1 (Vulnerability Identification)_" >> $GITHUB_STEP_SUMMARY
+
+      # -------------------------------------------------------
+      # Fail on CRITICAL/HIGH vulnerabilities
+      # SI-2: Flaws rated as critical/high must block deployment
+      # -------------------------------------------------------
+      - name: Enforce vulnerability policy
+        if: always()
+        run: |
+          FAIL_ON_VULN="${{ inputs.fail-on-vulnerabilities || 'true' }}"
+          HAS_BLOCKING="${{ steps.grype-scan.outputs.has-blocking || 'false' }}"
+          CRITICAL="${{ steps.grype-scan.outputs.critical || '0' }}"
+          HIGH="${{ steps.grype-scan.outputs.high || '0' }}"
+
+          echo "Policy enforcement:"
+          echo "  Fail on vulnerabilities: ${FAIL_ON_VULN}"
+          echo "  Has blocking (CRITICAL/HIGH): ${HAS_BLOCKING}"
+          echo "  Critical: ${CRITICAL}, High: ${HIGH}"
+
+          if [[ "${FAIL_ON_VULN}" == "true" && "${HAS_BLOCKING}" == "true" ]]; then
+            echo ""
+            echo "::error::SBOM vulnerability scan found ${CRITICAL} CRITICAL and ${HIGH} HIGH vulnerabilities."
+            echo "::error::Per NIST SI-2 (Flaw Remediation), CRITICAL and HIGH CVEs must be resolved before deployment."
+            echo ""
+            echo "Review the vulnerability report artifact for details and remediation guidance."
+            exit 1
+          fi
+
+          echo "Vulnerability policy check passed."
+
+      # -------------------------------------------------------
+      # Upload SBOM artifacts (90-day retention)
+      # RV.1: Retain vulnerability and provenance data for audit trail
+      # -------------------------------------------------------
+      - name: Upload aggregate SBOM (CycloneDX)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-aggregate-cyclonedx
+          path: dist/sbom/thewatch-aggregate-sbom.json
+          retention-days: 90
+
+      - name: Upload aggregate SBOM (SPDX)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-aggregate-spdx
+          path: dist/sbom/thewatch-aggregate-sbom.spdx.json
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Upload per-project SBOMs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-per-project
+          path: |
+            dist/sbom/*.cdx.json
+          retention-days: 90
+
+      - name: Upload vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerability-report
+          path: |
+            dist/sbom/vulnerability-report.json
+            dist/sbom/vulnerability-report.txt
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Upload generation log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-generation-log
+          path: sbom-generation.log
+          retention-days: 30

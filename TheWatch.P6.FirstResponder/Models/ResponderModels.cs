@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TheWatch.P6.FirstResponder.Responders;
 
 public enum ResponderType
@@ -52,6 +54,9 @@ public class Responder
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
+
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = [];
 }
 
 public class CheckIn

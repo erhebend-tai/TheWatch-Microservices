@@ -2,23 +2,28 @@
 
 > **Origin**: 2022-08-11 DoD Memorandum — Sub-2-second citizen emergency response & deterrence.
 > **Constraint**: The core mission remains the center of gravity. Everything serves it.
+> **Current Status**: 180/265 TODO items complete. Stages 5-13 done. Stages 14-18 pending for launch.
 
 ---
 
-## What Exists Today (Sessions 1–7)
+## What Exists Today (Sessions 1–35)
 
-### Solution: 27 .NET 10 Projects
+### Solution: 54+ .NET 10 Projects
 
 | Layer | Projects | Status |
 |-------|----------|--------|
-| **Microservices** | P1 CoreGateway, P2 VoiceEmergency, P3 MeshNetwork, P4 Wearable, P5 AuthSecurity, P6 FirstResponder, P7 FamilyHealth, P8 DisasterRelief, P9 DoctorServices, P10 Gamification | Real endpoints, EF Core SQL Server stores, Hangfire Pro jobs |
-| **Tests** | 10 test projects (P1–P10) + Mobile.Tests | 25 Mobile tests pass; ~113 custom integration tests pass across P1–P10 |
-| **Dashboard** | TheWatch.Dashboard (Blazor Server + Radzen) | Login, service health, per-program tabs, API explorer, mapping coverage, Dockerized |
-| **Mobile** | TheWatch.Mobile (MAUI Blazor Hybrid) | Login, Home, SOS, Phrases, Health, Profile; platform speech recognition (Android/iOS/Windows); offline SQLite persistence; evidence collection |
-| **Generators** | TheWatch.Generators (8 Roslyn generators) | Endpoint, Model, Service, Hangfire, Test, Serilog, OpenApi, MauiPage generators |
-| **Shared** | TheWatch.Shared | Health contracts, Serilog defaults, mobile DTOs, Azure/GCP/Cloudflare integrations |
-| **Orchestration** | Aspire AppHost + ServiceDefaults | All 11 services orchestrated with service discovery, OpenTelemetry |
-| **Infrastructure** | Docker, K8s (Helm), Terraform, CI/CD | Full containerization, IaC for Azure/AWS/GCP, GitHub Actions workflows |
+| **Microservices** | P1-P10 + P11 Surveillance + Geospatial (12 services) | Real endpoints, EF Core + IWatchRepository, SignalR hubs, Kafka events, Hangfire Pro jobs, JWT auth on all endpoints |
+| **Contracts** | 12 typed client libraries (TheWatch.Contracts.*) + Abstractions | ServiceClientBase pattern, Aspire service discovery, per-service DTOs |
+| **REST API Gateway** | TheWatch.Admin.RestAPI (13 controllers) | Zero Trust auth, Scalar API docs, aggregated health checks, routes to all 12 services |
+| **Admin Portal** | TheWatch.Admin (8 Blazor Server pages) | Dashboard, Users, Roles, Security, Audit Log, Services, Settings, Login |
+| **Dashboard** | TheWatch.Dashboard (Blazor Server + Radzen) | Login, service health, per-program tabs, API explorer, mapping coverage, incident map, response demo |
+| **Mobile** | TheWatch.Mobile (MAUI Blazor Hybrid, 12 pages, 31 services) | Auth, SOS, Map, Evidence, SITREP, Health, Profile; platform speech; offline SQLite; BLE mesh fallback; chain-of-custody |
+| **Generators** | TheWatch.Generators (10 Roslyn generators) | Endpoint, Model, Service, Hangfire, Test, Serilog, OpenApi, MauiPage, DbContext, SignalR, Security, Notification, Kafka, RestApiController |
+| **Shared** | TheWatch.Shared | Auth extensions, security middleware, Serilog defaults, mobile DTOs, Azure/GCP/Cloudflare provider stubs, Kafka events, notification contracts |
+| **Orchestration** | Aspire AppHost + ServiceDefaults | 12 services + SQL Server (11 DBs) + PostgreSQL/PostGIS + Kafka + Redis orchestrated |
+| **Infrastructure** | Docker (12 Dockerfiles), K8s (Helm), Terraform (Azure 7 modules, AWS 20 modules, GCP 9 modules), 5 GitHub Actions workflows | Full multi-cloud IaC |
+| **CLI** | TheWatch.Admin.CLI (PowerShell module, 45 cmdlets) | API ops, infra management, Terraform plan/apply |
+| **Tests** | 12 test projects | P1-P10 integration tests, Geospatial tests, Mobile unit tests (battery, crypto, sync, auth) |
 
 ### Data Assets
 
@@ -29,19 +34,21 @@
 | 251 OpenAPI specs | `E:\json_output\APIS\` (48 domain files + catalog) | Extracted, cataloged |
 | API-to-code mapping | `E:\json_output\Microservices\_mapping.json` | 256 matched ops, 2,739 unmatched |
 | MongoDB Atlas | `TheWatch` DB on ClusterOne | 8 collections, 4,365 docs + 251 API docs |
-| SQL schemas | `Common_Measurement_Infrastructure/` | P0–P10 DDL, PostGIS geospatial |
-| Program specifications | `Watch-AuthSecurity/`, `Watch-DisasterRelief/`, `Watch-Logging/`, etc. | Detailed designs for P2–P10 |
+| SQL schemas | `Common_Measurement_Infrastructure/` | P0–P11 DDL, PostGIS geospatial |
+| EF Core Migrations | Per-service `Migrations/` directories | 10 services migrated (P5 uses EnsureCreated, P11 missing) |
+| Seed Data | Per-service `Data/Seeders/` classes | 9 seeders registered via IWatchDataSeeder (P5 seeds inline, P11 missing) |
 | 10 monitoring agents | `Agents/` | PowerShell orchestrated, schema/security/API/quality/compliance |
 
-### Key Gaps
+### Key Gaps (Launch Blockers)
 
-1. **All services use in-memory ConcurrentDictionary** — no SQL Server, no MongoDB, no Redis (Stage 5 work in progress)
-2. **MAUI speech recognition is a framework stub** — no platform-specific implementations (Stage 9 work in progress)
-3. **No Docker/Kubernetes/Helm** — no containerization (Stage 10 work in progress)
-4. **No CI/CD pipeline** — no GitHub Actions wired to the Microservices solution (Stage 10 work in progress)
-5. **No cloud deployment** — Azure, GCP, Cloudflare not configured (Stage 11 work in progress)
-6. **No evidence chain-of-custody** — core memorandum requirement not yet implemented (Stage 9 work in progress)
-7. **AWS Infrastructure** — AWS Terraform modules and networking (Stage 13 pending)
+1. **P11 Surveillance not in deployment infrastructure** — missing from docker-compose, Terraform (Azure/AWS/GCP), Helm, health checks, CI/CD matrix, and has no test project or EF migration
+2. **Cloud provider stubs throw NotImplementedException** — GCP (Speech, Vision, Healthcare) and Cloudflare (CDN, Workers, WAF, Tunnels) providers are interface-complete but implementation bodies throw
+3. **No end-to-end integration tests** — individual service tests exist but no test exercises the full SOS→dispatch→evidence→SITREP lifecycle across services
+4. **SyncEngine.SendAsync() not implemented** — MAUI offline sync engine has a critical gap at line 401
+5. **No FluentValidation** on request DTOs — endpoints accept malformed input without structured validation
+6. **No global exception handler** — 5xx errors return raw stack traces, not ProblemDetails
+7. **Sub-2-second SOS latency not benchmarked** — core memorandum requirement never measured
+8. **Inter-service typed clients not wired** — Contract libraries exist but services still use ad-hoc HTTP calls for cross-service communication
 
 ---
 
@@ -266,19 +273,129 @@ Replace all ConcurrentDictionary stores with real database persistence.
 
 ---
 
-## Milestone Summary
+## Stage 14: P11 Surveillance Integration
 
-| Stage | Focus | Key Deliverable |
-|-------|-------|-----------------|
-| 5 | Database | EF Core + SQL Server replacing in-memory stores |
-| 6 | Real-Time | SignalR hubs + Kafka events + push notifications |
-| 7 | Geospatial | PostGIS + maps for responder proximity |
-| 8 | Security | Full P5 auth with MFA, RBAC, threat monitoring |
-| 9 | Mobile | Production MAUI with speech, offline, evidence |
-| 10 | DevOps | Docker + Kubernetes + CI/CD pipelines |
-| 11 | Cloud | Azure + GCP + Cloudflare deployment |
-| 12 | Advanced | ML, compliance, graph DB, observability |
+P11.Surveillance was added (Session 34) with 16 endpoints, SignalR hubs, Kafka events, and an ONNX object detector. However it was never wired into docker-compose, Terraform, Helm, health checks, CI/CD, or testing.
+
+- Add P11 to all deployment manifests (Docker, Helm, Terraform x3)
+- Add P11 to health check aggregation and dashboard
+- Create test project with integration tests
+- Create EF migration and seed data
+- Wire Kafka topics into event infrastructure
 
 ---
 
-*Last updated: 2026-02-25 (Session 7)*
+## Stage 15: Cloud Provider Implementation
+
+GCP and Cloudflare provider classes implement the correct interfaces but every method body throws `NotImplementedException("...not yet implemented. Implement in batch.")`. 32 stub methods across 5 files.
+
+### GCP (3 providers, 14 stubs)
+- `GoogleSpeechToTextProvider` — `TranscribeAsync`, `StartStreamingAsync`
+- `GoogleVisionProvider` — `AnalyzeImageAsync`, `AnalyzeImageUrlAsync`, `ExtractTextAsync`, `DetectLabelsAsync`
+- `GoogleHealthcareProvider` — `UpsertPatientAsync`, `GetPatientAsync`, `SearchPatientsAsync`, `CreateObservationAsync`, `GetObservationsAsync`, `CreateEncounterAsync`, `ExportPatientDataAsync`
+
+### Cloudflare (4 providers, 15 stubs)
+- `CloudflareCdnService` — cache purge, analytics
+- `CloudflareWorkerAuthService` — access token validation, identity
+- `CloudflareWafService` — rule deployment, rate limits, events, IP blocking
+- `CloudflareTunnelService` — tunnel status, connections, zero trust validation
+
+### Azure
+- `AzureMapsGeospatialService` — uses ConcurrentDictionary cache, should use Redis
+
+---
+
+## Stage 16: Contract Client Wiring
+
+13 typed client libraries exist under `TheWatch.Contracts.*` but no service currently injects them for cross-service calls. Wire typed clients into consuming services to replace ad-hoc HTTP calls and enable Polly resilience policies, distributed tracing, and API key authentication.
+
+---
+
+## Stage 17: Production Hardening
+
+Close the gap between "works in development" and "survives production traffic":
+
+### Database
+- P5 EF migration (currently EnsureCreated), concurrency tokens, connection resilience, ConcurrentDictionary→Redis migration
+
+### API Quality
+- FluentValidation, global ProblemDetails exception handler, PII-redacted logging, API versioning, response compression, ETags
+
+### Mobile
+- Fix SyncEngine.SendAsync(), bundle ONNX model, crash reporting, certificate pinning, accessibility audit
+
+### Security
+- Security headers, evidence request signing, JWT key rotation, OWASP ZAP scan, anti-forgery, secrets rotation runbook
+
+### Observability
+- Custom Prometheus metrics, Grafana dashboards, dependency health checks, distributed tracing enrichment, alerting rules, canary endpoints, runbook documentation
+
+---
+
+## Stage 18: Integration & End-to-End Testing
+
+No test currently exercises the full system. Build confidence that the emergency lifecycle works end-to-end.
+
+### End-to-End Tests
+- Docker-compose test harness spinning up all services
+- Full SOS lifecycle: incident → dispatch → evidence → SITREP
+- Family health flow: family → vitals → alert → doctor
+- Disaster relief flow: disaster → shelters → mesh → evacuees
+
+### Load Tests (k6 / NBomber)
+- 1,000 concurrent SOS activations
+- 500 concurrent auth+MFA flows
+- 10,000 concurrent SignalR connections
+- 100 concurrent 50MB evidence uploads
+- **Sub-2-second SOS benchmark** (core memorandum requirement)
+
+### Chaos & Resilience
+- SQL Server failover, Kafka broker failure, Redis failure
+- Inter-service failure (P6 down during dispatch)
+- MAUI offline→mesh→reconnect→sync cycle
+
+---
+
+## Milestone Summary
+
+| Stage | Focus | Key Deliverable | Status |
+|-------|-------|-----------------|--------|
+| 5 | Database | EF Core + SQL Server replacing in-memory stores | **DONE** |
+| 6 | Real-Time | SignalR hubs + Kafka events + push notifications | **DONE** |
+| 7 | Geospatial | PostGIS + maps for responder proximity | **DONE** |
+| 8 | Security | Full P5 auth with MFA, RBAC, threat monitoring | **DONE** |
+| 9 | Mobile | Production MAUI with speech, offline, evidence | **DONE** |
+| 10 | DevOps | Docker + Kubernetes + CI/CD pipelines | **DONE** |
+| 11 | Cloud | Azure + GCP + Cloudflare deployment | **DONE** |
+| 12 | Advanced | ML, compliance, graph DB, observability | **DONE** |
+| 13 | AWS | Compute, data, security, DevOps Terraform | **DONE** |
+| 14 | P11 Integration | Surveillance in deployment + tests | Pending |
+| 15 | Cloud Providers | Replace 32 NotImplementedException stubs | Pending |
+| 16 | Contracts | Wire typed clients for inter-service calls | Pending |
+| 17 | Hardening | Database, API, mobile, security, observability | Pending |
+| 18 | E2E Testing | Integration, load, chaos testing | Pending |
+
+---
+
+## Launch Readiness: Vertical Assessment
+
+### READY (Green)
+- **Authentication**: JWT + Argon2 + MFA (TOTP/SMS/magic link/FIDO2) + refresh rotation + sliding window + RBAC across all services
+- **Real-Time**: SignalR generated hubs wired into business logic (incident broadcast, dispatch, responder tracking) + Kafka event bus with DLQ
+- **Database**: EF Core with Roslyn-generated DbContext, IWatchRepository, migrations, seed data for 10/12 services
+- **Mobile Core**: 12 pages, 31 services, offline SQLite, BLE mesh fallback, chain-of-custody cryptography, evidence collection
+- **Infrastructure as Code**: Azure (7 modules), AWS (20 modules), GCP (9 modules), all with staging+production tfvars
+- **CI/CD**: 5 GitHub Actions workflows (build, Docker publish, staging deploy, production deploy with approval gate, security scanning)
+
+### NOT READY (Red)
+- **P11 Surveillance**: Fully coded but invisible to deployment, monitoring, and tests
+- **Cloud Provider Bodies**: 32 methods throw NotImplementedException if feature-flagged on
+- **End-to-End Proof**: Zero tests that the SOS lifecycle works across services
+- **SOS Latency**: Core <2s requirement from memorandum — never measured
+- **Input Validation**: No FluentValidation; endpoints accept arbitrary payloads
+- **Exception Handling**: No ProblemDetails; 5xx returns raw stack traces
+- **SyncEngine.SendAsync()**: Mobile offline sync broken for non-standard HTTP methods
+
+---
+
+*Last updated: 2026-02-26 — Vertical launch assessment (Session 35). 180/265 items complete.*

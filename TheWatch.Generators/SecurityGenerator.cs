@@ -81,8 +81,20 @@ public class SecurityGenerator : IIncrementalGenerator
         {
             // Consumer services: add JWT validation + policies
             sb.AppendLine();
-            sb.AppendLine("        // JWT Bearer authentication (validates tokens issued by P5)");
-            sb.AppendLine("        var jwtKey = config[\"Jwt:Key\"] ?? \"TheWatch-P5-AuthSecurity-DevKey-Min32Chars!!\";");
+            sb.AppendLine("        // JWT Bearer authentication — supports asymmetric RSA (prod) and symmetric HMAC (dev)");
+            sb.AppendLine("        var asymmetricKeyPath = config[\"Jwt:AsymmetricPublicKeyPath\"];");
+            sb.AppendLine("        Microsoft.IdentityModel.Tokens.SecurityKey signingKey;");
+            sb.AppendLine("        if (!string.IsNullOrEmpty(asymmetricKeyPath) && System.IO.File.Exists(asymmetricKeyPath))");
+            sb.AppendLine("        {");
+            sb.AppendLine("            var rsa = System.Security.Cryptography.RSA.Create();");
+            sb.AppendLine("            rsa.ImportFromPem(System.IO.File.ReadAllText(asymmetricKeyPath));");
+            sb.AppendLine("            signingKey = new Microsoft.IdentityModel.Tokens.RsaSecurityKey(rsa);");
+            sb.AppendLine("        }");
+            sb.AppendLine("        else");
+            sb.AppendLine("        {");
+            sb.AppendLine("            var jwtKey = config[\"Jwt:Key\"] ?? throw new InvalidOperationException(\"FATAL: Neither Jwt:AsymmetricPublicKeyPath nor Jwt:Key configured.\");");
+            sb.AppendLine("            signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));");
+            sb.AppendLine("        }");
             sb.AppendLine("        var jwtIssuer = config[\"Jwt:Issuer\"] ?? \"TheWatch.P5.AuthSecurity\";");
             sb.AppendLine("        var jwtAudience = config[\"Jwt:Audience\"] ?? \"TheWatch\";");
             sb.AppendLine();
@@ -101,8 +113,9 @@ public class SecurityGenerator : IIncrementalGenerator
             sb.AppendLine("                ValidateIssuerSigningKey = true,");
             sb.AppendLine("                ValidIssuer = jwtIssuer,");
             sb.AppendLine("                ValidAudience = jwtAudience,");
-            sb.AppendLine("                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),");
-            sb.AppendLine("                ClockSkew = TimeSpan.FromSeconds(30)");
+            sb.AppendLine("                IssuerSigningKey = signingKey,");
+            sb.AppendLine("                ClockSkew = TimeSpan.FromSeconds(30),");
+            sb.AppendLine("                RequireExpirationTime = true");
             sb.AppendLine("            };");
             sb.AppendLine();
             sb.AppendLine("            // Support SignalR token via query string");
@@ -176,10 +189,24 @@ public class SecurityGenerator : IIncrementalGenerator
         sb.AppendLine("                opt.QueueLimit = 5;");
         sb.AppendLine("            });");
         sb.AppendLine();
+        sb.AppendLine("            // Security+ 2.4: MFA/magic-link endpoint limit (3 req/min)");
+        sb.AppendLine("            options.AddSlidingWindowLimiter(\"MfaLimit\", opt =>");
+        sb.AppendLine("            {");
+        sb.AppendLine("                opt.PermitLimit = 3;");
+        sb.AppendLine("                opt.Window = TimeSpan.FromMinutes(1);");
+        sb.AppendLine("                opt.SegmentsPerWindow = 2;");
+        sb.AppendLine("                opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;");
+        sb.AppendLine("                opt.QueueLimit = 0;");
+        sb.AppendLine("            });");
+        sb.AppendLine();
+        sb.AppendLine("            // Security+ 2.5: Per-user rate limiting (authenticated → userId, anonymous → IP)");
         sb.AppendLine("            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>");
         sb.AppendLine("            {");
-        sb.AppendLine("                var ip = context.Connection.RemoteIpAddress?.ToString() ?? \"unknown\";");
-        sb.AppendLine("                return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions");
+        sb.AppendLine("                var userId = context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;");
+        sb.AppendLine("                var partitionKey = !string.IsNullOrEmpty(userId)");
+        sb.AppendLine("                    ? $\"user:{userId}\"");
+        sb.AppendLine("                    : $\"ip:{context.Connection.RemoteIpAddress?.ToString() ?? \"unknown\"}\";");
+        sb.AppendLine("                return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions");
         sb.AppendLine("                {");
         sb.AppendLine("                    PermitLimit = 100,");
         sb.AppendLine("                    Window = TimeSpan.FromMinutes(1)");
@@ -199,8 +226,12 @@ public class SecurityGenerator : IIncrementalGenerator
         sb.AppendLine("    /// </summary>");
         sb.AppendLine("    public static WebApplication UseWatchSecurity(this WebApplication app)");
         sb.AppendLine("    {");
+        sb.AppendLine("        // Security+ 2.2: OWASP security headers on all responses");
+        sb.AppendLine("        app.UseMiddleware<TheWatch.Shared.Security.SecurityHeadersMiddleware>();");
         sb.AppendLine("        app.UseRateLimiter();");
         sb.AppendLine("        app.UseMiddleware<TheWatch.Shared.Security.SecurityAuditMiddleware>();");
+        sb.AppendLine("        app.UseMiddleware<TheWatch.Shared.Security.WatchProblemDetailsMiddleware>();");
+        sb.AppendLine("        app.UseMiddleware<TheWatch.Shared.Security.CuiMarkingMiddleware>();");
         sb.AppendLine("        return app;");
         sb.AppendLine("    }");
 

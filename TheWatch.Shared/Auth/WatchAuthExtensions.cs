@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
@@ -8,14 +9,32 @@ namespace TheWatch.Shared.Auth;
 
 /// <summary>
 /// Shared JWT Bearer + authorization policy setup for all services.
+/// Supports asymmetric RSA-2048/ECDSA (production) and symmetric HMAC (dev fallback).
+/// NIST SC-12/SC-13, DISA STIG V-222641.
 /// </summary>
 public static class WatchAuthExtensions
 {
     public static IServiceCollection AddWatchJwtAuth(this IServiceCollection services, IConfiguration configuration)
     {
-        var jwtKey = configuration["Jwt:Key"] ?? "TheWatch-P5-AuthSecurity-DevKey-Min32Chars!!";
         var jwtIssuer = configuration["Jwt:Issuer"] ?? "TheWatch.P5.AuthSecurity";
         var jwtAudience = configuration["Jwt:Audience"] ?? "TheWatch";
+        var asymmetricKeyPath = configuration["Jwt:AsymmetricPublicKeyPath"];
+
+        SecurityKey signingKey;
+        if (!string.IsNullOrEmpty(asymmetricKeyPath) && System.IO.File.Exists(asymmetricKeyPath))
+        {
+            // Production: RSA-2048 asymmetric validation (public key only at consumers)
+            var rsa = RSA.Create();
+            rsa.ImportFromPem(System.IO.File.ReadAllText(asymmetricKeyPath));
+            signingKey = new RsaSecurityKey(rsa);
+        }
+        else
+        {
+            // Dev fallback: symmetric HMAC-SHA256
+            var jwtKey = configuration["Jwt:Key"]
+                ?? throw new InvalidOperationException("FATAL: Neither Jwt:AsymmetricPublicKeyPath nor Jwt:Key configured.");
+            signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+        }
 
         services.AddAuthentication(options =>
         {
@@ -32,8 +51,9 @@ public static class WatchAuthExtensions
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = jwtIssuer,
                 ValidAudience = jwtAudience,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-                ClockSkew = TimeSpan.FromSeconds(30)
+                IssuerSigningKey = signingKey,
+                ClockSkew = TimeSpan.FromSeconds(30),
+                RequireExpirationTime = true
             };
 
             // Support SignalR token via query string

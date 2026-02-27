@@ -8,6 +8,9 @@ using TheWatch.Shared.Contracts;
 using TheWatch.P9.DoctorServices.Data.Seeders;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
+using TheWatch.Shared.Security;
+using TheWatch.Contracts.Abstractions;
+using TheWatch.Contracts.FamilyHealth;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -19,17 +22,20 @@ builder.ConfigureWatchNotifications();
 builder.Services.AddGcpServicesIfConfigured(builder.Configuration);
 builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
-// CORS
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
-});
+builder.Services.AddWatchCors(builder.Configuration);
 
 // Hangfire with InMemory storage
 builder.Services.AddHangfire(config =>
     config.UseInMemoryStorage());
 builder.Services.AddHangfireServer();
+
+// ── Inter-service typed HTTP clients (Item 213) ──
+// Shared delegating handlers for correlation ID + API key auth (Items 218, 219)
+builder.Services.AddWatchClientHandlers();
+
+// Item 213: IFamilyHealthClient — patient family health data during appointments/telehealth
+builder.Services.AddFamilyHealthClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:FamilyHealth"] ?? "https+http://p7-familyhealth");
 
 // Services
 builder.Services.AddScoped<IDoctorService, DoctorService>();
@@ -47,7 +53,11 @@ app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseHangfireDashboard("/hangfire");
+app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
+{
+    Authorization = [new TheWatch.Shared.Security.HangfireDashboardAuthFilter()],
+    IsReadOnlyFunc = _ => true
+});
 app.MapWatchControllers();
 
 // Recurring Hangfire jobs

@@ -31,10 +31,12 @@ public static class GcpServiceExtensions
         // ─── Item 132: Speech-to-Text ───
         if (options.UseSpeechToText && !string.IsNullOrWhiteSpace(options.CredentialPath))
         {
+            services.AddHttpClient<GoogleSpeechToTextProvider>();
             services.AddSingleton<ISpeechToTextProvider>(sp =>
                 new GoogleSpeechToTextProvider(
                     options,
-                    sp.GetRequiredService<ILogger<GoogleSpeechToTextProvider>>()));
+                    sp.GetRequiredService<ILogger<GoogleSpeechToTextProvider>>(),
+                    sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(GoogleSpeechToTextProvider))));
         }
         else
         {
@@ -46,10 +48,12 @@ public static class GcpServiceExtensions
         // ─── Item 133: Vision API / Content Analysis ───
         if (options.UseVisionApi && !string.IsNullOrWhiteSpace(options.CredentialPath))
         {
+            services.AddHttpClient<GoogleVisionProvider>();
             services.AddSingleton<IContentAnalysisProvider>(sp =>
                 new GoogleVisionProvider(
                     options,
-                    sp.GetRequiredService<ILogger<GoogleVisionProvider>>()));
+                    sp.GetRequiredService<ILogger<GoogleVisionProvider>>(),
+                    sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(GoogleVisionProvider))));
         }
         else
         {
