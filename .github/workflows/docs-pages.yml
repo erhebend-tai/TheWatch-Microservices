@@ -25,6 +25,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+          dotnet-quality: "preview"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config', 'Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Setup Hangfire Pro local source
+        run: |
+          mkdir -p /tmp/hangfire-local
+        continue-on-error: true
+
+      - name: Restore and build for XML docs
+        run: |
+          dotnet restore TheWatch.sln
+          dotnet build TheWatch.Shared/TheWatch.Shared.csproj -c Release --no-restore
+          dotnet build TheWatch.Generators/TheWatch.Generators.csproj -c Release --no-restore
+          for project in \
+            TheWatch.P1.CoreGateway \
+            TheWatch.P2.VoiceEmergency \
+            TheWatch.P3.MeshNetwork \
+            TheWatch.P4.Wearable \
+            TheWatch.P5.AuthSecurity \
+            TheWatch.P6.FirstResponder \
+            TheWatch.P7.FamilyHealth \
+            TheWatch.P8.DisasterRelief \
+            TheWatch.P9.DoctorServices \
+            TheWatch.P10.Gamification \
+            TheWatch.P11.Surveillance \
+            TheWatch.Geospatial \
+            TheWatch.Dashboard; do
+              if ! dotnet build "$project/$project.csproj" -c Release --no-restore; then
+                echo "::warning::Build failed for $project — XML docs will be missing for this project"
+              fi
+          done
+
+      - name: Collect XML documentation
+        run: |
+          mkdir -p documentation/api/xml-docs
+          find . -path "*/bin/Release/*" -name "TheWatch.*.xml" -exec cp {} documentation/api/xml-docs/ \;
+          echo "Collected $(ls documentation/api/xml-docs/*.xml 2>/dev/null | wc -l) XML documentation files."
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 

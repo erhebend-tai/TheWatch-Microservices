@@ -38,6 +38,7 @@ builder.Services.AddHangfireServer();
 
 // Configurable: PostGIS (default) or Azure Maps (when Azure:UseAzureMaps = true)
 builder.Services.AddGeospatialProvider(builder.Configuration);
+builder.Services.AddScoped<IGeoRetentionService, GeoRetentionService>();
 builder.AddWatchSecurity();
 builder.AddWatchControllers();
 
@@ -73,6 +74,26 @@ app.MapWatchControllers();
 app.MapHealthChecks("/health/ready");
 // Item 249: Canary endpoints for synthetic monitoring (/canary + /canary/deep)
 app.MapWatchCanaryEndpoints("TheWatch.Geospatial");
+// === Data Retention Jobs ===
+RecurringJob.AddOrUpdate<IGeoRetentionService>(
+    "location-history-cleanup",
+    svc => svc.PurgeOldLocationHistoryAsync(TimeSpan.FromDays(30)),
+    "0 2 * * *"); // Daily at 2 AM — 30-day retention (GDPR minimization, SP-GEO)
+
+RecurringJob.AddOrUpdate<IGeoRetentionService>(
+    "geofence-events-cleanup",
+    svc => svc.PurgeOldGeofenceEventsAsync(TimeSpan.FromDays(90)),
+    "30 2 * * *"); // Daily at 2:30 AM — 90-day retention
+
+RecurringJob.AddOrUpdate<IGeoRetentionService>(
+    "family-locations-cleanup",
+    svc => svc.PurgeOldFamilyMemberLocationsAsync(TimeSpan.FromDays(7)),
+    "0 3 * * *"); // Daily at 3 AM — 7-day retention (high-volume SP-GEO data)
+
+RecurringJob.AddOrUpdate<IGeoRetentionService>(
+    "resolved-zones-cleanup",
+    svc => svc.PurgeResolvedIncidentZonesAsync(TimeSpan.FromDays(90)),
+    "0 4 * * 0"); // Weekly Sunday at 4 AM — 90-day post-resolution retention (NIST 800-171 IR-4)
 
 app.MapGet("/health", () => new HealthResponse(
     "TheWatch.Geospatial", "Geo", "Healthy", DateTime.UtcNow));

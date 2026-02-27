@@ -40,6 +40,13 @@ public class AuditService
         _logger.LogInformation(
             "Audit: {EventType} UserId={UserId} Identity={Identity} Success={IsSuccess} IP={IpAddress} Port={SourcePort}",
             eventType, userId, attemptedIdentity ?? userId?.ToString(), isSuccess, audit.IpAddress, audit.SourcePort);
+        // STIG V-222441-449: log timestamp (UTC), user identity, source IP, source port,
+        // event type, success/failure, device fingerprint, and user agent string.
+        _logger.LogInformation(
+            "Audit [{Timestamp:u}] EventType={EventType} UserId={UserId} IP={IpAddress} Port={SourcePort} " +
+            "Success={IsSuccess} DeviceFingerprint={DeviceFingerprint} UserAgent={UserAgent} FailureReason={FailureReason}",
+            audit.Timestamp, eventType, userId, audit.IpAddress, audit.SourcePort,
+            isSuccess, audit.DeviceFingerprint, audit.UserAgent, failureReason);
     }
 
     public async Task<IReadOnlyList<AuditEvent>> GetRecentEventsAsync(int page = 1, int pageSize = 50)

@@ -63,4 +63,22 @@ public class EulaService
             acceptedAt = user?.EulaAcceptedAt
         };
     }
+
+    public async Task<EulaVersion> PublishVersionAsync(string version, string content)
+    {
+        // Mark all existing versions as no longer current
+        var currentVersions = await _db.EulaVersions.Where(v => v.IsCurrent).ToListAsync();
+        foreach (var v in currentVersions)
+            v.IsCurrent = false;
+
+        var newVersion = new EulaVersion
+        {
+            Version = version,
+            Content = content,
+            IsCurrent = true
+        };
+        _db.EulaVersions.Add(newVersion);
+        await _db.SaveChangesAsync();
+        return newVersion;
+    }
 }

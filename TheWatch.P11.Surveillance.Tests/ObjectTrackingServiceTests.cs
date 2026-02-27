@@ -13,6 +13,7 @@ public class ObjectTrackingServiceTests
     private readonly IWatchRepository<TrackedObjectMatch> _matches = Substitute.For<IWatchRepository<TrackedObjectMatch>>();
     private readonly IWatchRepository<CrimeLocation> _crimeLocations = Substitute.For<IWatchRepository<CrimeLocation>>();
     private readonly IWatchRepository<DetectionResult> _detections = Substitute.For<IWatchRepository<DetectionResult>>();
+    private readonly IWatchRepository<AlibiVerification> _alibiVerifications = Substitute.For<IWatchRepository<AlibiVerification>>();
     private readonly Services.IFootageService _footageService = Substitute.For<Services.IFootageService>();
     private readonly Services.IVideoAnalysisService _videoAnalysisService = Substitute.For<Services.IVideoAnalysisService>();
     private readonly IObjectDetector _objectDetector = Substitute.For<IObjectDetector>();
@@ -20,7 +21,7 @@ public class ObjectTrackingServiceTests
 
     private Services.ObjectTrackingService CreateService() => new(
         _sessions, _matches, _crimeLocations, _footageService,
-        _videoAnalysisService, _detections, _objectDetector, _logger);
+        _videoAnalysisService, _detections, _alibiVerifications, _objectDetector, _logger);
 
     [Fact]
     public async Task TrackObjects_CrimeLocationNotFound_ReturnsFailed()
@@ -224,5 +225,156 @@ public class ObjectTrackingServiceTests
         result.Matches.Should().HaveCount(2);
         // Results should be ordered by distance (closest first)
         result.Matches[0].DistanceFromSceneKm.Should().BeLessThan(result.Matches[1].DistanceFromSceneKm);
+    }
+
+    [Fact]
+    public async Task VerifyAlibi_AllCheckpointsHaveEvidence_ReturnsSupported()
+    {
+        var subjectId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        _objectDetector.IsReady.Returns(true);
+        _alibiVerifications.AddAsync(Arg.Any<AlibiVerification>()).Returns(ci => ci.Arg<AlibiVerification>());
+        _alibiVerifications.UpdateAsync(Arg.Any<AlibiVerification>()).Returns(ci => ci.Arg<AlibiVerification>());
+
+        var footageId = Guid.NewGuid();
+        var footage = new FootageSubmission
+        {
+            Id = footageId,
+            GpsLatitude = 34.0530,
+            GpsLongitude = -118.2440,
+            Status = FootageStatus.Analyzed
+        };
+
+        _footageService.FindFootageNearLocationAsync(
+            Arg.Any<double>(), Arg.Any<double>(), Arg.Any<double>(),
+            Arg.Any<DateTime?>(), Arg.Any<DateTime?>())
+            .Returns([footage]);
+
+        var detection = new DetectionResult
+        {
+            Id = Guid.NewGuid(),
+            FootageId = footageId,
+            DetectionType = DetectionType.Person,
+            Label = "person",
+            Confidence = 0.88f,
+            FrameTimestamp = now.AddMinutes(-10)
+        };
+
+        _footageService.GetDetectionsForFootageAsync(footageId, 1, 100)
+            .Returns(new DetectionListResponse([detection], 1, 1, 100));
+
+        var svc = CreateService();
+
+        var request = new AlibiVerificationRequest(
+            SubjectId: subjectId,
+            SubjectDescription: "Suspect A",
+            Checkpoints:
+            [
+                new AlibiCheckpoint(34.0530, -118.2440, now.AddHours(-2), now.AddHours(-1), "Coffee shop")
+            ],
+            InitiatedBy: Guid.NewGuid(),
+            TargetObjectTypes: [DetectionType.Person]);
+
+        var result = await svc.VerifyAlibiAsync(request);
+
+        result.Verdict.Should().Be(AlibiVerdict.Supported);
+        result.CheckpointsTotal.Should().Be(1);
+        result.CheckpointsSupported.Should().Be(1);
+        result.TotalEvidenceFound.Should().Be(1);
+        result.CheckpointResults.Should().HaveCount(1);
+        result.CheckpointResults[0].HasEvidence.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task VerifyAlibi_NoFootageAtClaimedLocation_ReturnsInconclusive()
+    {
+        _objectDetector.IsReady.Returns(false);
+        _alibiVerifications.AddAsync(Arg.Any<AlibiVerification>()).Returns(ci => ci.Arg<AlibiVerification>());
+        _alibiVerifications.UpdateAsync(Arg.Any<AlibiVerification>()).Returns(ci => ci.Arg<AlibiVerification>());
+
+        _footageService.FindFootageNearLocationAsync(
+            Arg.Any<double>(), Arg.Any<double>(), Arg.Any<double>(),
+            Arg.Any<DateTime?>(), Arg.Any<DateTime?>())
+            .Returns([]);
+
+        var svc = CreateService();
+        var now = DateTime.UtcNow;
+
+        var request = new AlibiVerificationRequest(
+            SubjectId: Guid.NewGuid(),
+            SubjectDescription: "Suspect B",
+            Checkpoints:
+            [
+                new AlibiCheckpoint(40.7128, -74.0060, now.AddHours(-3), now.AddHours(-2), "Times Square")
+            ],
+            InitiatedBy: Guid.NewGuid());
+
+        var result = await svc.VerifyAlibiAsync(request);
+
+        result.Verdict.Should().Be(AlibiVerdict.Inconclusive);
+        result.CheckpointsSupported.Should().Be(0);
+        result.TotalFootageChecked.Should().Be(0);
+        result.TotalEvidenceFound.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task VerifyAlibi_PartialCheckpointCoverage_ReturnsInconclusive()
+    {
+        var now = DateTime.UtcNow;
+        _objectDetector.IsReady.Returns(true);
+        _alibiVerifications.AddAsync(Arg.Any<AlibiVerification>()).Returns(ci => ci.Arg<AlibiVerification>());
+        _alibiVerifications.UpdateAsync(Arg.Any<AlibiVerification>()).Returns(ci => ci.Arg<AlibiVerification>());
+
+        var footageId = Guid.NewGuid();
+        var footage = new FootageSubmission
+        {
+            Id = footageId,
+            GpsLatitude = 34.0530,
+            GpsLongitude = -118.2440,
+            Status = FootageStatus.Analyzed
+        };
+
+        var detection = new DetectionResult
+        {
+            Id = Guid.NewGuid(),
+            FootageId = footageId,
+            DetectionType = DetectionType.Person,
+            Label = "person",
+            Confidence = 0.80f,
+            FrameTimestamp = now.AddMinutes(-5)
+        };
+
+        // First checkpoint has footage/detections; second does not
+        _footageService.FindFootageNearLocationAsync(
+            34.0530, -118.2440, Arg.Any<double>(), Arg.Any<DateTime?>(), Arg.Any<DateTime?>())
+            .Returns([footage]);
+        _footageService.FindFootageNearLocationAsync(
+            40.7128, -74.0060, Arg.Any<double>(), Arg.Any<DateTime?>(), Arg.Any<DateTime?>())
+            .Returns([]);
+
+        _footageService.GetDetectionsForFootageAsync(footageId, 1, 100)
+            .Returns(new DetectionListResponse([detection], 1, 1, 100));
+
+        var svc = CreateService();
+
+        var request = new AlibiVerificationRequest(
+            SubjectId: Guid.NewGuid(),
+            SubjectDescription: "Suspect C",
+            Checkpoints:
+            [
+                new AlibiCheckpoint(34.0530, -118.2440, now.AddHours(-3), now.AddHours(-2), "LA restaurant"),
+                new AlibiCheckpoint(40.7128, -74.0060, now.AddHours(-1), now, "NYC hotel")
+            ],
+            InitiatedBy: Guid.NewGuid(),
+            TargetObjectTypes: [DetectionType.Person]);
+
+        var result = await svc.VerifyAlibiAsync(request);
+
+        result.Verdict.Should().Be(AlibiVerdict.Inconclusive);
+        result.CheckpointsTotal.Should().Be(2);
+        result.CheckpointsSupported.Should().Be(1);
+        result.CheckpointResults[0].HasEvidence.Should().BeTrue();
+        result.CheckpointResults[1].HasEvidence.Should().BeFalse();
     }
 }

@@ -109,3 +109,44 @@ public record CreateDispatchRequest(
 
 public record ExpandRadiusRequest(
     double AdditionalKm = 5.0);
+
+/// <summary>
+/// Pre-arrival triage intake captured via text or speech-to-text before the ambulance arrives.
+/// Persisted so responders have the caller's symptoms and matched guidance when they arrive.
+/// </summary>
+public class TriageIntake
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid? IncidentId { get; set; }
+    public Guid ReporterId { get; set; }
+
+    /// <summary>Raw symptom text entered by the caller (typed or speech-transcribed).</summary>
+    public string Symptoms { get; set; } = string.Empty;
+
+    /// <summary>"text" or "stt" — indicates how the symptoms were captured.</summary>
+    public string InputMethod { get; set; } = "text";
+
+    /// <summary>Substance/condition name parsed from the symptom text (e.g. "acetaminophen").</summary>
+    public string? SubstanceName { get; set; }
+
+    /// <summary>First-aid guidance text returned from the on-device medical reference lookup.</summary>
+    public string? MatchedGuidance { get; set; }
+
+    /// <summary>0 = unknown / not assessed; 1-5 matches incident severity scale.</summary>
+    public int TriageSeverity { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = [];
+}
+
+public record LogTriageIntakeRequest(
+    Guid ReporterId,
+    string Symptoms,
+    string InputMethod = "text",
+    Guid? IncidentId = null,
+    string? SubstanceName = null,
+    string? MatchedGuidance = null,
+    int TriageSeverity = 0);

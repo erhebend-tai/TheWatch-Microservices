@@ -419,6 +419,14 @@ app.MapGet("/api/eula/status", async (ClaimsPrincipal user, EulaService eula) =>
     return Results.Ok(status);
 }).RequireAuthorization();
 
+app.MapPost("/api/eula/versions", async (PublishEulaRequest request, EulaService eula) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Version) || string.IsNullOrWhiteSpace(request.Content))
+        return Results.BadRequest(new { error = "Version and content are required." });
+    var version = await eula.PublishVersionAsync(request.Version, request.Content);
+    return Results.Ok(version);
+}).RequireAuthorization(WatchPolicies.AdminOnly);
+
 // === Onboarding Endpoints (Item 70) ===
 
 app.MapGet("/api/onboarding/progress", async (ClaimsPrincipal user, OnboardingService onboarding) =>
@@ -529,7 +537,77 @@ static async Task SeedDataAsync(IServiceProvider services)
         db.EulaVersions.Add(new EulaVersion
         {
             Version = "1.0.0",
-            Content = "TheWatch End User License Agreement v1.0.0. By using this service you agree to the terms.",
+            Content = """
+                THEWATCH END USER LICENSE AGREEMENT
+                Version 1.0.0 — Effective Date: January 1, 2025
+
+                PLEASE READ THIS END USER LICENSE AGREEMENT ("AGREEMENT") CAREFULLY BEFORE USING THEWATCH
+                ("APPLICATION"). BY ACCESSING OR USING THE APPLICATION, YOU AGREE TO BE BOUND BY THE TERMS
+                OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT USE THE APPLICATION.
+
+                1. GRANT OF LICENSE
+                Subject to the terms of this Agreement, TheWatch grants you a limited, non-exclusive,
+                non-transferable, revocable license to use the Application solely for lawful emergency
+                coordination and personal safety purposes.
+
+                2. RESTRICTIONS
+                You may not: (a) copy, modify, or distribute the Application; (b) reverse engineer or
+                attempt to extract source code; (c) use the Application for any unlawful purpose or in
+                violation of any applicable laws or regulations; (d) share your account credentials with
+                any third party; (e) use the Application to transmit false emergency alerts.
+
+                3. EMERGENCY SERVICES DISCLAIMER
+                THE APPLICATION IS AN AUXILIARY COMMUNICATION TOOL AND DOES NOT REPLACE OFFICIAL EMERGENCY
+                SERVICES. ALWAYS DIAL YOUR LOCAL EMERGENCY NUMBER (e.g., 911) FOR LIFE-THREATENING
+                SITUATIONS. THEWATCH MAKES NO WARRANTY THAT THE APPLICATION WILL BE AVAILABLE AT ALL
+                TIMES OR IN ALL LOCATIONS.
+
+                4. PRIVACY AND DATA COLLECTION
+                The Application may collect location data, device information, health metrics, and
+                communication logs solely to provide emergency coordination services. Your data is
+                processed in accordance with our Privacy Policy. By using the Application you consent
+                to this data processing.
+
+                5. DATA SECURITY
+                TheWatch employs industry-standard security controls including end-to-end encryption,
+                multi-factor authentication, and regular security audits. You are responsible for
+                maintaining the confidentiality of your account credentials.
+
+                6. LOCATION SERVICES
+                Emergency features require access to your device's location services. By enabling these
+                features you consent to the continuous or periodic collection and transmission of your
+                precise geographic location to emergency responders and designated contacts.
+
+                7. HEALTH DATA
+                If you use wearable integration or health monitoring features, you consent to the
+                collection and processing of health-related data. This data may be shared with
+                designated emergency contacts and first responders during an active emergency.
+
+                8. INTELLECTUAL PROPERTY
+                The Application and all content therein are the exclusive property of TheWatch and
+                its licensors. No rights or licenses are granted except as expressly set forth herein.
+
+                9. DISCLAIMER OF WARRANTIES
+                THE APPLICATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND. THEWATCH DISCLAIMS
+                ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS
+                FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+                10. LIMITATION OF LIABILITY
+                TO THE MAXIMUM EXTENT PERMITTED BY LAW, THEWATCH SHALL NOT BE LIABLE FOR ANY INDIRECT,
+                INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM YOUR USE OF THE
+                APPLICATION.
+
+                11. GOVERNING LAW
+                This Agreement shall be governed by and construed in accordance with applicable law.
+                Any disputes shall be resolved through binding arbitration.
+
+                12. CHANGES TO THIS AGREEMENT
+                TheWatch reserves the right to update this Agreement at any time. Continued use of the
+                Application following notification of changes constitutes acceptance of the revised Agreement.
+
+                13. CONTACT
+                For questions about this Agreement, contact: legal@thewatch.app
+                """,
             IsCurrent = true
         });
         await db.SaveChangesAsync();
@@ -538,3 +616,5 @@ static async Task SeedDataAsync(IServiceProvider services)
 
 // Needed for WebApplicationFactory in tests
 public partial class Program { }
+
+internal record PublishEulaRequest(string Version, string Content);

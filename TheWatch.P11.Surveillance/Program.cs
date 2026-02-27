@@ -327,6 +327,12 @@ app.MapGet("/api/object-tracking/{id:guid}/matches", async (Guid id, IObjectTrac
     return Results.Ok(matches);
 }).RequireAuthorization("ResponderAccess");
 
+app.MapPost("/api/object-tracking/verify-alibi", async (AlibiVerificationRequest request, IObjectTrackingService svc) =>
+{
+    var result = await svc.VerifyAlibiAsync(request);
+    return Results.Created($"/api/object-tracking/verify-alibi/{result.VerificationId}", result);
+}).RequireAuthorization("ResponderAccess");
+
 // SignalR hub endpoints (/hubs/cameras, /hubs/detections, /hubs/footagesubmissions)
 app.MapWatchHubs();
 
