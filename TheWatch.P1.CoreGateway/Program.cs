@@ -78,6 +78,8 @@ RecurringJob.AddOrUpdate<IConfigService>(
 
 // Item 246: Readiness probe — checks SQL Server, Redis, Kafka, PostGIS connectivity
 app.MapHealthChecks("/health/ready");
+// Item 249: Canary endpoints for synthetic monitoring (/canary + /canary/deep)
+app.MapWatchCanaryEndpoints("TheWatch.P1.CoreGateway");
 
 app.MapGet("/health", () => new HealthResponse(
     "TheWatch.P1.CoreGateway", "P1", "Healthy", DateTime.UtcNow));

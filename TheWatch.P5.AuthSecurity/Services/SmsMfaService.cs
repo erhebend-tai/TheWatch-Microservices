@@ -104,10 +104,10 @@ public class SmsMfaService
     public bool VerifyCode(string phoneNumber, string code)
         => VerifyCodeAsync(phoneNumber, code).GetAwaiter().GetResult();
 
-    /// <summary>Cache key for OTP. Uses SHA256 hash of phone number to avoid storing PII as a key.</summary>
+    /// <summary>Cache key for OTP. Uses the full SHA256 hash of the phone number to avoid storing PII as a key.</summary>
     private static string GetPhoneKey(string phoneNumber)
-        => $"otp:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(phoneNumber)))[..16]}";
+        => $"otp:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(phoneNumber)))}";
 
     private static string GetAttemptsKey(string phoneNumber)
-        => $"otp_attempts:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(phoneNumber)))[..16]}";
+        => $"otp_attempts:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(phoneNumber)))}";
 }

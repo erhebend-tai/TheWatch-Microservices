@@ -448,7 +448,7 @@
 - [x] 209. Wire `ICoreGatewayClient` into P2 VoiceEmergency for reporter profile lookup on incident creation
 - [x] 210. Wire `IFirstResponderClient` into P2 VoiceEmergency for nearest-responder query on dispatch
 - [x] 211. Wire `IGeospatialClient` into P6 FirstResponder for spatial proximity calculations
-- [ ] 212. Wire `IAuthSecurityClient` into Admin.RestAPI gateway for user management passthrough (replace direct HTTP)
+- [x] 212. Wire `IAuthSecurityClient` into Admin.RestAPI gateway for user management passthrough (replace direct HTTP)
 - [x] 213. Wire `IFamilyHealthClient` into P9 DoctorServices for patient family context during appointments
 - [x] 214. Wire `IDisasterReliefClient` into P6 FirstResponder for shelter location during disaster dispatches
 - [x] 215. Wire `ISurveillanceClient` into P2 VoiceEmergency for footage correlation with active incidents
@@ -503,7 +503,7 @@
 - [x] 246. Add health check dependencies: verify SQL Server, Redis, Kafka, PostGIS connectivity in `/health` endpoint (not just HTTP 200)
 - [x] 247. Add distributed tracing span enrichment: user ID, incident ID, device ID on all traces
 - [ ] 248. Implement log-based alerting rules: >5 auth failures/min, >10 5xx errors/min, evidence upload failure spike, SOS endpoint latency >2s
-- [ ] 249. Add canary endpoints for synthetic monitoring (return known payload for comparison)
+- [x] 249. Add canary endpoints for synthetic monitoring (return known payload for comparison)
 - [ ] 250. Create runbook documentation: incident response, rollback procedure, database recovery, secret rotation
 
 ---
@@ -542,7 +542,7 @@
 ### 19A. FIPS Mode & TLS Hardening
 - [x] 266. Enable FIPS-compliant TLS across all services — configure Kestrel `SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13` in a shared `ConfigureWatchKestrel()` extension method. Disable TLS 1.0/1.1 globally. Restrict cipher suites to FIPS-approved only: TLS_AES_256_GCM_SHA384, TLS_AES_128_GCM_SHA256, TLS_CHACHA20_POLY1305_SHA256. Disable CBC mode ciphers. Apply to all 12 service `Program.cs` files + Admin.RestAPI + Dashboard. Files: new shared extension, 14 `Program.cs` files. [NIST SC-8, STIG V-222596] **CRITICAL**
 - [x] 267. Enable .NET FIPS mode — add `"System.Security.Cryptography.UseFipsAlgorithms": true` to `runtimeconfig.template.json` for all 14 web projects. Verify no crypto calls use non-FIPS algorithms (MD5, DES, RC2, RijndaelManaged). Add Roslyn analyzer rule to ban non-FIPS crypto APIs via `Directory.Build.props`. Files: 14 `runtimeconfig.template.json`, `Directory.Build.props`. [NIST SC-13, STIG V-222570] **CRITICAL**
-- [ ] 268. Audit all `System.Security.Cryptography` usage across codebase — grep for MD5, SHA1, DES, TripleDES, RC2, RijndaelManaged, Rfc2898DeriveBytes (PBKDF2 with SHA1). Replace any non-FIPS calls with FIPS-validated equivalents (SHA256, SHA512, AES-GCM). Document each replacement with STIG finding ID. Files: full codebase scan + targeted fixes. [NIST SC-13, STIG V-222570] **HIGH**
+- [x] 268. Audit all `System.Security.Cryptography` usage across codebase — grep for MD5, SHA1, DES, TripleDES, RC2, RijndaelManaged, Rfc2898DeriveBytes (PBKDF2 with SHA1). Replace any non-FIPS calls with FIPS-validated equivalents (SHA256, SHA512, AES-GCM). Document each replacement with STIG finding ID. Files: full codebase scan + targeted fixes. [NIST SC-13, STIG V-222570] **HIGH**
 
 ### 19B. JWT Asymmetric Key Migration
 - [x] 269. Migrate JWT signing from symmetric HMAC-SHA256 to asymmetric RSA-2048 (or ECDSA P-256) — P5 AuthSecurity signs tokens with RSA private key; all consumer services validate with RSA public key only. This eliminates the shared-secret risk where compromising any one service compromises all JWT validation. Files: `WatchAuthExtensions.cs`, `SecurityGenerator.cs`, P5 `AuthService`, P5 `Program.cs`. [NIST SC-12, SC-13, STIG V-222641] **CRITICAL**
@@ -593,7 +593,7 @@
 - [ ] 292. Implement data-at-rest encryption verification — create a health check that verifies TDE is enabled on all databases, Redis TLS is active, Kafka SASL_SSL is configured. Add to `/health` endpoint as a security subsystem check. Fail health check in production if any encryption is disabled. Files: shared health check class, all `Program.cs` health registrations. [NIST SC-28] **MEDIUM**
 
 ### 20E. Data Retention & Disposal
-- [ ] 293. Define data retention policies per entity type — PII: retain while account active + 30 days after deletion request (GDPR). PHI: 6 years per HIPAA. Evidence: 7 years per legal hold. Audit logs: 1 year minimum. Geolocation: 90 days. Implement `IDataRetentionPolicy` interface with per-entity TTLs. Files: new `DataRetentionPolicy.cs` in Shared, `docs/data-retention-policy.md`. [NIST MP-6, SI-12] **MEDIUM**
+- [x] 293. Define data retention policies per entity type — PII: retain while account active + 30 days after deletion request (GDPR). PHI: 6 years per HIPAA. Evidence: 7 years per legal hold. Audit logs: 1 year minimum. Geolocation: 90 days. Implement `IDataRetentionPolicy` interface with per-entity TTLs. Files: new `DataRetentionPolicy.cs` in Shared, `docs/data-retention-policy.md`. [NIST MP-6, SI-12] **MEDIUM**
 - [ ] 294. Implement automated data purge jobs — create Hangfire recurring jobs per service that delete expired data per retention policy. Use soft-delete (mark as deleted) with a 30-day grace period before hard delete. Log all purge events to audit trail. Run SHA-256 verification on evidence before purge to confirm chain-of-custody integrity. Files: new purge jobs in P2/P5/P7/P8/P9/P11. [NIST MP-6, SI-12] **MEDIUM**
 - [ ] 295. Implement NIST 800-88 media sanitization for deleted CUI — when hard-deleting CUI records from SQL Server, overwrite the data pages (not just mark as deallocated). For file storage (evidence), overwrite file contents before deletion. For Redis, ensure `DEL` commands remove data from memory immediately (verify `lazyfree-lazy-expire no`). Files: data purge implementation, Redis config. [NIST MP-6] **LOW**
 

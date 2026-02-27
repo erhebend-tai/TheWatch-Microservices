@@ -71,6 +71,8 @@ app.MapWatchControllers();
 
 // Item 246: Readiness probe — checks SQL Server, Redis, Kafka, PostGIS connectivity
 app.MapHealthChecks("/health/ready");
+// Item 249: Canary endpoints for synthetic monitoring (/canary + /canary/deep)
+app.MapWatchCanaryEndpoints("TheWatch.Geospatial");
 
 app.MapGet("/health", () => new HealthResponse(
     "TheWatch.Geospatial", "Geo", "Healthy", DateTime.UtcNow));

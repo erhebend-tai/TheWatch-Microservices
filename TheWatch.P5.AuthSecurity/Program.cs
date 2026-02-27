@@ -167,6 +167,8 @@ RecurringJob.AddOrUpdate<MitreDetectionService>("mitre-detection-scan", s => s.S
 // Health endpoint — stripped of internal details (DISA STIG V-222609)
 // Item 246: Readiness probe — checks SQL Server, Redis, Kafka, PostGIS connectivity
 app.MapHealthChecks("/health/ready");
+// Item 249: Canary endpoints for synthetic monitoring (/canary + /canary/deep)
+app.MapWatchCanaryEndpoints("TheWatch.P5.AuthSecurity");
 
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
@@ -402,9 +404,17 @@ app.MapPost("/api/onboarding/complete-step", async (CompleteOnboardingStepReques
 {
     var userId = GetUserId(user);
     if (userId is null) return Results.Unauthorized();
-    // Step is validated by enum binding — invalid values produce a 400 automatically
-    var step = request.Step.ToString().ToLowerInvariant().Replace("emergencycontacts", "emergency-contacts")
-                                                          .Replace("notificationpreferences", "notification-preferences");
+    // Map enum to the canonical step string expected by OnboardingService
+    var step = request.Step switch
+    {
+        Auth.OnboardingStep.Profile => "profile",
+        Auth.OnboardingStep.Eula => "eula",
+        Auth.OnboardingStep.Mfa => "mfa",
+        Auth.OnboardingStep.EmergencyContacts => "emergency-contacts",
+        Auth.OnboardingStep.NotificationPreferences => "notification-preferences",
+        Auth.OnboardingStep.Tutorial => "tutorial",
+        _ => request.Step.ToString().ToLowerInvariant()
+    };
     await onboarding.CompleteStepAsync(userId.Value, step);
     return Results.Ok(new { completed = step });
 }).RequireAuthorization();
