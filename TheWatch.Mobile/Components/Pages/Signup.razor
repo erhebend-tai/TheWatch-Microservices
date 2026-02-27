@@ -62,8 +62,10 @@
                 </RadzenFormField>
 
                 <RadzenCheckBox @bind-Value="_model.AcceptTerms" Name="AcceptTerms" />
-                <RadzenLabel Text="I accept the Terms of Service and Privacy Policy" Component="AcceptTerms" Style="margin-left: 0.5rem;" />
-                <RadzenRequiredValidator Component="AcceptTerms" Text="You must accept the terms to continue" />
+                <RadzenLabel Component="AcceptTerms" Style="margin-left: 0.5rem;">
+                    I accept the <RadzenLink Text="End User License Agreement" @onclick="@(() => Nav.NavigateTo("/eula"))" />
+                </RadzenLabel>
+                <RadzenRequiredValidator Component="AcceptTerms" Text="You must accept the EULA to continue" />
 
                 <RadzenButton Text="Create Account" ButtonType="ButtonType.Submit"
                               ButtonStyle="ButtonStyle.Primary" Style="width: 100%;" IsBusy="@_loading" />
