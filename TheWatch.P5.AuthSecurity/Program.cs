@@ -23,6 +23,7 @@ using MfaVerifyRequest = TheWatch.P5.AuthSecurity.Auth.MfaVerifyRequest;
 using SmsMfaSendRequest = TheWatch.P5.AuthSecurity.Auth.SmsMfaSendRequest;
 using SmsMfaVerifyRequest = TheWatch.P5.AuthSecurity.Auth.SmsMfaVerifyRequest;
 using MagicLinkRequest = TheWatch.P5.AuthSecurity.Auth.MagicLinkRequest;
+using ChangePasswordRequest = TheWatch.P5.AuthSecurity.Auth.ChangePasswordRequest;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
 using TheWatch.Shared.Security;
@@ -88,6 +89,14 @@ builder.Services.AddHangfire(config =>
         .UseInMemoryStorage()
         .UseBatches());
 builder.Services.AddHangfireServer();
+
+// Item 305: Distributed cache for SMS OTP storage (Redis in production, in-memory in dev)
+// In production, override with AddStackExchangeRedisCache() via a Redis connection string.
+var redisConn = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrEmpty(redisConn))
+    builder.Services.AddStackExchangeRedisCache(opts => opts.Configuration = redisConn);
+else
+    builder.Services.AddDistributedMemoryCache(); // dev/test fallback
 
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -158,12 +167,12 @@ app.MapPost("/api/auth/register", async (RegisterRequest request, IAuthService a
     try
     {
         var response = await auth.RegisterAsync(request);
-        await audit.LogAsync("Register", response.User.Id, ctx, true);
+        await audit.LogAsync("Register", response.User.Id, ctx, true, attemptedIdentity: request.Email);
         return Results.Ok(response);
     }
     catch (InvalidOperationException ex)
     {
-        await audit.LogAsync("Register", null, ctx, false, ex.Message);
+        await audit.LogAsync("Register", null, ctx, false, ex.Message, attemptedIdentity: request.Email);
         return Results.Conflict(new { error = ex.Message });
     }
 });
@@ -174,12 +183,12 @@ app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService auth, A
     {
         var response = await auth.LoginAsync(request);
         if (!response.MfaRequired)
-            await audit.LogAsync("Login", response.User.Id, ctx, true);
+            await audit.LogAsync("Login", response.User.Id, ctx, true, attemptedIdentity: request.Email);
         return Results.Ok(response);
     }
     catch (UnauthorizedAccessException)
     {
-        await audit.LogAsync("Login", null, ctx, false, "Invalid credentials");
+        await audit.LogAsync("Login", null, ctx, false, "Invalid credentials", attemptedIdentity: request.Email);
         return Results.Unauthorized();
     }
 });
@@ -231,6 +240,24 @@ app.MapPost("/api/auth/roles/assign", async (AssignRoleRequest request, IAuthSer
     }
 }).RequireAuthorization(WatchPolicies.AdminOnly);
 
+// Item 299/300: Change password — 60-day expiry, 24-hour min age, ≥8 character-position delta (STIG V-222541/544/545)
+app.MapPost("/api/auth/change-password", async (ChangePasswordRequest request, ClaimsPrincipal principal, IAuthService auth, AuditService audit, HttpContext ctx) =>
+{
+    var userId = GetUserId(principal);
+    if (userId is null) return Results.Unauthorized();
+    try
+    {
+        await auth.ChangePasswordAsync(userId.Value, request);
+        await audit.LogAsync("ChangePassword", userId, ctx, true);
+        return Results.Ok(new { message = "Password changed successfully." });
+    }
+    catch (InvalidOperationException ex)
+    {
+        await audit.LogAsync("ChangePassword", userId, ctx, false, ex.Message);
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}).RequireAuthorization();
+
 // === MFA Endpoints (Items 63-66) ===
 
 // TOTP MFA
@@ -267,7 +294,7 @@ app.MapPost("/api/auth/mfa/sms/send", async (SmsMfaSendRequest request, SmsMfaSe
 
 app.MapPost("/api/auth/mfa/sms/verify", async (SmsMfaVerifyRequest request, SmsMfaService sms) =>
 {
-    var valid = sms.VerifyCode(request.PhoneNumber, request.Code);
+    var valid = await sms.VerifyCodeAsync(request.PhoneNumber, request.Code);
     return valid ? Results.Ok(new { verified = true }) : Results.BadRequest(new { error = "Invalid or expired code." });
 });
 

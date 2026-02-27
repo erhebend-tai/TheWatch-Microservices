@@ -444,20 +444,20 @@
 > Per-service contract libraries exist (TheWatch.Contracts.*) but consuming services still use raw HttpClient in some cases. These items complete the typed client integration.
 
 ### 16A. Inter-Service Typed Clients
-- [ ] 208. Wire `IVoiceEmergencyClient` into P6 FirstResponder for incident correlation on dispatch
-- [ ] 209. Wire `ICoreGatewayClient` into P2 VoiceEmergency for reporter profile lookup on incident creation
-- [ ] 210. Wire `IFirstResponderClient` into P2 VoiceEmergency for nearest-responder query on dispatch
-- [ ] 211. Wire `IGeospatialClient` into P6 FirstResponder for spatial proximity calculations
+- [x] 208. Wire `IVoiceEmergencyClient` into P6 FirstResponder for incident correlation on dispatch
+- [x] 209. Wire `ICoreGatewayClient` into P2 VoiceEmergency for reporter profile lookup on incident creation
+- [x] 210. Wire `IFirstResponderClient` into P2 VoiceEmergency for nearest-responder query on dispatch
+- [x] 211. Wire `IGeospatialClient` into P6 FirstResponder for spatial proximity calculations
 - [ ] 212. Wire `IAuthSecurityClient` into Admin.RestAPI gateway for user management passthrough (replace direct HTTP)
-- [ ] 213. Wire `IFamilyHealthClient` into P9 DoctorServices for patient family context during appointments
-- [ ] 214. Wire `IDisasterReliefClient` into P6 FirstResponder for shelter location during disaster dispatches
-- [ ] 215. Wire `ISurveillanceClient` into P2 VoiceEmergency for footage correlation with active incidents
+- [x] 213. Wire `IFamilyHealthClient` into P9 DoctorServices for patient family context during appointments
+- [x] 214. Wire `IDisasterReliefClient` into P6 FirstResponder for shelter location during disaster dispatches
+- [x] 215. Wire `ISurveillanceClient` into P2 VoiceEmergency for footage correlation with active incidents
 
 ### 16B. Contract Validation
 - [ ] 216. Add contract compatibility tests — verify each contract DTO matches the server's actual response schema
-- [ ] 217. Add Polly resilience policies (retry, circuit breaker, timeout) to all typed clients in `ServiceClientBase`
-- [ ] 218. Add distributed tracing correlation headers (`X-Correlation-Id`) to all inter-service calls via `ServiceClientBase`
-- [ ] 219. Add service-to-service API key authentication to all typed clients (use `ApiKeyAuthHandler` from Shared)
+- [x] 217. Add Polly resilience policies (retry, circuit breaker, timeout) to all typed clients in `ServiceClientBase`
+- [x] 218. Add distributed tracing correlation headers (`X-Correlation-Id`) to all inter-service calls via `ServiceClientBase`
+- [x] 219. Add service-to-service API key authentication to all typed clients (use `ApiKeyAuthHandler` from Shared)
 - [ ] 220. Integration test: full incident lifecycle across P2→P6→P3→P11 via typed clients
 
 ---
@@ -541,7 +541,7 @@
 
 ### 19A. FIPS Mode & TLS Hardening
 - [x] 266. Enable FIPS-compliant TLS across all services — configure Kestrel `SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13` in a shared `ConfigureWatchKestrel()` extension method. Disable TLS 1.0/1.1 globally. Restrict cipher suites to FIPS-approved only: TLS_AES_256_GCM_SHA384, TLS_AES_128_GCM_SHA256, TLS_CHACHA20_POLY1305_SHA256. Disable CBC mode ciphers. Apply to all 12 service `Program.cs` files + Admin.RestAPI + Dashboard. Files: new shared extension, 14 `Program.cs` files. [NIST SC-8, STIG V-222596] **CRITICAL**
-- [ ] 267. Enable .NET FIPS mode — add `"System.Security.Cryptography.UseFipsAlgorithms": true` to `runtimeconfig.template.json` for all 14 web projects. Verify no crypto calls use non-FIPS algorithms (MD5, DES, RC2, RijndaelManaged). Add Roslyn analyzer rule to ban non-FIPS crypto APIs via `Directory.Build.props`. Files: 14 `runtimeconfig.template.json`, `Directory.Build.props`. [NIST SC-13, STIG V-222570] **CRITICAL**
+- [x] 267. Enable .NET FIPS mode — add `"System.Security.Cryptography.UseFipsAlgorithms": true` to `runtimeconfig.template.json` for all 14 web projects. Verify no crypto calls use non-FIPS algorithms (MD5, DES, RC2, RijndaelManaged). Add Roslyn analyzer rule to ban non-FIPS crypto APIs via `Directory.Build.props`. Files: 14 `runtimeconfig.template.json`, `Directory.Build.props`. [NIST SC-13, STIG V-222570] **CRITICAL**
 - [ ] 268. Audit all `System.Security.Cryptography` usage across codebase — grep for MD5, SHA1, DES, TripleDES, RC2, RijndaelManaged, Rfc2898DeriveBytes (PBKDF2 with SHA1). Replace any non-FIPS calls with FIPS-validated equivalents (SHA256, SHA512, AES-GCM). Document each replacement with STIG finding ID. Files: full codebase scan + targeted fixes. [NIST SC-13, STIG V-222570] **HIGH**
 
 ### 19B. JWT Asymmetric Key Migration
@@ -607,23 +607,23 @@
 - [x] 296. Increase minimum password length to 15 characters — change `options.Password.RequiredLength = 8` to `RequiredLength = 15` in P5 `Program.cs` line 62. Update `RegisterRequest` DTO `[MinLength]` annotation from 8 to 15. Update MAUI `LoginPage.razor` and `RegisterPage` UI validation messages. Files: P5 `Program.cs`, P5 `AuthModels.cs`, MAUI auth pages. [STIG V-222536] **HIGH**
 - [x] 297. Reduce max failed login attempts from 5 to 3 — change `options.Lockout.MaxFailedAccessAttempts = 5` to `MaxFailedAccessAttempts = 3` in P5 `Program.cs` line 66. Implement progressive lockout escalation: 1st lockout = 15 min, 2nd = 1 hour, 3rd = 24 hours, 4th+ = admin unlock required. Track escalation level in `WatchUser.LockoutEscalationLevel` column. Files: P5 `Program.cs`, `WatchUser` model, P5 `AuthService`. [STIG V-222432] **HIGH**
 - [x] 298. Implement password history — create `PasswordHistory` entity with columns: `UserId`, `HashedPassword`, `ChangedAtUtc`. On password change, hash the new password and compare against last 5 stored hashes. Reject if any match. Store new hash after successful change. Files: new `PasswordHistory.cs` entity, `AuthIdentityDbContext`, P5 `AuthService.ChangePasswordAsync()`, EF migration. [STIG V-222546] **HIGH**
-- [ ] 299. Implement password age limits — add `PasswordLastChangedUtc` and `PasswordMinAgeEnforcedUntil` columns to `WatchUser`. Enforce 60-day maximum age: on login, if password is >60 days old, return `PasswordExpired` flag in `LoginResponse` and redirect to password change. Enforce 24-hour minimum age: reject password changes within 24 hours of last change (prevents rapid cycling to exhaust history). Files: `WatchUser` model, P5 `AuthService`, `LoginResponse` DTO, EF migration. [STIG V-222544, V-222545] **HIGH**
-- [ ] 300. Enforce password change delta — on password change, verify the new password differs from the old password in at least 8 character positions (per STIG V-222541). Implement Levenshtein distance or character-position comparison. Reject changes that are too similar. Files: P5 `AuthService.ChangePasswordAsync()`. [STIG V-222541] **MEDIUM**
+- [x] 299. Implement password age limits — add `PasswordLastChangedUtc` and `PasswordMinAgeEnforcedUntil` columns to `WatchUser`. Enforce 60-day maximum age: on login, if password is >60 days old, return `PasswordExpired` flag in `LoginResponse` and redirect to password change. Enforce 24-hour minimum age: reject password changes within 24 hours of last change (prevents rapid cycling to exhaust history). Files: `WatchUser` model, P5 `AuthService`, `LoginResponse` DTO, EF migration. [STIG V-222544, V-222545] **HIGH**
+- [x] 300. Enforce password change delta — on password change, verify the new password differs from the old password in at least 8 character positions (per STIG V-222541). Implement Levenshtein distance or character-position comparison. Reject changes that are too similar. Files: P5 `AuthService.ChangePasswordAsync()`. [STIG V-222541] **MEDIUM**
 - [ ] 301. Add password strength meter to MAUI and Dashboard registration — use zxcvbn-style password strength estimator. Display strength indicator (Weak/Fair/Good/Strong) during registration and password change. Reject passwords that score below "Good" threshold. Files: MAUI registration page, Dashboard registration form, new `PasswordStrengthService.cs`. [STIG V-222536-540, OWASP A07] **LOW**
 
 ### 21B. Session Management (STIG)
-- [ ] 302. Enforce `HttpOnly` and `Secure` flags on all cookies — audit all `CookieOptions` in Dashboard and Admin portal. Set `HttpOnly = true`, `Secure = true`, `SameSite = SameSiteMode.Strict` on every cookie. Verify SignalR connection cookies also have these flags. Files: Dashboard `Program.cs`, Admin `Program.cs`, any cookie-setting middleware. [STIG V-222575, V-222576] **HIGH**
-- [ ] 303. Implement session timeout and idle timeout — for Dashboard/Admin Blazor Server: configure circuit timeout to 15 minutes of inactivity (per STIG). For JWT: access token lifetime maximum 30 minutes, refresh token maximum 8 hours (not 7 days). Force re-authentication after 8 hours regardless of activity. Files: Dashboard/Admin `Program.cs` circuit options, P5 JWT configuration. [NIST AC-12, STIG V-222578] **HIGH**
+- [x] 302. Enforce `HttpOnly` and `Secure` flags on all cookies — audit all `CookieOptions` in Dashboard and Admin portal. Set `HttpOnly = true`, `Secure = true`, `SameSite = SameSiteMode.Strict` on every cookie. Verify SignalR connection cookies also have these flags. Files: Dashboard `Program.cs`, Admin `Program.cs`, any cookie-setting middleware. [STIG V-222575, V-222576] **HIGH**
+- [x] 303. Implement session timeout and idle timeout — for Dashboard/Admin Blazor Server: configure circuit timeout to 15 minutes of inactivity (per STIG). For JWT: access token lifetime maximum 30 minutes, refresh token maximum 8 hours (not 7 days). Force re-authentication after 8 hours regardless of activity. Files: Dashboard/Admin `Program.cs` circuit options, P5 JWT configuration. [NIST AC-12, STIG V-222578] **HIGH**
 - [x] 304. Prevent session fixation — ensure JWT token IDs (`jti` claim) are unique per issuance. On login, invalidate any existing refresh tokens for the user before issuing new ones. Track active sessions per user in Redis with maximum concurrent session limit (default: 5). Files: P5 `AuthService.LoginAsync()`, P5 `AuthService.RefreshAsync()`. [STIG V-222579] **MEDIUM**
 
 ### 21C. Authentication Strengthening
-- [ ] 305. Move SMS OTP storage from ConcurrentDictionary to Redis — replace in-memory `ConcurrentDictionary<string, (string Code, DateTime Expiry)>` in P5 `SmsMfaService` with Redis hash entries using TTL. Key format: `otp:{phone}:{code_hash}`. Limit verification attempts to 3 per code (track in Redis counter). Files: P5 `SmsMfaService.cs`. [NIST IA-2, STIG V-222530] **HIGH**
+- [x] 305. Move SMS OTP storage from ConcurrentDictionary to Redis — replace in-memory `ConcurrentDictionary<string, (string Code, DateTime Expiry)>` in P5 `SmsMfaService` with Redis hash entries using TTL. Key format: `otp:{phone}:{code_hash}`. Limit verification attempts to 3 per code (track in Redis counter). Files: P5 `SmsMfaService.cs`. [NIST IA-2, STIG V-222530] **HIGH**
 - [ ] 306. Enforce device fingerprint binding on refresh tokens — make `DeviceFingerprint` required (not optional) on `RefreshTokenRequest`. Store fingerprint hash with refresh token in database. On refresh, reject if fingerprint doesn't match. Log device change attempts as security events. Files: P5 `AuthModels.cs`, P5 `AuthService.RefreshAsync()`. [NIST IA-5, SC-23] **MEDIUM**
 - [ ] 307. Implement account recovery flow — create secure account recovery that doesn't weaken MFA: require email verification + security questions + admin approval for privileged accounts. Prevent recovery flow from bypassing MFA. Log all recovery attempts. Files: new recovery endpoints in P5, `AccountRecoveryService.cs`. [NIST IA-5, STIG V-222522] **MEDIUM**
 - [x] 308. Implement concurrent session management — track active JWT sessions per user in Redis. Enforce maximum 5 concurrent sessions. On new login beyond limit, either reject or terminate oldest session. Provide `/api/auth/sessions` endpoint for users to view and revoke active sessions. Files: P5 `AuthService`, new `SessionManagementService.cs`, Redis session store. [NIST AC-10, AC-12] **MEDIUM**
 
 ### 21D. Authentication Audit
-- [ ] 309. Enhance auth audit logging to STIG requirements — every auth event must log: timestamp (UTC), user identity (or attempted identity), source IP address, source port, event type (login/logout/fail/lockout/MFA/token-refresh), success/failure, device fingerprint, user agent string. Verify all fields present in `AuditService.LogAsync()`. Files: P5 `AuditService.cs`, audit event model. [STIG V-222441-449] **HIGH**
+- [x] 309. Enhance auth audit logging to STIG requirements — every auth event must log: timestamp (UTC), user identity (or attempted identity), source IP address, source port, event type (login/logout/fail/lockout/MFA/token-refresh), success/failure, device fingerprint, user agent string. Verify all fields present in `AuditService.LogAsync()`. Files: P5 `AuditService.cs`, audit event model. [STIG V-222441-449] **HIGH**
 - [x] 310. Implement login banner/consent — display DoD-required login banner before authentication: "You are accessing a U.S. Government information system. By using this system you consent to monitoring..." Require explicit acceptance before proceeding. Store acceptance in audit log. Files: MAUI `LoginPage.razor`, Dashboard login page, P5 login flow. [NIST AC-8] **MEDIUM**
 
 ---
@@ -644,7 +644,7 @@
 ### 22B. Global Exception Handling
 - [x] 318. Create shared `WatchProblemDetailsMiddleware` — implement RFC 9457 Problem Details middleware in `TheWatch.Shared/Security/`. Map common exceptions: `ValidationException` → 400, `UnauthorizedAccessException` → 401, `KeyNotFoundException` → 404, `InvalidOperationException` → 409, unhandled → 500. Never expose stack traces, type names, or connection strings. Include `traceId` from correlation ID. Files: new `WatchProblemDetailsMiddleware.cs` in Shared. [STIG V-222610, V-222656, OWASP A05] **HIGH**
 - [x] 319. Wire `WatchProblemDetailsMiddleware` into all 12 services — add `app.UseMiddleware<WatchProblemDetailsMiddleware>()` to all `Program.cs` files (P1-P11 + Geospatial). Place after authentication but before endpoint routing. Admin.RestAPI already has `GlobalExceptionMiddleware` — verify it produces RFC 9457 format. Files: 12 `Program.cs` files. [STIG V-222610] **HIGH**
-- [ ] 320. Suppress detailed error responses in production — configure `builder.Services.AddProblemDetails()` with custom `ProblemDetailsOptions.CustomizeProblemDetails` that strips exception details when `IHostEnvironment.IsProduction()`. Verify `ASPNETCORE_ENVIRONMENT` is set to `Production` in all Dockerfiles and deploy manifests. Files: shared configuration, Dockerfiles, deploy manifests. [STIG V-222656, OWASP A05] **MEDIUM**
+- [x] 320. Suppress detailed error responses in production — configure `builder.Services.AddProblemDetails()` with custom `ProblemDetailsOptions.CustomizeProblemDetails` that strips exception details when `IHostEnvironment.IsProduction()`. Verify `ASPNETCORE_ENVIRONMENT` is set to `Production` in all Dockerfiles and deploy manifests. Files: shared configuration, Dockerfiles, deploy manifests. [STIG V-222656, OWASP A05] **MEDIUM**
 
 ### 22C. Request Size & SSRF Protection
 - [x] 321. Apply consistent Kestrel request limits to all services — create shared `ConfigureWatchKestrel()` extension: `MaxRequestBodySize = 10_485_760` (10MB), `MaxRequestHeadersTotalSize = 32_768` (32KB), `MaxRequestLineSize = 8_192` (8KB), `RequestHeadersTimeout = TimeSpan.FromSeconds(30)`, suppress Server header. Apply to all 12 services (Admin.RestAPI already has this). Files: new shared extension, 12 `Program.cs`. [NIST SC-5, STIG V-222602] **MEDIUM**

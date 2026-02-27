@@ -65,3 +65,7 @@ public record SmsMfaVerifyRequest(
 
 public record MagicLinkRequest(
     [property: Required, EmailAddress, MaxLength(256)] string Email);
+
+public record ChangePasswordRequest(
+    [property: Required, MinLength(1)] string CurrentPassword,
+    [property: Required, MinLength(15), MaxLength(128)] string NewPassword);

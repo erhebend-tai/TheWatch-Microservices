@@ -18,6 +18,7 @@ using TokenPair = TheWatch.P5.AuthSecurity.Auth.TokenPair;
 using UserInfo = TheWatch.P5.AuthSecurity.Auth.UserInfo;
 using AssignRoleRequest = TheWatch.P5.AuthSecurity.Auth.AssignRoleRequest;
 using MfaSetupResponse = TheWatch.P5.AuthSecurity.Auth.MfaSetupResponse;
+using ChangePasswordRequest = TheWatch.P5.AuthSecurity.Auth.ChangePasswordRequest;
 
 namespace TheWatch.P5.AuthSecurity.Services;
 
@@ -29,6 +30,7 @@ public interface IAuthService
     Task<UserInfo?> GetUserByIdAsync(Guid userId);
     Task<IReadOnlyList<UserInfo>> ListUsersAsync();
     Task AssignRoleAsync(Guid userId, string role);
+    Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request);
 }
 
 public class AuthService : IAuthService
@@ -57,7 +59,9 @@ public class AuthService : IAuthService
             DisplayName = request.DisplayName,
             PhoneNumber = request.Phone,
             IsActive = true,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            PasswordLastChangedUtc = DateTime.UtcNow,
+            PasswordMinAgeEnforcedUntil = DateTime.UtcNow.AddHours(24)
         };
 
         var result = await _userManager.CreateAsync(user, request.Password);
@@ -117,6 +121,14 @@ public class AuthService : IAuthService
         var roles = await _userManager.GetRolesAsync(user);
         var tokens = await GenerateTokensAsync(user, roles.ToArray(), request.DeviceFingerprint);
         var userInfo = ToUserInfo(user, roles.ToArray());
+
+        // Item 299: Check 60-day password expiry (STIG V-222544)
+        var passwordAge = user.PasswordLastChangedUtc.HasValue
+            ? DateTime.UtcNow - user.PasswordLastChangedUtc.Value
+            : TimeSpan.MaxValue;
+        if (passwordAge.TotalDays > 60)
+            return new LoginResponse(tokens.AccessToken, tokens.RefreshToken, tokens.ExpiresAt, userInfo, PasswordExpired: true);
+
         return new LoginResponse(tokens.AccessToken, tokens.RefreshToken, tokens.ExpiresAt, userInfo);
     }
 
@@ -189,7 +201,8 @@ public class AuthService : IAuthService
         var jwtKey = _config["Jwt:Key"] ?? "TheWatch-P5-AuthSecurity-DevKey-Min32Chars!!";
         var issuer = _config["Jwt:Issuer"] ?? "TheWatch.P5.AuthSecurity";
         var audience = _config["Jwt:Audience"] ?? "TheWatch";
-        var expiryMinutes = int.TryParse(_config["Jwt:AccessTokenLifetimeMinutes"], out var m) ? m : 15;
+        // Item 303: Access token max 30 minutes (NIST AC-12, STIG V-222578)
+        var expiryMinutes = int.TryParse(_config["Jwt:AccessTokenLifetimeMinutes"], out var m) ? Math.Min(m, 30) : 15;
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -213,12 +226,14 @@ public class AuthService : IAuthService
         var token = new JwtSecurityToken(issuer, audience, claims, expires: expiresAt, signingCredentials: creds);
         var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
 
+        // Item 303: Refresh token max 8 hours (not 7 days) — STIG V-222578
+        var refreshTokenHours = int.TryParse(_config["Jwt:RefreshTokenLifetimeHours"], out var h) ? Math.Min(h, 8) : 8;
         var refreshTokenValue = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
         var refreshTokenObj = new RefreshToken
         {
             Token = refreshTokenValue,
             UserId = user.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(7),
+            ExpiresAt = DateTime.UtcNow.AddHours(refreshTokenHours),
             DeviceFingerprint = deviceFingerprint,
             IpAddress = ipAddress
         };
@@ -226,6 +241,58 @@ public class AuthService : IAuthService
         await _db.SaveChangesAsync();
 
         return new TokenPair(accessToken, refreshTokenValue, expiresAt);
+    }
+
+    /// <summary>
+    /// Item 299/300: Change password with age and delta enforcement.
+    /// STIG V-222544 (60-day max age), V-222545 (24-hour min age), V-222541 (≥8 character positions different).
+    /// </summary>
+    public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+            throw new InvalidOperationException("User not found.");
+
+        // Item 299: Enforce 24-hour minimum age (STIG V-222545)
+        if (user.PasswordMinAgeEnforcedUntil.HasValue && user.PasswordMinAgeEnforcedUntil.Value > DateTime.UtcNow)
+        {
+            var hoursRemaining = (user.PasswordMinAgeEnforcedUntil.Value - DateTime.UtcNow).TotalHours;
+            throw new InvalidOperationException(
+                $"Password was changed too recently. You must wait {hoursRemaining:F1} more hours before changing it again.");
+        }
+
+        // Item 300: Enforce ≥8 character-position difference (STIG V-222541)
+        if (!PasswordHasEnoughDifference(request.CurrentPassword, request.NewPassword, minPositions: 8))
+            throw new InvalidOperationException(
+                "New password must differ from the current password in at least 8 character positions.");
+
+        var result = await _userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+            throw new InvalidOperationException(string.Join("; ", result.Errors.Select(e => e.Description)));
+
+        // Update password age tracking
+        user.PasswordLastChangedUtc = DateTime.UtcNow;
+        user.PasswordMinAgeEnforcedUntil = DateTime.UtcNow.AddHours(24);
+        await _userManager.UpdateAsync(user);
+    }
+
+    /// <summary>
+    /// Item 300 (STIG V-222541): Counts character positions where the two strings differ.
+    /// Returns true when the new password differs from the current in at least <paramref name="minPositions"/> positions.
+    /// Pads the shorter string to match the longer one, so added/removed characters at the end count as differences.
+    /// </summary>
+    private static bool PasswordHasEnoughDifference(string current, string newPassword, int minPositions)
+    {
+        var maxLen = Math.Max(current.Length, newPassword.Length);
+        var differences = 0;
+        for (var i = 0; i < maxLen; i++)
+        {
+            var c = i < current.Length ? current[i] : '\0';
+            var n = i < newPassword.Length ? newPassword[i] : '\0';
+            if (c != n) differences++;
+            if (differences >= minPositions) return true;
+        }
+        return false;
     }
 
     private async Task RevokeTokenChainAsync(string token)
