@@ -520,11 +520,11 @@
 - [x] 255. Implement test: disaster relief flow — declare disaster (P8) → open shelters → allocate resources → activate mesh network (P3) → track evacuees
 
 ### 18B. Load & Stress Testing
-- [ ] 256. Create k6 or NBomber load test scripts for P2 incident creation (target: 1,000 concurrent SOS activations)
-- [ ] 257. Create k6 load test for P5 auth (target: 500 concurrent logins with MFA)
-- [ ] 258. Create k6 load test for SignalR hub connections (target: 10,000 concurrent WebSocket connections)
-- [ ] 259. Create k6 load test for evidence upload (target: 100 concurrent 50MB video uploads)
-- [ ] 260. Benchmark sub-2-second SOS activation: measure end-to-end latency from SOS button press to first responder notification
+- [x] 256. Create k6 or NBomber load test scripts for P2 incident creation (target: 1,000 concurrent SOS activations)
+- [x] 257. Create k6 load test for P5 auth (target: 500 concurrent logins with MFA)
+- [x] 258. Create k6 load test for SignalR hub connections (target: 10,000 concurrent WebSocket connections)
+- [x] 259. Create k6 load test for evidence upload (target: 100 concurrent 50MB video uploads)
+- [x] 260. Benchmark sub-2-second SOS activation: measure end-to-end latency from SOS button press to first responder notification
 
 ### 18C. Chaos & Resilience Testing
 - [ ] 261. Test SQL Server failover: kill primary, verify services recover via Aspire retry/failover
