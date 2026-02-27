@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Hangfire;
+using Hangfire.Batches;
 using NetTopologySuite.IO.Converters;
 using Hangfire.InMemory;
 using NetTopologySuite.Geometries;
@@ -26,7 +27,9 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddWatchCors(builder.Configuration);
 
 builder.Services.AddHangfire(config =>
-    config.UseInMemoryStorage());
+    config
+        .UseInMemoryStorage()
+        .UseBatches());
 builder.Services.AddHangfireServer();
 
 // Configurable: PostGIS (default) or Azure Maps (when Azure:UseAzureMaps = true)

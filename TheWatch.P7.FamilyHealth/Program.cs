@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.Batches;
 using Hangfire.InMemory;
 using Serilog;
 using TheWatch.P7.FamilyHealth;
@@ -26,9 +27,11 @@ builder.Services.AddWatchCors(builder.Configuration, requiresSignalR: true);
 // SignalR real-time hubs (CheckInHub, VitalReadingHub, MedicalAlertHub, etc.)
 builder.Services.AddWatchSignalR();
 
-// Hangfire with InMemory storage
+// Hangfire with InMemory storage + Pro batches
 builder.Services.AddHangfire(config =>
-    config.UseInMemoryStorage());
+    config
+        .UseInMemoryStorage()
+        .UseBatches());
 builder.Services.AddHangfireServer();
 
 // Services

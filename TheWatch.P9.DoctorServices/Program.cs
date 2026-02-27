@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.Batches;
 using Hangfire.InMemory;
 using Serilog;
 using TheWatch.P9.DoctorServices;
@@ -24,9 +25,11 @@ builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 
 builder.Services.AddWatchCors(builder.Configuration);
 
-// Hangfire with InMemory storage
+// Hangfire with InMemory storage + Pro batches
 builder.Services.AddHangfire(config =>
-    config.UseInMemoryStorage());
+    config
+        .UseInMemoryStorage()
+        .UseBatches());
 builder.Services.AddHangfireServer();
 
 // ── Inter-service typed HTTP clients (Item 213) ──
