@@ -133,6 +133,20 @@ jobs:
           done
           echo "Packable project validation complete. $(ls ./nupkgs/*.nupkg | wc -l) packages produced."
 
+      # Collect XML documentation files produced by the build
+      - name: Collect XML documentation
+        run: |
+          mkdir -p xml-docs
+          find . -path "*/bin/Release/*" -name "TheWatch.*.xml" -exec cp {} xml-docs/ \;
+          echo "Collected $(ls xml-docs/*.xml 2>/dev/null | wc -l) XML documentation files."
+
+      - name: Upload XML documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: xml-documentation
+          path: xml-docs/
+          retention-days: 30
+
       # Upload build output for test job
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
