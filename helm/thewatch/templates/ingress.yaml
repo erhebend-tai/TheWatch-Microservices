@@ -293,6 +293,59 @@ spec:
                   number: 8080
           {{- end }}
 
+          # P11 Surveillance — /api/cameras, /api/footage, /api/crime-locations, /api/surveillance, /hubs/cameras, /hubs/detections, /hubs/footagesubmissions
+          {{- if (index $.Values.services "p11-surveillance").enabled }}
+          - path: /api/cameras
+            pathType: Prefix
+            backend:
+              service:
+                name: p11-surveillance
+                port:
+                  number: 8080
+          - path: /api/footage
+            pathType: Prefix
+            backend:
+              service:
+                name: p11-surveillance
+                port:
+                  number: 8080
+          - path: /api/crime-locations
+            pathType: Prefix
+            backend:
+              service:
+                name: p11-surveillance
+                port:
+                  number: 8080
+          - path: /api/surveillance
+            pathType: Prefix
+            backend:
+              service:
+                name: p11-surveillance
+                port:
+                  number: 8080
+          - path: /hubs/cameras
+            pathType: Prefix
+            backend:
+              service:
+                name: p11-surveillance
+                port:
+                  number: 8080
+          - path: /hubs/detections
+            pathType: Prefix
+            backend:
+              service:
+                name: p11-surveillance
+                port:
+                  number: 8080
+          - path: /hubs/footagesubmissions
+            pathType: Prefix
+            backend:
+              service:
+                name: p11-surveillance
+                port:
+                  number: 8080
+          {{- end }}
+
           # Geospatial — /api/geo
           {{- if (index $.Values.services "geospatial").enabled }}
           - path: /api/geo

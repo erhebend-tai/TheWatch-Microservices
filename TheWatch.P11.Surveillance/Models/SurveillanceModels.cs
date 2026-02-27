@@ -46,6 +46,13 @@ public enum SubmissionSource
     Other
 }
 
+public enum MediaType
+{
+    Video,
+    Audio,
+    Image
+}
+
 public class CameraRegistration
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -80,6 +87,8 @@ public class FootageSubmission
     public string? ThumbnailUrl { get; set; }
     public double? DurationSeconds { get; set; }
     public FootageStatus Status { get; set; } = FootageStatus.Submitted;
+    public MediaType MediaType { get; set; } = MediaType.Video;
+    public string? FileHashSha256 { get; set; }
     public string? Description { get; set; }
     public List<string> Tags { get; set; } = [];
     public DateTime? AnalysisCompletedAt { get; set; }
@@ -139,6 +148,8 @@ public record SubmitFootageRequest(
     DateTime StartTime,
     DateTime EndTime,
     string MediaUrl,
+    MediaType MediaType = MediaType.Video,
+    string? FileHashSha256 = null,
     string? Description = null,
     List<string>? Tags = null);
 
