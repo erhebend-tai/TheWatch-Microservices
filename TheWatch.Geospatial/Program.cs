@@ -34,6 +34,7 @@ builder.Services.AddHangfireServer();
 
 // Configurable: PostGIS (default) or Azure Maps (when Azure:UseAzureMaps = true)
 builder.Services.AddGeospatialProvider(builder.Configuration);
+builder.Services.AddScoped<IIntelService, IntelService>();
 builder.Services.AddScoped<IGeoRetentionService, GeoRetentionService>();
 builder.AddWatchSecurity();
 builder.AddWatchControllers();
@@ -193,6 +194,34 @@ app.MapPost("/api/geo/geofences/check", async (CheckGeofenceRequest req, IGeospa
 {
     var events = await svc.CheckGeofencesForMemberAsync(req.MemberId, req.FamilyGroupId, req.Longitude, req.Latitude);
     return Results.Ok(events);
+});
+
+// === Intel Caching & Inferencing ===
+
+app.MapPost("/api/intel/ingest", async (IngestIntelEntryRequest req, IIntelService svc) =>
+{
+    var entry = await svc.IngestEntryAsync(req);
+    return Results.Created($"/api/intel/entries/{entry.Id}", entry);
+});
+
+app.MapGet("/api/intel/entries", async (double lon, double lat, double radius, string? category, string? minThreatLevel, int? count, IIntelService svc) =>
+{
+    IntelCategory? cat = Enum.TryParse<IntelCategory>(category, true, out var c) ? c : null;
+    IntelThreatLevel? min = Enum.TryParse<IntelThreatLevel>(minThreatLevel, true, out var tl) ? tl : null;
+    var results = await svc.QueryEntriesNearAsync(lon, lat, radius, cat, min, count ?? 20);
+    return Results.Ok(results);
+});
+
+app.MapGet("/api/intel/inferences", async (double lon, double lat, double radius, IIntelService svc) =>
+{
+    var results = await svc.GetInferencesNearAsync(lon, lat, radius);
+    return Results.Ok(results);
+});
+
+app.MapPost("/api/intel/inferences/generate", async (GenerateInferenceRequest req, IIntelService svc) =>
+{
+    var inference = await svc.GenerateInferenceAsync(req.Longitude, req.Latitude, req.RadiusMeters, req.Category);
+    return Results.Created($"/api/intel/inferences/{inference.Id}", inference);
 });
 
 app.Run();

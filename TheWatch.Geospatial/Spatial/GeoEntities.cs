@@ -241,6 +241,48 @@ public class SpatialSearchResult
     public DateTimeOffset FoundAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
+// ─── Schema: geo_intel ───
+
+/// <summary>Cached intelligence entry — news, encyclopedic data, field reports, etc. — with geolocation context.</summary>
+public class IntelEntry
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; } = "";
+    public string Summary { get; set; } = "";
+    /// <summary>News | Encyclopedia | SocialMedia | FieldReport | Sensor</summary>
+    public string SourceType { get; set; } = "";
+    public string SourceUrl { get; set; } = "";
+    public string SourceName { get; set; } = "";
+    public Point Location { get; set; } = null!;
+    /// <summary>Radius (meters) of geographic relevance for this entry.</summary>
+    public double RadiusMeters { get; set; }
+    public IntelCategory Category { get; set; }
+    public IntelThreatLevel ThreatLevel { get; set; }
+    /// <summary>Analyst confidence 0.0–1.0.</summary>
+    public double ConfidenceScore { get; set; }
+    public Dictionary<string, string> Tags { get; set; } = new();
+    public bool IsActive { get; set; } = true;
+    public DateTimeOffset PublishedAt { get; set; }
+    public DateTimeOffset IngestedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? ExpiresAt { get; set; }
+}
+
+/// <summary>Derived situational inference generated from nearby IntelEntry records.</summary>
+public class IntelInference
+{
+    public Guid Id { get; set; }
+    public Point Location { get; set; } = null!;
+    public double RadiusMeters { get; set; }
+    public IntelCategory Category { get; set; }
+    public IntelThreatLevel ThreatLevel { get; set; }
+    public string Summary { get; set; } = "";
+    public double ConfidenceScore { get; set; }
+    public int SupportingEntryCount { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTimeOffset GeneratedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? ExpiresAt { get; set; }
+}
+
 // ─── Enums ───
 
 public enum GeoLocationType
@@ -301,4 +343,15 @@ public enum GeofenceAlertType
 public enum GeofenceEventType
 {
     Entered, Exited
+}
+
+public enum IntelCategory
+{
+    GeneralHazard, CivilUnrest, Crime, NaturalDisaster, PublicHealth, Infrastructure,
+    WeatherEvent, HazardousMaterial, PoliticalInstability, Military, Terrorism
+}
+
+public enum IntelThreatLevel
+{
+    Informational, Low, Moderate, Elevated, High, Critical
 }
