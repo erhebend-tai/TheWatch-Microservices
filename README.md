@@ -153,6 +153,12 @@ TheWatch-Microservices/
 
 ---
 
+## Related Repositories
+
+- [`watch-two`](https://github.com/erhebend-tai/watch-two) — placeholder repo; currently contains only a README and no assets to import.
+
+---
+
 ## Getting Started
 
 ### Prerequisites
