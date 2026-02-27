@@ -9,6 +9,8 @@
 @inject EmergencyLocationService EmergencyLocation
 @inject IOfflineQueueService OfflineQueue
 @inject IConnectivityMonitorService Connectivity
+@inject IAmbulanceTriageService Triage
+@inject ILogger<SOSPage> Logger
 
 <div class="page-content" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh;">
 
@@ -33,6 +35,56 @@
                                   Style="width: 100%;" />
                 </ChildContent>
             </RadzenFormField>
+
+            <!-- ── Triage Intake ── -->
+            <div class="watch-card" style="width: 280px;">
+                <RadzenStack Gap="0.75rem">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Describe your emergency</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                        Type or dictate symptoms so responders are informed before they arrive.
+                    </RadzenText>
+
+                    <!-- Symptom text area -->
+                    <RadzenTextArea @bind-Value="_symptoms" Rows="3"
+                                    Placeholder="e.g. chest pain, took too many pills, chemical smell..."
+                                    Style="width: 100%;" />
+
+                    <!-- Mic + Lookup buttons -->
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                        <RadzenButton Icon="@(_dictating ? "mic_off" : "mic")"
+                                      Text="@(_dictating ? "Stop" : "Dictate")"
+                                      ButtonStyle="@(_dictating ? ButtonStyle.Danger : ButtonStyle.Secondary)"
+                                      Size="ButtonSize.Small"
+                                      Click="@ToggleDictationAsync" />
+
+                        <RadzenButton Icon="search" Text="Check"
+                                      ButtonStyle="ButtonStyle.Info"
+                                      Size="ButtonSize.Small"
+                                      Click="@LookupSymptomsAsync"
+                                      Disabled="@(string.IsNullOrWhiteSpace(_symptoms) || _lookingUp)" />
+                    </RadzenStack>
+
+                    <!-- Inline guidance from on-device DB -->
+                    @if (_triageGuidance is not null)
+                    {
+                        <div style="background: var(--watch-surface-alt, #f5f5f5); border-radius: 6px; padding: 0.5rem 0.75rem;">
+                            @if (_triageMatchedEntry is not null)
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-danger); font-weight: 600;">
+                                    🔍 Matched: @_triageMatchedEntry (@_triageUrgency urgency)
+                                </RadzenText>
+                            }
+                            <RadzenText TextStyle="TextStyle.Caption">@_triageGuidance</RadzenText>
+                            <RadzenButton Icon="volume_up" Text="Read Aloud"
+                                          ButtonStyle="ButtonStyle.Light"
+                                          Size="ButtonSize.ExtraSmall"
+                                          Click="@SpeakGuidanceAsync"
+                                          Style="margin-top: 0.25rem;" />
+                        </div>
+                    }
+                </RadzenStack>
+            </div>
+            <!-- ── /Triage Intake ── -->
 
             <!-- THE SOS BUTTON -->
             <button class="sos-button" @onclick="OnSOSActivated" disabled="@_activating">
@@ -86,8 +138,27 @@
                             Location: @_location.Value.lat.ToString("F4"), @_location.Value.lon.ToString("F4")
                         </RadzenText>
                     }
+                    @if (_911Called)
+                    {
+                        <RadzenText Style="color: var(--watch-danger); font-weight: 600;">
+                            📞 911 contacted
+                        </RadzenText>
+                    }
+                    @if (_triageGuidance is not null)
+                    {
+                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                            🩺 Triage intake logged — responders have your info.
+                        </RadzenText>
+                    }
                 </RadzenStack>
             </div>
+
+            @if (_show911Button)
+            {
+                <RadzenButton Text="Call 911 Now" Icon="call"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Click="@Call911Manually" />
+            }
 
             <RadzenButton Text="Back to Home" Icon="home"
                           ButtonStyle="ButtonStyle.Secondary" Click="@(() => Nav.NavigateTo("/"))" />
@@ -100,7 +171,19 @@
     private int _severity = 3;
     private bool _activating;
     private bool _incidentCreated;
+    private bool _911Called;
+    private bool _show911Button;
     private (double lat, double lon)? _location;
+
+    // Triage intake state
+    private string _symptoms = string.Empty;
+    private bool _dictating;
+    private bool _lookingUp;
+    private string? _triageGuidance;
+    private string? _triageMatchedEntry;
+    private string? _triageUrgency;
+    private TriageResult? _lastTriageResult;
+    private string _triageInputMethod = "text";
 
     private readonly List<TypeOption> _emergencyTypes = Enum.GetValues<EmergencyType>()
         .Select(e => new TypeOption(e.ToString(), e))
@@ -109,7 +192,77 @@
     protected override void OnInitialized()
     {
         SpeechService.OnPhraseMatched += OnVoiceSOSTriggered;
+        SpeechService.OnSpeechRecognized += OnDictationResult;
     }
+
+    // ── Triage dictation ─────────────────────────────────────────────────────
+
+    private async Task ToggleDictationAsync()
+    {
+        if (_dictating)
+        {
+            await SpeechService.StopListeningAsync();
+            _dictating = false;
+            // Auto-lookup once dictation stops and there's content
+            if (!string.IsNullOrWhiteSpace(_symptoms))
+                await LookupSymptomsAsync();
+        }
+        else
+        {
+            _dictating = true;
+            await SpeechService.StartListeningAsync();
+        }
+        StateHasChanged();
+    }
+
+    private void OnDictationResult(string transcript)
+    {
+        // Append dictated text to the symptoms field
+        if (_dictating && !string.IsNullOrWhiteSpace(transcript))
+        {
+            _symptoms = string.IsNullOrWhiteSpace(_symptoms)
+                ? transcript
+                : $"{_symptoms.TrimEnd()} {transcript}";
+            _triageInputMethod = "stt"; // symptoms were captured via speech
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task LookupSymptomsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_symptoms)) return;
+        _lookingUp = true;
+        StateHasChanged();
+
+        try
+        {
+            var user = AuthService.CurrentUser;
+            _lastTriageResult = _triageInputMethod == "stt"
+                ? await Triage.AssessSttAsync(_symptoms, user?.Id ?? Guid.Empty)
+                : await Triage.AssessTextAsync(_symptoms, user?.Id ?? Guid.Empty);
+            _triageGuidance = _lastTriageResult.Guidance;
+            _triageMatchedEntry = _lastTriageResult.MatchedEntryName;
+            _triageUrgency = _lastTriageResult.UrgencyLevel;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Triage lookup failed");
+            _triageGuidance = "Unable to look up guidance. Describe symptoms to the dispatcher when 911 connects.";
+        }
+        finally
+        {
+            _lookingUp = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SpeakGuidanceAsync()
+    {
+        if (_triageGuidance is not null)
+            await Triage.SpeakGuidanceAsync(_triageGuidance);
+    }
+
+    // ── SOS activation ───────────────────────────────────────────────────────
 
     private async void OnVoiceSOSTriggered(string phrase, PhraseAction action)
     {
@@ -127,6 +280,17 @@
     {
         _activating = true;
 
+        // Stop any active dictation before submitting
+        if (_dictating)
+        {
+            await SpeechService.StopListeningAsync();
+            _dictating = false;
+        }
+
+        // Run triage lookup now if there are symptoms and no result yet
+        if (!string.IsNullOrWhiteSpace(_symptoms) && _lastTriageResult is null)
+            await LookupSymptomsAsync();
+
         // Get high-accuracy location via EmergencyLocationService
         try
         {
@@ -137,9 +301,13 @@
         catch { /* location unavailable */ }
 
         var user = AuthService.CurrentUser;
+
+        // Build description: combine SOS tag with triage summary if available
+        var description = BuildDescription();
+
         var request = new CreateIncidentRequest(
             _selectedType,
-            $"SOS activated via TheWatch Mobile",
+            description,
             new LocationDto(_location?.lat ?? 0, _location?.lon ?? 0),
             user?.Id ?? Guid.Empty,
             user?.DisplayName,
@@ -148,7 +316,7 @@
 
         try
         {
-            await Api.CreateIncidentAsync(request);
+            var incident = await Api.CreateIncidentAsync(request);
 
             // Activate continuous emergency GPS tracking
             await EmergencyLocation.ActivateAsync();
@@ -159,6 +327,9 @@
             _incidentCreated = true;
             Notification.Notify(NotificationSeverity.Warning, "SOS Sent",
                 "Emergency dispatched. Help is on the way.");
+
+            // Automatically open the phone dialer to call 911 on the user's behalf
+            Dial911();
         }
         catch (Exception ex)
         {
@@ -171,6 +342,9 @@
                 _incidentCreated = true;
                 Notification.Notify(NotificationSeverity.Warning, "SOS Queued",
                     "You're offline. SOS will be sent when connectivity is restored.");
+
+                // Still attempt 911 even when offline — the dialer is a local OS feature
+                Dial911();
             }
             else
             {
@@ -179,6 +353,56 @@
         }
 
         _activating = false;
+    }
+
+    private string BuildDescription()
+    {
+        if (string.IsNullOrWhiteSpace(_symptoms))
+            return "SOS activated via TheWatch Mobile";
+
+        var sb = new System.Text.StringBuilder("SOS activated via TheWatch Mobile");
+        sb.Append($" | Symptoms: {_symptoms.Trim()}");
+        if (_triageMatchedEntry is not null)
+            sb.Append($" | Matched: {_triageMatchedEntry} ({_triageUrgency})");
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Opens the platform phone dialer with 911 pre-filled.
+    /// If the dialer is not supported on this device (e.g. tablet without SIM), a
+    /// manual "Call 911 Now" button is shown instead.
+    /// </summary>
+    private void Dial911()
+    {
+        try
+        {
+            if (PhoneDialer.IsSupported)
+            {
+                PhoneDialer.Open("911");
+                _911Called = true;
+            }
+            else
+            {
+                // Dialer not available — show a manual button
+                _show911Button = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "PhoneDialer.Open(\"911\") failed: {Message}", ex.Message);
+            _show911Button = true;
+        }
+    }
+
+    private void Call911Manually()
+    {
+        try
+        {
+            PhoneDialer.Open("911");
+            _911Called = true;
+            _show911Button = false;
+        }
+        catch { /* ignore if dialer unavailable */ }
     }
 
     private record TypeOption(string Text, EmergencyType Value);

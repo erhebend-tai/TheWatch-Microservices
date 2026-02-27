@@ -63,6 +63,8 @@ builder.Services.AddSurveillanceClient()
 // Services
 builder.Services.AddScoped<IEmergencyService, EmergencyService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
+builder.Services.AddScoped<IEmergencyCallService, EmergencyCallService>();
+builder.Services.AddScoped<ITriageService, TriageService>();
 builder.Services.AddScoped<IWatchDataSeeder, VoiceEmergencySeeder>();
 builder.AddWatchControllers();
 
@@ -211,6 +213,26 @@ app.MapGet("/api/incidents/{incidentId:guid}/dispatches", async (Guid incidentId
 
 // SignalR hub endpoints (/hubs/incidents, /hubs/dispatches)
 app.MapWatchHubs();
+
+// === Triage Intake Endpoints ===
+
+app.MapPost("/api/triage", async (LogTriageIntakeRequest request, ITriageService svc) =>
+{
+    var intake = await svc.LogIntakeAsync(request);
+    return Results.Created($"/api/triage/{intake.Id}", intake);
+}).RequireAuthorization("Authenticated");
+
+app.MapGet("/api/triage/{id:guid}", async (Guid id, ITriageService svc) =>
+{
+    var intake = await svc.GetIntakeAsync(id);
+    return intake is not null ? Results.Ok(intake) : Results.NotFound();
+}).RequireAuthorization("Authenticated");
+
+app.MapGet("/api/incidents/{incidentId:guid}/triage", async (Guid incidentId, ITriageService svc) =>
+{
+    var intakes = await svc.GetIntakesForIncidentAsync(incidentId);
+    return Results.Ok(intakes);
+}).RequireAuthorization("ResponderAccess");
 
 app.Run();
 

@@ -18,12 +18,18 @@ public class EmergencyService : IEmergencyService
 {
     private readonly IWatchRepository<Incident> _incidents;
     private readonly INotificationService _notifications;
+    private readonly IEmergencyCallService _emergencyCall;
     private readonly ILogger<EmergencyService> _logger;
 
-    public EmergencyService(IWatchRepository<Incident> incidents, INotificationService notifications, ILogger<EmergencyService> logger)
+    public EmergencyService(
+        IWatchRepository<Incident> incidents,
+        INotificationService notifications,
+        IEmergencyCallService emergencyCall,
+        ILogger<EmergencyService> logger)
     {
         _incidents = incidents;
         _notifications = notifications;
+        _emergencyCall = emergencyCall;
         _logger = logger;
     }
 
@@ -66,6 +72,27 @@ public class EmergencyService : IEmergencyService
                 if (!t.Result.Success)
                     _logger.LogWarning("Failed to send incident notification: {Error}", t.Result.Error);
             }, TaskContinuationOptions.OnlyOnRanToCompletion);
+
+        // Automatically contact 911 for high-severity incidents (severity 4-5)
+        if (incident.Severity >= 4)
+        {
+            _ = _emergencyCall.Dispatch911Async(
+                    incident.Id,
+                    incident.Description,
+                    incident.Location.Latitude,
+                    incident.Location.Longitude,
+                    incident.ReporterPhone)
+                .ContinueWith(t =>
+                {
+                    if (t.IsCompletedSuccessfully && !t.Result.Success)
+                        _logger.LogWarning("911 dispatch returned non-success for IncidentId={IncidentId}: {Error}", incident.Id, t.Result.Error);
+                }, TaskContinuationOptions.OnlyOnRanToCompletion)
+                .ContinueWith(t =>
+                {
+                    if (t.Exception is not null)
+                        _logger.LogError(t.Exception, "Exception during 911 dispatch for IncidentId={IncidentId}", incident.Id);
+                }, TaskContinuationOptions.OnlyOnFaulted);
+        }
 
         return incident;
     }
