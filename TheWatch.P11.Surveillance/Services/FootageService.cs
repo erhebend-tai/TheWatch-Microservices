@@ -50,6 +50,8 @@ public class FootageService : IFootageService
             StartTime = request.StartTime,
             EndTime = request.EndTime,
             MediaUrl = request.MediaUrl,
+            MediaType = request.MediaType,
+            FileHashSha256 = request.FileHashSha256,
             Description = request.Description,
             Tags = request.Tags ?? [],
             DurationSeconds = (request.EndTime - request.StartTime).TotalSeconds
