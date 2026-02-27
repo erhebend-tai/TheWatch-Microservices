@@ -63,6 +63,7 @@ locals {
     "p9-doctorservices",
     "p10-gamification",
     "p11-surveillance",
+    "p12-notifications",
     "geospatial",
     "dashboard",
   ]
@@ -79,6 +80,7 @@ locals {
     "WatchDoctorServicesDB" = { service = "p9-doctorservices", tier = "standard" }
     "WatchGamificationDB"   = { service = "p10-gamification", tier = "standard" }
     "WatchSurveillanceDB"   = { service = "p11-surveillance", tier = "standard" }
+    "WatchNotificationsDB"  = { service = "p12-notifications", tier = "standard" }
   }
 
   ecs_services = {
@@ -222,8 +224,8 @@ locals {
     "vital-alert"        = { partitions = 6, replication = 3, consumers = ["p7-familyhealth", "p9-doctorservices"] }
     "evidence-uploaded"  = { partitions = 6, replication = 3, consumers = ["p2-voiceemergency"] }
     "disaster-declared"       = { partitions = 6, replication = 3, consumers = ["p8-disasterrelief", "p6-firstresponder", "dashboard"] }
-    "footage-submitted"       = { partitions = 6, replication = 3, consumers = ["p11-surveillance", "p2-voiceemergency"] }
-    "crime-location-reported" = { partitions = 6, replication = 3, consumers = ["p11-surveillance", "p6-firstresponder"] }
+    "footage-submitted"       = { partitions = 6, replication = 3, consumers = ["p11-surveillance", "p12-notifications", "p2-voiceemergency"] }
+    "crime-location-reported" = { partitions = 6, replication = 3, consumers = ["p11-surveillance", "p12-notifications", "p6-firstresponder"] }
     "dead-letter"             = { partitions = 3, replication = 3, consumers = ["monitoring"] }
   }
 }

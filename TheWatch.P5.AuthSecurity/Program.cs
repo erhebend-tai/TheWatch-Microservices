@@ -410,7 +410,12 @@ static async Task SeedDataAsync(IServiceProvider services)
 {
     using var scope = services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AuthIdentityDbContext>();
-    await db.Database.EnsureCreatedAsync();
+
+    // Use MigrateAsync for SQL Server (production), EnsureCreatedAsync for InMemory (dev/test)
+    if (db.Database.IsSqlServer())
+        await db.Database.MigrateAsync();
+    else
+        await db.Database.EnsureCreatedAsync();
 
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<WatchRole>>();
     foreach (var role in WatchRoles.All)

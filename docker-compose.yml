@@ -348,7 +348,7 @@ services:
       Jwt__Audience: "thewatch-services"
       Kafka__BootstrapServers: "kafka:29092"
     ports:
-      - "5113:8080"
+      - "5112:8080"
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -375,7 +375,7 @@ services:
       Jwt__Audience: "thewatch-services"
       ServiceUrls__CoreGateway: "http://p1-coregateway:8080"
     ports:
-      - "5114:8080"
+      - "5113:8080"
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -427,6 +427,7 @@ services:
       services__p9-doctorservices__http__0: "http://p9-doctorservices:8080"
       services__p10-gamification__http__0: "http://p10-gamification:8080"
       services__p11-surveillance__http__0: "http://p11-surveillance:8080"
+      services__p12-notifications__http__0: "http://p12-notifications:8080"
       services__geospatial__http__0: "http://geospatial:8080"
       Jwt__Key: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}"
       Jwt__Issuer: "thewatch-auth"

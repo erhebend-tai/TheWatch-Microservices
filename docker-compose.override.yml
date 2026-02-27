@@ -168,7 +168,7 @@ services:
       Logging__LogLevel__Default: Debug
       Serilog__MinimumLevel: Debug
     ports:
-      - "5113:8080"
+      - "5112:8080"
     volumes:
       - ./TheWatch.P11.Surveillance/logs:/app/logs
 
@@ -180,6 +180,6 @@ services:
       Logging__LogLevel__Default: Debug
       Serilog__MinimumLevel: Debug
     ports:
-      - "5114:8080"
+      - "5113:8080"
     volumes:
       - ./TheWatch.P12.Notifications/logs:/app/logs

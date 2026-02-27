@@ -34,6 +34,7 @@ locals {
     "WatchDoctorServicesDB" = { service = "p9-doctorservices", tier = "standard" }
     "WatchGamificationDB"   = { service = "p10-gamification", tier = "standard" }
     "WatchSurveillanceDB"   = { service = "p11-surveillance", tier = "standard" }
+    "WatchNotificationsDB"  = { service = "p12-notifications", tier = "standard" }
   }
 
   pubsub_topics = {
@@ -61,6 +62,7 @@ locals {
     "p9-doctorservices" = { cpu = "1", memory = "512Mi", min_instances = 1, max_instances = 3,  image_tag = "latest", env_vars = {}, public = false }
     "p10-gamification"  = { cpu = "1", memory = "512Mi", min_instances = 0, max_instances = 2,  image_tag = "latest", env_vars = {}, public = false }
     "p11-surveillance"  = { cpu = "2", memory = "1Gi",   min_instances = 1, max_instances = 5,  image_tag = "latest", env_vars = {}, public = false }
+    "p12-notifications" = { cpu = "0.5", memory = "512Mi", min_instances = 0, max_instances = 3,  image_tag = "latest", env_vars = {}, public = false }
     "geospatial"        = { cpu = "2", memory = "1Gi",   min_instances = 1, max_instances = 5,  image_tag = "latest", env_vars = {}, public = false }
     "dashboard"         = { cpu = "1", memory = "512Mi", min_instances = 1, max_instances = 3,  image_tag = "latest", env_vars = {}, public = true }
   }

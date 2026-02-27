@@ -32,7 +32,9 @@ public class MicroserviceClient
         ["P7"] = ("p7-familyhealth", new() { Id = "P7", Name = "Family Health", Description = "Child check-ins, vital signs, evidence chain", Icon = "favorite" }),
         ["P8"] = ("p8-disasterrelief", new() { Id = "P8", Name = "Disaster Relief", Description = "Resource matching, evacuation", Icon = "flood" }),
         ["P9"] = ("p9-doctorservices", new() { Id = "P9", Name = "Doctor Services", Description = "Doctor marketplace", Icon = "medical_services" }),
-        ["P10"] = ("p10-gamification", new() { Id = "P10", Name = "Gamification", Description = "Rewards, ML training, geo-challenges", Icon = "trophy" })
+        ["P10"] = ("p10-gamification", new() { Id = "P10", Name = "Gamification", Description = "Rewards, ML training, geo-challenges", Icon = "trophy" }),
+        ["P11"] = ("p11-surveillance", new() { Id = "P11", Name = "Surveillance", Description = "Camera registration, footage analysis, crime locations", Icon = "videocam" }),
+        ["P12"] = ("p12-notifications", new() { Id = "P12", Name = "Notifications", Description = "Push, SMS, email, broadcast alerts", Icon = "notifications" })
     };
 
     public MicroserviceClient(IHttpClientFactory httpClientFactory, IConfiguration config)
