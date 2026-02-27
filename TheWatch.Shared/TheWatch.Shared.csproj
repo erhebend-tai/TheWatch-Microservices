@@ -31,6 +31,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Certificate" />
     <!-- Item 229: API versioning -->
     <PackageReference Include="Asp.Versioning.Http" />
+    <!-- Item 361: Centralized SIEM — Seq sink for structured log forwarding -->
+    <PackageReference Include="Serilog.Sinks.Seq" />
     <!-- Item 244: Prometheus metrics export via OpenTelemetry -->
     <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />

@@ -25,6 +25,7 @@ public class AuditService
             EventType = eventType,
             UserId = userId,
             IpAddress = ctx.Connection.RemoteIpAddress?.ToString(),
+            SourcePort = ctx.Connection.RemotePort,
             UserAgent = ctx.Request.Headers.UserAgent.ToString(),
             DeviceFingerprint = ctx.Request.Headers["X-Device-Fingerprint"].FirstOrDefault(),
             IsSuccess = isSuccess,
@@ -34,8 +35,13 @@ public class AuditService
         _db.AuditEvents.Add(audit);
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Audit: {EventType} UserId={UserId} Success={IsSuccess} IP={IpAddress}",
-            eventType, userId, isSuccess, audit.IpAddress);
+        // STIG V-222441-449: log timestamp (UTC), user identity, source IP, source port,
+        // event type, success/failure, device fingerprint, and user agent string.
+        _logger.LogInformation(
+            "Audit [{Timestamp:u}] EventType={EventType} UserId={UserId} IP={IpAddress} Port={SourcePort} " +
+            "Success={IsSuccess} DeviceFingerprint={DeviceFingerprint} UserAgent={UserAgent} FailureReason={FailureReason}",
+            audit.Timestamp, eventType, userId, audit.IpAddress, audit.SourcePort,
+            isSuccess, audit.DeviceFingerprint, audit.UserAgent, failureReason);
     }
 
     public async Task<IReadOnlyList<AuditEvent>> GetRecentEventsAsync(int page = 1, int pageSize = 50)
