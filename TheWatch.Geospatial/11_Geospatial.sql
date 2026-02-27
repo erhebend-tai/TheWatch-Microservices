@@ -307,6 +307,58 @@ CREATE INDEX idx_poi_category ON geo_search.points_of_interest (category);
 CREATE INDEX idx_poi_emergency ON geo_search.points_of_interest (is_emergency_facility);
 CREATE INDEX idx_search_results_entity ON geo_search.spatial_search_results (entity_type, entity_id);
 
+-- ─── Schema: geo_intel ────────────────────────────────────────────────────────
+
+CREATE SCHEMA IF NOT EXISTS geo_intel;
+
+CREATE TABLE geo_intel.intel_entries (
+    id UUID PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    summary VARCHAR(500) NOT NULL,
+    source_type VARCHAR(500) NOT NULL,
+    source_url VARCHAR(2048) NOT NULL,
+    source_name VARCHAR(200) NOT NULL,
+    location GEOMETRY(Point, 4326) NOT NULL,
+    radius_meters DOUBLE PRECISION NOT NULL DEFAULT 0,
+    category VARCHAR(50) NOT NULL,
+    threat_level VARCHAR(50) NOT NULL,
+    confidence_score DOUBLE PRECISION NOT NULL DEFAULT 0,
+    tags JSONB NOT NULL DEFAULT '{}',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    published_at TIMESTAMPTZ NOT NULL,
+    ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ
+);
+
+CREATE TABLE geo_intel.intel_inferences (
+    id UUID PRIMARY KEY,
+    location GEOMETRY(Point, 4326) NOT NULL,
+    radius_meters DOUBLE PRECISION NOT NULL DEFAULT 0,
+    category VARCHAR(50) NOT NULL,
+    threat_level VARCHAR(50) NOT NULL,
+    summary VARCHAR(500) NOT NULL,
+    confidence_score DOUBLE PRECISION NOT NULL DEFAULT 0,
+    supporting_entry_count INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_intel_entries_location ON geo_intel.intel_entries USING GIST (location);
+CREATE INDEX idx_intel_entries_category ON geo_intel.intel_entries (category);
+CREATE INDEX idx_intel_entries_threat_level ON geo_intel.intel_entries (threat_level);
+CREATE INDEX idx_intel_entries_published ON geo_intel.intel_entries (published_at);
+CREATE INDEX idx_intel_entries_ingested ON geo_intel.intel_entries (ingested_at);
+CREATE INDEX idx_intel_entries_expires ON geo_intel.intel_entries (expires_at);
+CREATE INDEX idx_intel_entries_active ON geo_intel.intel_entries (is_active);
+
+CREATE INDEX idx_intel_inferences_location ON geo_intel.intel_inferences USING GIST (location);
+CREATE INDEX idx_intel_inferences_category ON geo_intel.intel_inferences (category);
+CREATE INDEX idx_intel_inferences_threat_level ON geo_intel.intel_inferences (threat_level);
+CREATE INDEX idx_intel_inferences_generated ON geo_intel.intel_inferences (generated_at);
+CREATE INDEX idx_intel_inferences_expires ON geo_intel.intel_inferences (expires_at);
+CREATE INDEX idx_intel_inferences_active ON geo_intel.intel_inferences (is_active);
+
 -- ─── Spatial Functions ────────────────────────────────────────────────────────
 
 -- 1. Find nearest N entities of a given type within radius
@@ -499,4 +551,49 @@ LANGUAGE SQL STABLE AS $$
       AND ST_DWithin(poi.location::geography, ST_MakePoint(p_lon, p_lat)::geography, p_max_radius)
     ORDER BY distance_meters
     LIMIT p_count;
+$$;
+
+-- 13. Query intel entries near a point — supports threat/category filtering
+CREATE OR REPLACE FUNCTION geo_intel.find_intel_near(
+    p_lon DOUBLE PRECISION, p_lat DOUBLE PRECISION,
+    p_radius_meters DOUBLE PRECISION DEFAULT 10000,
+    p_category VARCHAR DEFAULT NULL,
+    p_min_threat VARCHAR DEFAULT NULL,
+    p_count INTEGER DEFAULT 20
+)
+RETURNS TABLE(
+    entry_id UUID, title VARCHAR, category VARCHAR, threat_level VARCHAR,
+    confidence_score DOUBLE PRECISION, source_name VARCHAR, distance_meters DOUBLE PRECISION
+)
+LANGUAGE SQL STABLE AS $$
+    SELECT ie.id, ie.title, ie.category, ie.threat_level, ie.confidence_score, ie.source_name,
+           ST_Distance(ie.location::geography, ST_MakePoint(p_lon, p_lat)::geography) AS distance_meters
+    FROM geo_intel.intel_entries ie
+    WHERE ie.is_active = TRUE
+      AND (ie.expires_at IS NULL OR ie.expires_at > NOW())
+      AND (p_category IS NULL OR ie.category = p_category)
+      AND (p_min_threat IS NULL OR ie.threat_level >= p_min_threat)
+      AND ST_DWithin(ie.location::geography, ST_MakePoint(p_lon, p_lat)::geography, p_radius_meters)
+    ORDER BY ie.threat_level DESC, ie.confidence_score DESC, distance_meters
+    LIMIT p_count;
+$$;
+
+-- 14. Get active inferences near a point
+CREATE OR REPLACE FUNCTION geo_intel.find_inferences_near(
+    p_lon DOUBLE PRECISION, p_lat DOUBLE PRECISION,
+    p_radius_meters DOUBLE PRECISION DEFAULT 10000
+)
+RETURNS TABLE(
+    inference_id UUID, category VARCHAR, threat_level VARCHAR,
+    confidence_score DOUBLE PRECISION, summary VARCHAR,
+    supporting_entry_count INTEGER, generated_at TIMESTAMPTZ
+)
+LANGUAGE SQL STABLE AS $$
+    SELECT ii.id, ii.category, ii.threat_level, ii.confidence_score,
+           ii.summary, ii.supporting_entry_count, ii.generated_at
+    FROM geo_intel.intel_inferences ii
+    WHERE ii.is_active = TRUE
+      AND (ii.expires_at IS NULL OR ii.expires_at > NOW())
+      AND ST_DWithin(ii.location::geography, ST_MakePoint(p_lon, p_lat)::geography, p_radius_meters)
+    ORDER BY ii.threat_level DESC, ii.confidence_score DESC;
 $$;
