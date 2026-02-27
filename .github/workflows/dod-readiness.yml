@@ -33,6 +33,9 @@ on:
     # Weekly assessment — Monday at 07:00 UTC
     - cron: "0 7 * * 1"
 
+permissions:
+  contents: read
+
 concurrency:
   group: dod-readiness-${{ github.ref }}
   cancel-in-progress: true
