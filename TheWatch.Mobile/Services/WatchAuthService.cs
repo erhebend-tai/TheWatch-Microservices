@@ -173,6 +173,39 @@ public class WatchAuthService
         }
     }
 
+    public async Task<EulaDto?> GetCurrentEulaAsync(string baseUrl)
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            var response = await http.GetAsync($"{baseUrl}/api/eula/current");
+            if (!response.IsSuccessStatusCode) return null;
+            return await response.Content.ReadFromJsonAsync<EulaDto>();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<bool> AcceptEulaAsync(string baseUrl)
+    {
+        try
+        {
+            var token = await GetAccessTokenAsync();
+            if (token is null) return false;
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            http.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            var response = await http.PostAsync($"{baseUrl}/api/eula/accept", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public async Task LogoutAsync()
     {
         _accessToken = null;

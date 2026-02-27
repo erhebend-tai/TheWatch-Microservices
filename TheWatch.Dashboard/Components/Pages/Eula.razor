@@ -1,0 +1,78 @@
+@page "/eula"
+@inject IConfiguration Config
+@inject IHttpClientFactory HttpClientFactory
+
+<PageTitle>TheWatch — End User License Agreement</PageTitle>
+
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-mb-4">
+    <RadzenIcon Icon="gavel" style="font-size: 2rem; color: var(--rz-primary);" />
+    <RadzenText TextStyle="TextStyle.H4" class="rz-mb-0">End User License Agreement</RadzenText>
+</RadzenStack>
+
+@if (_loading)
+{
+    <RadzenStack AlignItems="AlignItems.Center" class="rz-p-6">
+        <RadzenProgressBarCircular ShowValue="false" Size="ProgressBarCircularSize.Large" />
+        <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6; margin-top: 0.5rem;">Loading…</RadzenText>
+    </RadzenStack>
+}
+else if (_eula is null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false" class="rz-mb-4">
+        Unable to load the current EULA. Please try again later.
+    </RadzenAlert>
+}
+else
+{
+    <RadzenRow Gap="1rem" class="rz-mb-4">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-3">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="verified" style="color: var(--rz-success);" />
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-0">
+                        <strong>Version:</strong> @_eula.Version
+                    </RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-3">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="event" style="color: var(--rz-info);" />
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-0">
+                        <strong>Published:</strong> @_eula.PublishedAt.ToString("MMMM d, yyyy")
+                    </RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenCard class="rz-p-4">
+        <pre style="white-space: pre-wrap; word-wrap: break-word; font-family: inherit;
+                    font-size: 0.875rem; line-height: 1.7; color: var(--rz-text-color);">@_eula.Content</pre>
+    </RadzenCard>
+}
+
+@code {
+    private EulaVersionDto? _eula;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var p5Url = Config["Services:P5:Url"] ?? "http://localhost:5005";
+            var client = HttpClientFactory.CreateClient("microservices");
+            var response = await client.GetAsync($"{p5Url}/api/eula/current");
+            if (response.IsSuccessStatusCode)
+                _eula = await response.Content.ReadFromJsonAsync<EulaVersionDto>();
+        }
+        catch
+        {
+            // Silently fail — show warning in UI
+        }
+        _loading = false;
+    }
+
+    private record EulaVersionDto(Guid Id, string Version, string Content, DateTime PublishedAt, bool IsCurrent);
+}

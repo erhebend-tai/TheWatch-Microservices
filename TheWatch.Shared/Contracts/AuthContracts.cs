@@ -44,3 +44,10 @@ public record ResetPasswordRequest(
     [property: Required, EmailAddress, MaxLength(256)] string Email,
     [property: Required] string Token,
     [property: Required, MinLength(8), MaxLength(128)] string NewPassword);
+
+public record EulaDto(
+    Guid Id,
+    string Version,
+    string Content,
+    DateTime PublishedAt,
+    bool IsCurrent);

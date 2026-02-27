@@ -1,0 +1,183 @@
+@page "/eula"
+@attribute [Authorize(Roles = "Admin")]
+@inject AdminApiClient ApiClient
+@inject NotificationService Notification
+
+<PageTitle>TheWatch Admin — EULA Management</PageTitle>
+
+<!-- Header -->
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center"
+             JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
+        <RadzenIcon Icon="gavel" style="font-size: 2rem; color: var(--rz-primary);" />
+        <RadzenText TextStyle="TextStyle.H4" class="rz-mb-0">EULA Management</RadzenText>
+    </RadzenStack>
+    <RadzenButton Text="Publish New Version" Icon="publish" ButtonStyle="ButtonStyle.Primary"
+                  Click="@OpenPublishPanel" Disabled="@_publishing" />
+</RadzenStack>
+
+<!-- Current Version Card -->
+@if (_loading)
+{
+    <RadzenStack AlignItems="AlignItems.Center" class="rz-p-6">
+        <RadzenProgressBarCircular ShowValue="false" Size="ProgressBarCircularSize.Large" />
+        <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6; margin-top: 0.5rem;">Loading…</RadzenText>
+    </RadzenStack>
+}
+else if (_currentEula is null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false" class="rz-mb-4">
+        No EULA version found. Use "Publish New Version" to create the first version.
+    </RadzenAlert>
+}
+else
+{
+    <RadzenRow Gap="1rem" class="rz-mb-4">
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard class="rz-p-4" Style="text-align: center; border-left: 3px solid var(--rz-success);">
+                <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                    <RadzenIcon Icon="verified" style="font-size: 1.5rem; color: var(--rz-success);" />
+                    <RadzenText TextStyle="TextStyle.H3" class="rz-mb-0" style="color: var(--rz-success);">
+                        @_currentEula.Version
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6;">Current Version</RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard class="rz-p-4" Style="text-align: center; border-left: 3px solid var(--rz-info);">
+                <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                    <RadzenIcon Icon="event" style="font-size: 1.5rem; color: var(--rz-info);" />
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0" style="color: var(--rz-info);">
+                        @_currentEula.PublishedAt.ToString("MMM d, yyyy")
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6;">Published Date</RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard class="rz-p-4" Style="text-align: center; border-left: 3px solid var(--rz-primary);">
+                <RadzenStack AlignItems="AlignItems.Center" Gap="0.25rem">
+                    <RadzenIcon Icon="article" style="font-size: 1.5rem; color: var(--rz-primary);" />
+                    <RadzenText TextStyle="TextStyle.H3" class="rz-mb-0" style="color: var(--rz-primary);">
+                        @_currentEula.Content.Length.ToString("N0")
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" style="opacity: 0.6;">Characters</RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">Current EULA Text</RadzenText>
+    <RadzenCard class="rz-p-4 rz-mb-4">
+        <pre style="white-space: pre-wrap; word-wrap: break-word; font-family: inherit;
+                    font-size: 0.875rem; line-height: 1.7; color: var(--rz-text-color);
+                    max-height: 500px; overflow-y: auto;">@_currentEula.Content</pre>
+    </RadzenCard>
+}
+
+<!-- Publish New Version Panel -->
+@if (_showPublishPanel)
+{
+    <RadzenCard class="rz-p-4" Style="border: 2px solid var(--rz-primary);">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-mb-3">
+            <RadzenIcon Icon="publish" style="color: var(--rz-primary);" />
+            <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">Publish New EULA Version</RadzenText>
+        </RadzenStack>
+
+        <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false" class="rz-mb-3">
+            Publishing a new version will replace the current EULA. All users will be required to
+            accept the new version before accessing the application.
+        </RadzenAlert>
+
+        <RadzenStack Gap="1rem">
+            <RadzenFormField Text="Version Number (e.g. 1.1.0)" Style="width: 100%; max-width: 300px;">
+                <RadzenTextBox @bind-Value="_newVersion" Placeholder="1.1.0" />
+            </RadzenFormField>
+
+            <RadzenFormField Text="EULA Content" Style="width: 100%;">
+                <RadzenTextArea @bind-Value="_newContent" Rows="20"
+                                Placeholder="Enter the full EULA text..." Style="width: 100%; font-family: monospace;" />
+            </RadzenFormField>
+
+            @if (!string.IsNullOrEmpty(_publishError))
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">@_publishError</RadzenAlert>
+            }
+
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem" JustifyContent="JustifyContent.End">
+                <RadzenButton Text="Cancel" Icon="close" ButtonStyle="ButtonStyle.Light"
+                              Click="@CancelPublish" Disabled="@_publishing" />
+                <RadzenButton Text="Publish" Icon="publish" ButtonStyle="ButtonStyle.Danger"
+                              Click="@PublishNewVersion" IsBusy="@_publishing" />
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
+}
+
+@code {
+    private EulaVersionDto? _currentEula;
+    private bool _loading = true;
+    private bool _showPublishPanel;
+    private bool _publishing;
+    private string _newVersion = string.Empty;
+    private string _newContent = string.Empty;
+    private string? _publishError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCurrentEula();
+    }
+
+    private async Task LoadCurrentEula()
+    {
+        _loading = true;
+        _currentEula = await ApiClient.GetCurrentEulaAsync();
+        _loading = false;
+    }
+
+    private void OpenPublishPanel()
+    {
+        _newVersion = string.Empty;
+        _newContent = _currentEula?.Content ?? string.Empty;
+        _publishError = null;
+        _showPublishPanel = true;
+    }
+
+    private void CancelPublish()
+    {
+        _showPublishPanel = false;
+        _publishError = null;
+    }
+
+    private async Task PublishNewVersion()
+    {
+        if (string.IsNullOrWhiteSpace(_newVersion))
+        {
+            _publishError = "Version number is required.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_newContent))
+        {
+            _publishError = "EULA content cannot be empty.";
+            return;
+        }
+
+        _publishing = true;
+        _publishError = null;
+
+        try
+        {
+            _currentEula = await ApiClient.PublishEulaVersionAsync(_newVersion, _newContent);
+            _showPublishPanel = false;
+            Notification.Notify(NotificationSeverity.Success, "EULA Published",
+                $"Version {_currentEula.Version} is now the active EULA.");
+        }
+        catch (Exception ex)
+        {
+            _publishError = $"Failed to publish: {ex.Message}";
+        }
+
+        _publishing = false;
+    }
+}
