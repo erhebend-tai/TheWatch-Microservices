@@ -482,7 +482,7 @@
 - [ ] 231. Add ETag/If-None-Match conditional response support for GET endpoints
 
 ### 17C. Mobile Production Readiness
-- [ ] 232. Implement `SyncEngine.SendAsync()` — currently throws `NotImplementedException` (TheWatch.Mobile/Services/SyncEngine.cs:401)
+- [x] 232. Implement `SyncEngine.SendAsync()` — already implemented with full HTTP method dispatch and retry logic
 - [ ] 233. Bundle ONNX model for content moderation (ContentModerationService currently has framework but no model file in Resources/Raw/)
 - [ ] 234. Add app crash reporting integration (Sentry or AppCenter) with breadcrumb logging
 - [ ] 235. Add app update check flow — compare installed version against server minimum version, force update if below
@@ -490,7 +490,7 @@
 - [ ] 237. Add accessibility: screen reader labels on all interactive elements, high contrast mode, dynamic font scaling
 
 ### 17D. Security Hardening
-- [ ] 238. Add security headers middleware to all services: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security`, `Content-Security-Policy`, `Referrer-Policy`
+- [x] 238. Add security headers middleware to all services: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security`, `Content-Security-Policy`, `Referrer-Policy`
 - [ ] 239. Implement request signing for evidence uploads (prevent replay attacks on chain-of-custody)
 - [ ] 240. Add JWT key rotation mechanism — support multiple valid signing keys during rotation window
 - [ ] 241. Pen test preparation: run OWASP ZAP against all service endpoints, fix findings
@@ -513,11 +513,11 @@
 > No end-to-end tests exist that exercise the full incident lifecycle across services. These items build confidence that the system works as a whole.
 
 ### 18A. End-to-End Test Infrastructure
-- [ ] 251. Create `TheWatch.Integration.Tests` project with docker-compose test harness (spin up all services + infra, run tests, tear down)
-- [ ] 252. Implement test fixture: register user via P5, login, get JWT, use token for all subsequent calls
-- [ ] 253. Implement test: full SOS lifecycle — create incident (P2) → dispatch responder (P2/P6) → submit evidence (P2) → resolve incident → generate SITREP report
-- [ ] 254. Implement test: family health flow — create family (P7) → add members → submit vital readings → trigger medical alert → doctor appointment (P9)
-- [ ] 255. Implement test: disaster relief flow — declare disaster (P8) → open shelters → allocate resources → activate mesh network (P3) → track evacuees
+- [x] 251. Create `TheWatch.Integration.Tests` project with docker-compose test harness (spin up all services + infra, run tests, tear down)
+- [x] 252. Implement test fixture: register user via P5, login, get JWT, use token for all subsequent calls
+- [x] 253. Implement test: full SOS lifecycle — create incident (P2) → dispatch responder (P2/P6) → submit evidence (P2) → resolve incident → generate SITREP report
+- [x] 254. Implement test: family health flow — create family (P7) → add members → submit vital readings → trigger medical alert → doctor appointment (P9)
+- [x] 255. Implement test: disaster relief flow — declare disaster (P8) → open shelters → allocate resources → activate mesh network (P3) → track evacuees
 
 ### 18B. Load & Stress Testing
 - [ ] 256. Create k6 or NBomber load test scripts for P2 incident creation (target: 1,000 concurrent SOS activations)
