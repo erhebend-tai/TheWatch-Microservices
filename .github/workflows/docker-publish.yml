@@ -37,20 +37,20 @@ jobs:
       fail-fast: false
       matrix:
         service:
-          - { name: p1-coregateway,     dockerfile: TheWatch.P1.CoreGateway/Dockerfile }
-          - { name: p2-voiceemergency,  dockerfile: TheWatch.P2.VoiceEmergency/Dockerfile }
-          - { name: p3-meshnetwork,     dockerfile: TheWatch.P3.MeshNetwork/Dockerfile }
-          - { name: p4-wearable,        dockerfile: TheWatch.P4.Wearable/Dockerfile }
-          - { name: p5-authsecurity,    dockerfile: TheWatch.P5.AuthSecurity/Dockerfile }
-          - { name: p6-firstresponder,  dockerfile: TheWatch.P6.FirstResponder/Dockerfile }
-          - { name: p7-familyhealth,    dockerfile: TheWatch.P7.FamilyHealth/Dockerfile }
-          - { name: p8-disasterrelief,  dockerfile: TheWatch.P8.DisasterRelief/Dockerfile }
-          - { name: p9-doctorservices,  dockerfile: TheWatch.P9.DoctorServices/Dockerfile }
-          - { name: p10-gamification,   dockerfile: TheWatch.P10.Gamification/Dockerfile }
-          - { name: p11-surveillance,   dockerfile: TheWatch.P11.Surveillance/Dockerfile }
-          - { name: p12-notifications,   dockerfile: TheWatch.P12.Notifications/Dockerfile }
-          - { name: geospatial,         dockerfile: TheWatch.Geospatial/Dockerfile }
-          - { name: dashboard,          dockerfile: TheWatch.Dashboard/Dockerfile }
+          - { name: p1-coregateway,     dockerfile: src/services/TheWatch.P1.CoreGateway/Dockerfile }
+          - { name: p2-voiceemergency,  dockerfile: src/services/TheWatch.P2.VoiceEmergency/Dockerfile }
+          - { name: p3-meshnetwork,     dockerfile: src/services/TheWatch.P3.MeshNetwork/Dockerfile }
+          - { name: p4-wearable,        dockerfile: src/services/TheWatch.P4.Wearable/Dockerfile }
+          - { name: p5-authsecurity,    dockerfile: src/services/TheWatch.P5.AuthSecurity/Dockerfile }
+          - { name: p6-firstresponder,  dockerfile: src/services/TheWatch.P6.FirstResponder/Dockerfile }
+          - { name: p7-familyhealth,    dockerfile: src/services/TheWatch.P7.FamilyHealth/Dockerfile }
+          - { name: p8-disasterrelief,  dockerfile: src/services/TheWatch.P8.DisasterRelief/Dockerfile }
+          - { name: p9-doctorservices,  dockerfile: src/services/TheWatch.P9.DoctorServices/Dockerfile }
+          - { name: p10-gamification,   dockerfile: src/services/TheWatch.P10.Gamification/Dockerfile }
+          - { name: p11-surveillance,   dockerfile: src/services/TheWatch.P11.Surveillance/Dockerfile }
+          - { name: p12-notifications,   dockerfile: src/services/TheWatch.P12.Notifications/Dockerfile }
+          - { name: geospatial,         dockerfile: src/services/TheWatch.Geospatial/Dockerfile }
+          - { name: dashboard,          dockerfile: src/clients/TheWatch.Dashboard/Dockerfile }
 
     steps:
       - uses: actions/checkout@v4

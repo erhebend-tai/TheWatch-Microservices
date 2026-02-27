@@ -1,0 +1,44 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
+WORKDIR /repo
+
+# Copy solution and project files for restore
+COPY *.sln Directory.* nuget.config ./
+COPY tests/TheWatch.Integration.Tests/TheWatch.Integration.Tests.csproj tests/TheWatch.Integration.Tests/
+COPY src/contracts/TheWatch.Contracts.Abstractions/TheWatch.Contracts.Abstractions.csproj src/contracts/TheWatch.Contracts.Abstractions/
+COPY src/contracts/TheWatch.Contracts.AuthSecurity/TheWatch.Contracts.AuthSecurity.csproj src/contracts/TheWatch.Contracts.AuthSecurity/
+COPY src/contracts/TheWatch.Contracts.VoiceEmergency/TheWatch.Contracts.VoiceEmergency.csproj src/contracts/TheWatch.Contracts.VoiceEmergency/
+COPY src/contracts/TheWatch.Contracts.FirstResponder/TheWatch.Contracts.FirstResponder.csproj src/contracts/TheWatch.Contracts.FirstResponder/
+COPY src/contracts/TheWatch.Contracts.FamilyHealth/TheWatch.Contracts.FamilyHealth.csproj src/contracts/TheWatch.Contracts.FamilyHealth/
+COPY src/contracts/TheWatch.Contracts.DoctorServices/TheWatch.Contracts.DoctorServices.csproj src/contracts/TheWatch.Contracts.DoctorServices/
+COPY src/contracts/TheWatch.Contracts.DisasterRelief/TheWatch.Contracts.DisasterRelief.csproj src/contracts/TheWatch.Contracts.DisasterRelief/
+COPY src/contracts/TheWatch.Contracts.MeshNetwork/TheWatch.Contracts.MeshNetwork.csproj src/contracts/TheWatch.Contracts.MeshNetwork/
+COPY src/contracts/TheWatch.Contracts.Surveillance/TheWatch.Contracts.Surveillance.csproj src/contracts/TheWatch.Contracts.Surveillance/
+COPY src/contracts/TheWatch.Contracts.Geospatial/TheWatch.Contracts.Geospatial.csproj src/contracts/TheWatch.Contracts.Geospatial/
+COPY src/shared/TheWatch.Shared/TheWatch.Shared.csproj src/shared/TheWatch.Shared/
+COPY src/shared/TheWatch.Generators/TheWatch.Generators.csproj src/shared/TheWatch.Generators/
+
+RUN dotnet restore tests/TheWatch.Integration.Tests/TheWatch.Integration.Tests.csproj
+
+# Copy source and build
+COPY tests/TheWatch.Integration.Tests/ tests/TheWatch.Integration.Tests/
+COPY src/contracts/TheWatch.Contracts.Abstractions/ src/contracts/TheWatch.Contracts.Abstractions/
+COPY src/contracts/TheWatch.Contracts.AuthSecurity/ src/contracts/TheWatch.Contracts.AuthSecurity/
+COPY src/contracts/TheWatch.Contracts.VoiceEmergency/ src/contracts/TheWatch.Contracts.VoiceEmergency/
+COPY src/contracts/TheWatch.Contracts.FirstResponder/ src/contracts/TheWatch.Contracts.FirstResponder/
+COPY src/contracts/TheWatch.Contracts.FamilyHealth/ src/contracts/TheWatch.Contracts.FamilyHealth/
+COPY src/contracts/TheWatch.Contracts.DoctorServices/ src/contracts/TheWatch.Contracts.DoctorServices/
+COPY src/contracts/TheWatch.Contracts.DisasterRelief/ src/contracts/TheWatch.Contracts.DisasterRelief/
+COPY src/contracts/TheWatch.Contracts.MeshNetwork/ src/contracts/TheWatch.Contracts.MeshNetwork/
+COPY src/contracts/TheWatch.Contracts.Surveillance/ src/contracts/TheWatch.Contracts.Surveillance/
+COPY src/contracts/TheWatch.Contracts.Geospatial/ src/contracts/TheWatch.Contracts.Geospatial/
+COPY src/shared/TheWatch.Shared/ src/shared/TheWatch.Shared/
+COPY src/shared/TheWatch.Generators/ src/shared/TheWatch.Generators/
+COPY meta/_mapping.json meta/
+
+RUN dotnet build tests/TheWatch.Integration.Tests/TheWatch.Integration.Tests.csproj -c Release --no-restore
+
+ENTRYPOINT ["dotnet", "test", "tests/TheWatch.Integration.Tests/TheWatch.Integration.Tests.csproj", \
+    "--configuration", "Release", "--no-build", \
+    "--filter", "Category=Integration", \
+    "--logger", "trx;LogFileName=integration-results.trx", \
+    "--verbosity", "normal"]

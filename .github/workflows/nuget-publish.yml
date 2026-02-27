@@ -65,25 +65,25 @@ jobs:
         run: |
           PACK_ARGS="-c Release --no-restore -o ./nupkgs ${{ steps.version.outputs.version_args }}"
           PACKABLE_PROJECTS=(
-            "TheWatch.Contracts.Abstractions"
-            "TheWatch.Contracts.CoreGateway"
-            "TheWatch.Contracts.VoiceEmergency"
-            "TheWatch.Contracts.MeshNetwork"
-            "TheWatch.Contracts.Wearable"
-            "TheWatch.Contracts.AuthSecurity"
-            "TheWatch.Contracts.FirstResponder"
-            "TheWatch.Contracts.FamilyHealth"
-            "TheWatch.Contracts.DisasterRelief"
-            "TheWatch.Contracts.DoctorServices"
-            "TheWatch.Contracts.Gamification"
-            "TheWatch.Contracts.Geospatial"
-            "TheWatch.Contracts.Surveillance"
-            "TheWatch.Shared"
-            "TheWatch.Generators"
+            "src/contracts/TheWatch.Contracts.Abstractions"
+            "src/contracts/TheWatch.Contracts.CoreGateway"
+            "src/contracts/TheWatch.Contracts.VoiceEmergency"
+            "src/contracts/TheWatch.Contracts.MeshNetwork"
+            "src/contracts/TheWatch.Contracts.Wearable"
+            "src/contracts/TheWatch.Contracts.AuthSecurity"
+            "src/contracts/TheWatch.Contracts.FirstResponder"
+            "src/contracts/TheWatch.Contracts.FamilyHealth"
+            "src/contracts/TheWatch.Contracts.DisasterRelief"
+            "src/contracts/TheWatch.Contracts.DoctorServices"
+            "src/contracts/TheWatch.Contracts.Gamification"
+            "src/contracts/TheWatch.Contracts.Geospatial"
+            "src/contracts/TheWatch.Contracts.Surveillance"
+            "src/shared/TheWatch.Shared"
+            "src/shared/TheWatch.Generators"
           )
           for project in "${PACKABLE_PROJECTS[@]}"; do
             echo "::group::Packing $project"
-            dotnet pack "$project/$project.csproj" $PACK_ARGS
+            dotnet pack "$project/${project##*/}.csproj" $PACK_ARGS
             echo "::endgroup::"
           done
 

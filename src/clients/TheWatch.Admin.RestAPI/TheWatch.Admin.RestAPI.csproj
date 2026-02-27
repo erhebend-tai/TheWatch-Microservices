@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>TheWatch.Admin.RestAPI</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\aspire\TheWatch.Aspire.ServiceDefaults\TheWatch.Aspire.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.Abstractions\TheWatch.Contracts.Abstractions.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.CoreGateway\TheWatch.Contracts.CoreGateway.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.VoiceEmergency\TheWatch.Contracts.VoiceEmergency.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.MeshNetwork\TheWatch.Contracts.MeshNetwork.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.Wearable\TheWatch.Contracts.Wearable.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.AuthSecurity\TheWatch.Contracts.AuthSecurity.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.FirstResponder\TheWatch.Contracts.FirstResponder.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.FamilyHealth\TheWatch.Contracts.FamilyHealth.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.DisasterRelief\TheWatch.Contracts.DisasterRelief.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.DoctorServices\TheWatch.Contracts.DoctorServices.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.Gamification\TheWatch.Contracts.Gamification.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.Geospatial\TheWatch.Contracts.Geospatial.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.Surveillance\TheWatch.Contracts.Surveillance.csproj" />
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.Notifications\TheWatch.Contracts.Notifications.csproj" />
+  </ItemGroup>
+
+</Project>

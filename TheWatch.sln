@@ -5,107 +5,107 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{5A6FC541-A142-412D-BE81-5692CD462AFD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Shared", "TheWatch.Shared\TheWatch.Shared.csproj", "{9FC11F6E-6435-4159-A5D7-70A485F0AD02}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Shared", "src\shared\TheWatch.Shared\TheWatch.Shared.csproj", "{9FC11F6E-6435-4159-A5D7-70A485F0AD02}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Generators", "TheWatch.Generators\TheWatch.Generators.csproj", "{0EAAFF26-5F2A-4643-B066-030516C5989C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Generators", "src\shared\TheWatch.Generators\TheWatch.Generators.csproj", "{0EAAFF26-5F2A-4643-B066-030516C5989C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P1.CoreGateway", "TheWatch.P1.CoreGateway\TheWatch.P1.CoreGateway.csproj", "{F09CF144-7F47-4C5B-8DA8-14D705B8A4AB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P1.CoreGateway", "src\services\TheWatch.P1.CoreGateway\TheWatch.P1.CoreGateway.csproj", "{F09CF144-7F47-4C5B-8DA8-14D705B8A4AB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P2.VoiceEmergency", "TheWatch.P2.VoiceEmergency\TheWatch.P2.VoiceEmergency.csproj", "{23192420-28B9-4266-B620-203E3DA13447}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P2.VoiceEmergency", "src\services\TheWatch.P2.VoiceEmergency\TheWatch.P2.VoiceEmergency.csproj", "{23192420-28B9-4266-B620-203E3DA13447}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P3.MeshNetwork", "TheWatch.P3.MeshNetwork\TheWatch.P3.MeshNetwork.csproj", "{BB3E4444-FF3B-4B25-AC36-857E7D42834B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P3.MeshNetwork", "src\services\TheWatch.P3.MeshNetwork\TheWatch.P3.MeshNetwork.csproj", "{BB3E4444-FF3B-4B25-AC36-857E7D42834B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P4.Wearable", "TheWatch.P4.Wearable\TheWatch.P4.Wearable.csproj", "{AC2897C0-69E2-428B-B14D-293C5C91443D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P4.Wearable", "src\services\TheWatch.P4.Wearable\TheWatch.P4.Wearable.csproj", "{AC2897C0-69E2-428B-B14D-293C5C91443D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P5.AuthSecurity", "TheWatch.P5.AuthSecurity\TheWatch.P5.AuthSecurity.csproj", "{1A5DFEF0-4AE3-405B-A1B2-B78BD6A74E00}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P5.AuthSecurity", "src\services\TheWatch.P5.AuthSecurity\TheWatch.P5.AuthSecurity.csproj", "{1A5DFEF0-4AE3-405B-A1B2-B78BD6A74E00}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P6.FirstResponder", "TheWatch.P6.FirstResponder\TheWatch.P6.FirstResponder.csproj", "{1EE3A3FA-0D84-4A6D-8F9A-D3A0060B09BF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P6.FirstResponder", "src\services\TheWatch.P6.FirstResponder\TheWatch.P6.FirstResponder.csproj", "{1EE3A3FA-0D84-4A6D-8F9A-D3A0060B09BF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P7.FamilyHealth", "TheWatch.P7.FamilyHealth\TheWatch.P7.FamilyHealth.csproj", "{39B9EF9D-E635-4744-852E-8F077DA3525D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P7.FamilyHealth", "src\services\TheWatch.P7.FamilyHealth\TheWatch.P7.FamilyHealth.csproj", "{39B9EF9D-E635-4744-852E-8F077DA3525D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P8.DisasterRelief", "TheWatch.P8.DisasterRelief\TheWatch.P8.DisasterRelief.csproj", "{27675D80-D6A7-4D89-98FA-D660DBCE81EB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P8.DisasterRelief", "src\services\TheWatch.P8.DisasterRelief\TheWatch.P8.DisasterRelief.csproj", "{27675D80-D6A7-4D89-98FA-D660DBCE81EB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P9.DoctorServices", "TheWatch.P9.DoctorServices\TheWatch.P9.DoctorServices.csproj", "{C079E84B-7AED-4F61-8993-4186549645C3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P9.DoctorServices", "src\services\TheWatch.P9.DoctorServices\TheWatch.P9.DoctorServices.csproj", "{C079E84B-7AED-4F61-8993-4186549645C3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P10.Gamification", "TheWatch.P10.Gamification\TheWatch.P10.Gamification.csproj", "{70F37644-1830-4E3A-80FA-99E4CB71CF14}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P10.Gamification", "src\services\TheWatch.P10.Gamification\TheWatch.P10.Gamification.csproj", "{70F37644-1830-4E3A-80FA-99E4CB71CF14}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Aspire.AppHost", "TheWatch.Aspire.AppHost\TheWatch.Aspire.AppHost.csproj", "{3585EC5E-2207-4BD6-A20F-3B0983B7EB4A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Aspire.AppHost", "src\aspire\TheWatch.Aspire.AppHost\TheWatch.Aspire.AppHost.csproj", "{3585EC5E-2207-4BD6-A20F-3B0983B7EB4A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Aspire.ServiceDefaults", "TheWatch.Aspire.ServiceDefaults\TheWatch.Aspire.ServiceDefaults.csproj", "{C4CFF86A-BBF5-463A-B83A-7A3ECEDF1734}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Aspire.ServiceDefaults", "src\aspire\TheWatch.Aspire.ServiceDefaults\TheWatch.Aspire.ServiceDefaults.csproj", "{C4CFF86A-BBF5-463A-B83A-7A3ECEDF1734}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P1.CoreGateway.Tests", "TheWatch.P1.CoreGateway.Tests\TheWatch.P1.CoreGateway.Tests.csproj", "{B234ADD8-B8CD-4649-894D-DC48E2A47739}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P1.CoreGateway.Tests", "tests\TheWatch.P1.CoreGateway.Tests\TheWatch.P1.CoreGateway.Tests.csproj", "{B234ADD8-B8CD-4649-894D-DC48E2A47739}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P2.VoiceEmergency.Tests", "TheWatch.P2.VoiceEmergency.Tests\TheWatch.P2.VoiceEmergency.Tests.csproj", "{60D3FF03-5754-40A7-AC08-5429DC26109F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P2.VoiceEmergency.Tests", "tests\TheWatch.P2.VoiceEmergency.Tests\TheWatch.P2.VoiceEmergency.Tests.csproj", "{60D3FF03-5754-40A7-AC08-5429DC26109F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P3.MeshNetwork.Tests", "TheWatch.P3.MeshNetwork.Tests\TheWatch.P3.MeshNetwork.Tests.csproj", "{5CE7F504-2F6B-47DC-A600-466F9F0D398B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P3.MeshNetwork.Tests", "tests\TheWatch.P3.MeshNetwork.Tests\TheWatch.P3.MeshNetwork.Tests.csproj", "{5CE7F504-2F6B-47DC-A600-466F9F0D398B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P4.Wearable.Tests", "TheWatch.P4.Wearable.Tests\TheWatch.P4.Wearable.Tests.csproj", "{C07A8C15-8981-41A3-8508-5F44F44FBEB4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P4.Wearable.Tests", "tests\TheWatch.P4.Wearable.Tests\TheWatch.P4.Wearable.Tests.csproj", "{C07A8C15-8981-41A3-8508-5F44F44FBEB4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P5.AuthSecurity.Tests", "TheWatch.P5.AuthSecurity.Tests\TheWatch.P5.AuthSecurity.Tests.csproj", "{E6BA4609-3167-49CE-9EFD-71E2BB5C341B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P5.AuthSecurity.Tests", "tests\TheWatch.P5.AuthSecurity.Tests\TheWatch.P5.AuthSecurity.Tests.csproj", "{E6BA4609-3167-49CE-9EFD-71E2BB5C341B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P6.FirstResponder.Tests", "TheWatch.P6.FirstResponder.Tests\TheWatch.P6.FirstResponder.Tests.csproj", "{10747341-7D94-4EA9-B0C5-74A81B302B88}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P6.FirstResponder.Tests", "tests\TheWatch.P6.FirstResponder.Tests\TheWatch.P6.FirstResponder.Tests.csproj", "{10747341-7D94-4EA9-B0C5-74A81B302B88}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P7.FamilyHealth.Tests", "TheWatch.P7.FamilyHealth.Tests\TheWatch.P7.FamilyHealth.Tests.csproj", "{2D890373-2362-46F6-B54B-8330F9E9E16F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P7.FamilyHealth.Tests", "tests\TheWatch.P7.FamilyHealth.Tests\TheWatch.P7.FamilyHealth.Tests.csproj", "{2D890373-2362-46F6-B54B-8330F9E9E16F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P8.DisasterRelief.Tests", "TheWatch.P8.DisasterRelief.Tests\TheWatch.P8.DisasterRelief.Tests.csproj", "{36DB9B39-7342-4930-AD44-5804DA2DBCB1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P8.DisasterRelief.Tests", "tests\TheWatch.P8.DisasterRelief.Tests\TheWatch.P8.DisasterRelief.Tests.csproj", "{36DB9B39-7342-4930-AD44-5804DA2DBCB1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P9.DoctorServices.Tests", "TheWatch.P9.DoctorServices.Tests\TheWatch.P9.DoctorServices.Tests.csproj", "{87DF5A57-F51D-4E7C-AF1B-68DA6FCD0DBB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P9.DoctorServices.Tests", "tests\TheWatch.P9.DoctorServices.Tests\TheWatch.P9.DoctorServices.Tests.csproj", "{87DF5A57-F51D-4E7C-AF1B-68DA6FCD0DBB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P10.Gamification.Tests", "TheWatch.P10.Gamification.Tests\TheWatch.P10.Gamification.Tests.csproj", "{BB7BF08D-8838-42BD-835B-1B35989AE932}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P10.Gamification.Tests", "tests\TheWatch.P10.Gamification.Tests\TheWatch.P10.Gamification.Tests.csproj", "{BB7BF08D-8838-42BD-835B-1B35989AE932}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Dashboard", "TheWatch.Dashboard\TheWatch.Dashboard.csproj", "{3EB3CDBB-B3FB-475A-885E-BD87B56229C6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Dashboard", "src\clients\TheWatch.Dashboard\TheWatch.Dashboard.csproj", "{3EB3CDBB-B3FB-475A-885E-BD87B56229C6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Mobile", "TheWatch.Mobile\TheWatch.Mobile.csproj", "{2F7BD415-9915-4726-B1DE-5BB9314B88FA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Mobile", "src\clients\TheWatch.Mobile\TheWatch.Mobile.csproj", "{2F7BD415-9915-4726-B1DE-5BB9314B88FA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Mobile.Tests", "TheWatch.Mobile.Tests\TheWatch.Mobile.Tests.csproj", "{267FEAE7-6FE5-4852-A184-DE5A74053E40}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Mobile.Tests", "tests\TheWatch.Mobile.Tests\TheWatch.Mobile.Tests.csproj", "{267FEAE7-6FE5-4852-A184-DE5A74053E40}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Geospatial", "TheWatch.Geospatial\TheWatch.Geospatial.csproj", "{8FCFC787-5704-4978-801D-9875E1A79D6C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Geospatial", "src\services\TheWatch.Geospatial\TheWatch.Geospatial.csproj", "{8FCFC787-5704-4978-801D-9875E1A79D6C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Geospatial.Tests", "TheWatch.Geospatial.Tests\TheWatch.Geospatial.Tests.csproj", "{2438A61B-9D39-45EC-B45A-6B750442A743}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Geospatial.Tests", "tests\TheWatch.Geospatial.Tests\TheWatch.Geospatial.Tests.csproj", "{2438A61B-9D39-45EC-B45A-6B750442A743}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Admin", "TheWatch.Admin\TheWatch.Admin.csproj", "{96E204F7-F84A-4101-9D53-1B7747CE9AB3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Admin", "src\clients\TheWatch.Admin\TheWatch.Admin.csproj", "{96E204F7-F84A-4101-9D53-1B7747CE9AB3}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "contracts", "contracts", "{A73F2606-6D4C-3EEE-1759-0E59DCFEF523}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.Abstractions", "TheWatch.Contracts.Abstractions\TheWatch.Contracts.Abstractions.csproj", "{FEE2AE5B-ED03-4C82-AACA-565DB2810F28}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.Abstractions", "src\contracts\TheWatch.Contracts.Abstractions\TheWatch.Contracts.Abstractions.csproj", "{FEE2AE5B-ED03-4C82-AACA-565DB2810F28}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.CoreGateway", "TheWatch.Contracts.CoreGateway\TheWatch.Contracts.CoreGateway.csproj", "{0EB37F6B-387F-4FFD-BD8F-E35172D27CA2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.CoreGateway", "src\contracts\TheWatch.Contracts.CoreGateway\TheWatch.Contracts.CoreGateway.csproj", "{0EB37F6B-387F-4FFD-BD8F-E35172D27CA2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.VoiceEmergency", "TheWatch.Contracts.VoiceEmergency\TheWatch.Contracts.VoiceEmergency.csproj", "{E2E158E9-F00A-4B85-AADA-A7D22A7FA4A9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.VoiceEmergency", "src\contracts\TheWatch.Contracts.VoiceEmergency\TheWatch.Contracts.VoiceEmergency.csproj", "{E2E158E9-F00A-4B85-AADA-A7D22A7FA4A9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.MeshNetwork", "TheWatch.Contracts.MeshNetwork\TheWatch.Contracts.MeshNetwork.csproj", "{DDD18C44-5BA1-461A-A133-4FC80E5B00CC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.MeshNetwork", "src\contracts\TheWatch.Contracts.MeshNetwork\TheWatch.Contracts.MeshNetwork.csproj", "{DDD18C44-5BA1-461A-A133-4FC80E5B00CC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.Wearable", "TheWatch.Contracts.Wearable\TheWatch.Contracts.Wearable.csproj", "{3055BA9A-7898-4918-9F27-74886C459CAE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.Wearable", "src\contracts\TheWatch.Contracts.Wearable\TheWatch.Contracts.Wearable.csproj", "{3055BA9A-7898-4918-9F27-74886C459CAE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.AuthSecurity", "TheWatch.Contracts.AuthSecurity\TheWatch.Contracts.AuthSecurity.csproj", "{20BDEF61-08C3-4A7F-B690-0C759A89C28A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.AuthSecurity", "src\contracts\TheWatch.Contracts.AuthSecurity\TheWatch.Contracts.AuthSecurity.csproj", "{20BDEF61-08C3-4A7F-B690-0C759A89C28A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.FirstResponder", "TheWatch.Contracts.FirstResponder\TheWatch.Contracts.FirstResponder.csproj", "{8434ADDC-6BDE-4DC2-BFD9-F5FEDD02F49E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.FirstResponder", "src\contracts\TheWatch.Contracts.FirstResponder\TheWatch.Contracts.FirstResponder.csproj", "{8434ADDC-6BDE-4DC2-BFD9-F5FEDD02F49E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.FamilyHealth", "TheWatch.Contracts.FamilyHealth\TheWatch.Contracts.FamilyHealth.csproj", "{28AB2CA1-53B3-45D4-BC47-27D50B9BF727}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.FamilyHealth", "src\contracts\TheWatch.Contracts.FamilyHealth\TheWatch.Contracts.FamilyHealth.csproj", "{28AB2CA1-53B3-45D4-BC47-27D50B9BF727}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.DisasterRelief", "TheWatch.Contracts.DisasterRelief\TheWatch.Contracts.DisasterRelief.csproj", "{274EF7E4-A110-4820-A128-EA5BACFDA477}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.DisasterRelief", "src\contracts\TheWatch.Contracts.DisasterRelief\TheWatch.Contracts.DisasterRelief.csproj", "{274EF7E4-A110-4820-A128-EA5BACFDA477}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.DoctorServices", "TheWatch.Contracts.DoctorServices\TheWatch.Contracts.DoctorServices.csproj", "{3766148F-C777-4217-9C28-39643D4FB111}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.DoctorServices", "src\contracts\TheWatch.Contracts.DoctorServices\TheWatch.Contracts.DoctorServices.csproj", "{3766148F-C777-4217-9C28-39643D4FB111}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.Gamification", "TheWatch.Contracts.Gamification\TheWatch.Contracts.Gamification.csproj", "{82BA64B2-D8EC-42C6-B67A-6777BB855A31}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.Gamification", "src\contracts\TheWatch.Contracts.Gamification\TheWatch.Contracts.Gamification.csproj", "{82BA64B2-D8EC-42C6-B67A-6777BB855A31}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.Geospatial", "TheWatch.Contracts.Geospatial\TheWatch.Contracts.Geospatial.csproj", "{80312ECE-7D4A-4646-8B61-2225612047DF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.Geospatial", "src\contracts\TheWatch.Contracts.Geospatial\TheWatch.Contracts.Geospatial.csproj", "{80312ECE-7D4A-4646-8B61-2225612047DF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Admin.RestAPI", "TheWatch.Admin.RestAPI\TheWatch.Admin.RestAPI.csproj", "{EA961F2B-60E1-4FBD-A30C-F01F7E5BE2CB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Admin.RestAPI", "src\clients\TheWatch.Admin.RestAPI\TheWatch.Admin.RestAPI.csproj", "{EA961F2B-60E1-4FBD-A30C-F01F7E5BE2CB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P11.Surveillance", "TheWatch.P11.Surveillance\TheWatch.P11.Surveillance.csproj", "{A4247165-5364-4FB2-9961-E602257ED48B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P11.Surveillance", "src\services\TheWatch.P11.Surveillance\TheWatch.P11.Surveillance.csproj", "{A4247165-5364-4FB2-9961-E602257ED48B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.Surveillance", "TheWatch.Contracts.Surveillance\TheWatch.Contracts.Surveillance.csproj", "{0ECCFBD4-C306-4900-AA11-393358503F78}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.Surveillance", "src\contracts\TheWatch.Contracts.Surveillance\TheWatch.Contracts.Surveillance.csproj", "{0ECCFBD4-C306-4900-AA11-393358503F78}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P11.Surveillance.Tests", "TheWatch.P11.Surveillance.Tests\TheWatch.P11.Surveillance.Tests.csproj", "{D66F88A0-E63F-4E64-9D4C-CC91477798B7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P11.Surveillance.Tests", "tests\TheWatch.P11.Surveillance.Tests\TheWatch.P11.Surveillance.Tests.csproj", "{D66F88A0-E63F-4E64-9D4C-CC91477798B7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P12.Notifications", "TheWatch.P12.Notifications\TheWatch.P12.Notifications.csproj", "{F1A2B3C4-D5E6-7890-ABCD-EF1234567890}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P12.Notifications", "src\services\TheWatch.P12.Notifications\TheWatch.P12.Notifications.csproj", "{F1A2B3C4-D5E6-7890-ABCD-EF1234567890}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P12.Notifications.Tests", "TheWatch.P12.Notifications.Tests\TheWatch.P12.Notifications.Tests.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF0987654321}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.P12.Notifications.Tests", "tests\TheWatch.P12.Notifications.Tests\TheWatch.P12.Notifications.Tests.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF0987654321}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.Notifications", "TheWatch.Contracts.Notifications\TheWatch.Contracts.Notifications.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F01234567891}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Contracts.Notifications", "src\contracts\TheWatch.Contracts.Notifications\TheWatch.Contracts.Notifications.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F01234567891}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Integration.Tests", "TheWatch.Integration.Tests\TheWatch.Integration.Tests.csproj", "{E4EBE9A4-EE05-4D36-BCED-2D9AB6996AB5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheWatch.Integration.Tests", "tests\TheWatch.Integration.Tests\TheWatch.Integration.Tests.csproj", "{E4EBE9A4-EE05-4D36-BCED-2D9AB6996AB5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

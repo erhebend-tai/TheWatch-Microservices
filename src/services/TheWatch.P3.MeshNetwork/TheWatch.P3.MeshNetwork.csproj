@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TheWatch.P3.MeshNetwork</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" Condition="false" />
+    <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Hangfire.AspNetCore" />
+    <PackageReference Include="Hangfire.InMemory" />
+    <PackageReference Include="Hangfire.Pro" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="Serilog.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\shared\TheWatch.Shared\TheWatch.Shared.csproj" />
+    <ProjectReference Include="..\..\shared\TheWatch.Generators\TheWatch.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <!-- IDisasterReliefClient — mesh broadcasts for disaster evacuations -->
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.DisasterRelief\TheWatch.Contracts.DisasterRelief.csproj" />
+    <!-- IVoiceEmergencyClient — incident alerts via mesh -->
+    <ProjectReference Include="..\..\contracts\TheWatch.Contracts.VoiceEmergency\TheWatch.Contracts.VoiceEmergency.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="..\..\..\meta\Models.json" Link="Data\Models.json" />
+    <AdditionalFiles Include="..\..\..\meta\Interfaces.json" Link="Data\Interfaces.json" />
+    <AdditionalFiles Include="..\..\..\meta\_mapping.json" Link="Data\_mapping.json" />
+    <AdditionalFiles Include="..\..\..\meta\Controllers.json" Link="Data\Controllers.json" />
+  </ItemGroup>
+</Project>

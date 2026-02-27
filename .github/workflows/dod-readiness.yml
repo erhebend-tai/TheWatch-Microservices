@@ -97,7 +97,7 @@ jobs:
 
           build_project() {
             local project="$1"
-            local csproj="$project/$project.csproj"
+            local csproj="$project/${project##*/}.csproj"
             if [[ ! -f "$csproj" ]]; then
               echo "::warning::Project file not found: $csproj"
               return
@@ -115,73 +115,73 @@ jobs:
           }
 
           # Shared & generators first
-          build_project "TheWatch.Shared"
-          build_project "TheWatch.Generators"
+          build_project "src/shared/TheWatch.Shared"
+          build_project "src/shared/TheWatch.Generators"
 
           # Contract libraries
           for project in \
-            TheWatch.Contracts.Abstractions \
-            TheWatch.Contracts.CoreGateway \
-            TheWatch.Contracts.VoiceEmergency \
-            TheWatch.Contracts.MeshNetwork \
-            TheWatch.Contracts.Wearable \
-            TheWatch.Contracts.AuthSecurity \
-            TheWatch.Contracts.FirstResponder \
-            TheWatch.Contracts.FamilyHealth \
-            TheWatch.Contracts.DisasterRelief \
-            TheWatch.Contracts.DoctorServices \
-            TheWatch.Contracts.Gamification \
-            TheWatch.Contracts.Geospatial \
-            TheWatch.Contracts.Surveillance TheWatch.Contracts.Notifications; do
+            src/contracts/TheWatch.Contracts.Abstractions \
+            src/contracts/TheWatch.Contracts.CoreGateway \
+            src/contracts/TheWatch.Contracts.VoiceEmergency \
+            src/contracts/TheWatch.Contracts.MeshNetwork \
+            src/contracts/TheWatch.Contracts.Wearable \
+            src/contracts/TheWatch.Contracts.AuthSecurity \
+            src/contracts/TheWatch.Contracts.FirstResponder \
+            src/contracts/TheWatch.Contracts.FamilyHealth \
+            src/contracts/TheWatch.Contracts.DisasterRelief \
+            src/contracts/TheWatch.Contracts.DoctorServices \
+            src/contracts/TheWatch.Contracts.Gamification \
+            src/contracts/TheWatch.Contracts.Geospatial \
+            src/contracts/TheWatch.Contracts.Surveillance src/contracts/TheWatch.Contracts.Notifications; do
             build_project "$project"
           done
 
           # Microservices
           for project in \
-            TheWatch.P1.CoreGateway \
-            TheWatch.P2.VoiceEmergency \
-            TheWatch.P3.MeshNetwork \
-            TheWatch.P4.Wearable \
-            TheWatch.P5.AuthSecurity \
-            TheWatch.P6.FirstResponder \
-            TheWatch.P7.FamilyHealth \
-            TheWatch.P8.DisasterRelief \
-            TheWatch.P9.DoctorServices \
-            TheWatch.P10.Gamification \
-            TheWatch.P11.Surveillance \
-            TheWatch.P12.Notifications \
-            TheWatch.Geospatial \
-            TheWatch.Dashboard; do
+            src/services/TheWatch.P1.CoreGateway \
+            src/services/TheWatch.P2.VoiceEmergency \
+            src/services/TheWatch.P3.MeshNetwork \
+            src/services/TheWatch.P4.Wearable \
+            src/services/TheWatch.P5.AuthSecurity \
+            src/services/TheWatch.P6.FirstResponder \
+            src/services/TheWatch.P7.FamilyHealth \
+            src/services/TheWatch.P8.DisasterRelief \
+            src/services/TheWatch.P9.DoctorServices \
+            src/services/TheWatch.P10.Gamification \
+            src/services/TheWatch.P11.Surveillance \
+            src/services/TheWatch.P12.Notifications \
+            src/services/TheWatch.Geospatial \
+            src/clients/TheWatch.Dashboard; do
             build_project "$project"
           done
 
           # Admin projects
           for project in \
-            TheWatch.Admin \
-            TheWatch.Admin.CLI \
-            TheWatch.Admin.RestAPI \
-            TheWatch.Aspire.AppHost \
-            TheWatch.Aspire.ServiceDefaults; do
+            src/clients/TheWatch.Admin \
+            src/clients/TheWatch.Admin.CLI \
+            src/clients/TheWatch.Admin.RestAPI \
+            src/aspire/TheWatch.Aspire.AppHost \
+            src/aspire/TheWatch.Aspire.ServiceDefaults; do
             build_project "$project"
           done
 
           # Test projects
           for project in \
-            TheWatch.P1.CoreGateway.Tests \
-            TheWatch.P2.VoiceEmergency.Tests \
-            TheWatch.P3.MeshNetwork.Tests \
-            TheWatch.P4.Wearable.Tests \
-            TheWatch.P5.AuthSecurity.Tests \
-            TheWatch.P6.FirstResponder.Tests \
-            TheWatch.P7.FamilyHealth.Tests \
-            TheWatch.P8.DisasterRelief.Tests \
-            TheWatch.P9.DoctorServices.Tests \
-            TheWatch.P10.Gamification.Tests \
-            TheWatch.P11.Surveillance.Tests \
-            TheWatch.P12.Notifications.Tests \
-            TheWatch.Geospatial.Tests \
-            TheWatch.Mobile.Tests \
-            TheWatch.Integration.Tests; do
+            tests/TheWatch.P1.CoreGateway.Tests \
+            tests/TheWatch.P2.VoiceEmergency.Tests \
+            tests/TheWatch.P3.MeshNetwork.Tests \
+            tests/TheWatch.P4.Wearable.Tests \
+            tests/TheWatch.P5.AuthSecurity.Tests \
+            tests/TheWatch.P6.FirstResponder.Tests \
+            tests/TheWatch.P7.FamilyHealth.Tests \
+            tests/TheWatch.P8.DisasterRelief.Tests \
+            tests/TheWatch.P9.DoctorServices.Tests \
+            tests/TheWatch.P10.Gamification.Tests \
+            tests/TheWatch.P11.Surveillance.Tests \
+            tests/TheWatch.P12.Notifications.Tests \
+            tests/TheWatch.Geospatial.Tests \
+            tests/TheWatch.Mobile.Tests \
+            tests/TheWatch.Integration.Tests; do
             build_project "$project"
           done
 
@@ -227,20 +227,20 @@ jobs:
       fail-fast: false
       matrix:
         project:
-          - TheWatch.P1.CoreGateway.Tests
-          - TheWatch.P2.VoiceEmergency.Tests
-          - TheWatch.P3.MeshNetwork.Tests
-          - TheWatch.P4.Wearable.Tests
-          - TheWatch.P5.AuthSecurity.Tests
-          - TheWatch.P6.FirstResponder.Tests
-          - TheWatch.P7.FamilyHealth.Tests
-          - TheWatch.P8.DisasterRelief.Tests
-          - TheWatch.P9.DoctorServices.Tests
-          - TheWatch.P10.Gamification.Tests
-          - TheWatch.P11.Surveillance.Tests
-          - TheWatch.P12.Notifications.Tests
-          - TheWatch.Geospatial.Tests
-          - TheWatch.Mobile.Tests
+          - tests/TheWatch.P1.CoreGateway.Tests
+          - tests/TheWatch.P2.VoiceEmergency.Tests
+          - tests/TheWatch.P3.MeshNetwork.Tests
+          - tests/TheWatch.P4.Wearable.Tests
+          - tests/TheWatch.P5.AuthSecurity.Tests
+          - tests/TheWatch.P6.FirstResponder.Tests
+          - tests/TheWatch.P7.FamilyHealth.Tests
+          - tests/TheWatch.P8.DisasterRelief.Tests
+          - tests/TheWatch.P9.DoctorServices.Tests
+          - tests/TheWatch.P10.Gamification.Tests
+          - tests/TheWatch.P11.Surveillance.Tests
+          - tests/TheWatch.P12.Notifications.Tests
+          - tests/TheWatch.Geospatial.Tests
+          - tests/TheWatch.Mobile.Tests
 
     steps:
       - uses: actions/checkout@v4
@@ -266,7 +266,8 @@ jobs:
       - name: Run tests — ${{ matrix.project }}
         id: run-tests
         run: |
-          dotnet test ${{ matrix.project }}/${{ matrix.project }}.csproj \
+          PROJECT="${{ matrix.project }}"
+          dotnet test "${PROJECT}/${PROJECT##*/}.csproj" \
             --configuration Release \
             --no-build \
             --verbosity normal \
@@ -327,21 +328,21 @@ jobs:
         id: validate
         run: |
           PACKABLE_PROJECTS=(
-            "TheWatch.Contracts.Abstractions"
-            "TheWatch.Contracts.CoreGateway"
-            "TheWatch.Contracts.VoiceEmergency"
-            "TheWatch.Contracts.MeshNetwork"
-            "TheWatch.Contracts.Wearable"
-            "TheWatch.Contracts.AuthSecurity"
-            "TheWatch.Contracts.FirstResponder"
-            "TheWatch.Contracts.FamilyHealth"
-            "TheWatch.Contracts.DisasterRelief"
-            "TheWatch.Contracts.DoctorServices"
-            "TheWatch.Contracts.Gamification"
-            "TheWatch.Contracts.Geospatial"
-            "TheWatch.Contracts.Surveillance"
-            "TheWatch.Shared"
-            "TheWatch.Generators"
+            "src/contracts/TheWatch.Contracts.Abstractions"
+            "src/contracts/TheWatch.Contracts.CoreGateway"
+            "src/contracts/TheWatch.Contracts.VoiceEmergency"
+            "src/contracts/TheWatch.Contracts.MeshNetwork"
+            "src/contracts/TheWatch.Contracts.Wearable"
+            "src/contracts/TheWatch.Contracts.AuthSecurity"
+            "src/contracts/TheWatch.Contracts.FirstResponder"
+            "src/contracts/TheWatch.Contracts.FamilyHealth"
+            "src/contracts/TheWatch.Contracts.DisasterRelief"
+            "src/contracts/TheWatch.Contracts.DoctorServices"
+            "src/contracts/TheWatch.Contracts.Gamification"
+            "src/contracts/TheWatch.Contracts.Geospatial"
+            "src/contracts/TheWatch.Contracts.Surveillance"
+            "src/shared/TheWatch.Shared"
+            "src/shared/TheWatch.Generators"
           )
 
           PASSED=0
@@ -350,7 +351,7 @@ jobs:
 
           for project in "${PACKABLE_PROJECTS[@]}"; do
             echo "::group::Validating $project"
-            if dotnet pack "$project/$project.csproj" -c Release --no-restore --no-build -o ./nupkgs 2>&1; then
+            if dotnet pack "$project/${project##*/}.csproj" -c Release --no-restore --no-build -o ./nupkgs 2>&1; then
               PASSED=$((PASSED + 1))
               echo "  ✅ $project packages OK"
             else

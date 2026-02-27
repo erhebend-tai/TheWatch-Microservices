@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TheWatch.Integration.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\contracts\TheWatch.Contracts.Abstractions\TheWatch.Contracts.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\contracts\TheWatch.Contracts.AuthSecurity\TheWatch.Contracts.AuthSecurity.csproj" />
+    <ProjectReference Include="..\..\src\contracts\TheWatch.Contracts.VoiceEmergency\TheWatch.Contracts.VoiceEmergency.csproj" />
+    <ProjectReference Include="..\..\src\contracts\TheWatch.Contracts.FirstResponder\TheWatch.Contracts.FirstResponder.csproj" />
+    <ProjectReference Include="..\..\src\contracts\TheWatch.Contracts.FamilyHealth\TheWatch.Contracts.FamilyHealth.csproj" />
+    <ProjectReference Include="..\..\src\contracts\TheWatch.Contracts.DoctorServices\TheWatch.Contracts.DoctorServices.csproj" />
+    <ProjectReference Include="..\..\src\contracts\TheWatch.Contracts.DisasterRelief\TheWatch.Contracts.DisasterRelief.csproj" />
+    <ProjectReference Include="..\..\src\contracts\TheWatch.Contracts.MeshNetwork\TheWatch.Contracts.MeshNetwork.csproj" />
+    <ProjectReference Include="..\..\src\contracts\TheWatch.Contracts.Surveillance\TheWatch.Contracts.Surveillance.csproj" />
+    <ProjectReference Include="..\..\src\contracts\TheWatch.Contracts.Geospatial\TheWatch.Contracts.Geospatial.csproj" />
+    <ProjectReference Include="..\..\src\contracts\TheWatch.Contracts.Notifications\TheWatch.Contracts.Notifications.csproj" />
+    <ProjectReference Include="..\..\src\shared\TheWatch.Shared\TheWatch.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

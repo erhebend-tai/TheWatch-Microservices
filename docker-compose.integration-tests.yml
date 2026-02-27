@@ -24,7 +24,7 @@ services:
   integration-tests:
     build:
       context: .
-      dockerfile: TheWatch.Integration.Tests/Dockerfile.tests
+      dockerfile: tests/TheWatch.Integration.Tests/Dockerfile.tests
     environment:
       WATCH_AUTH_URL: http://p5-authsecurity:8080
       WATCH_VOICE_URL: http://p2-voiceemergency:8080

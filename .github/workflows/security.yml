@@ -61,22 +61,22 @@ jobs:
       # Build per-project to avoid OOM (D017)
       - name: Build for CodeQL analysis
         run: |
-          dotnet build TheWatch.Shared/TheWatch.Shared.csproj -c Release --no-restore
-          dotnet build TheWatch.Generators/TheWatch.Generators.csproj -c Release --no-restore
+          dotnet build src/shared/TheWatch.Shared/TheWatch.Shared.csproj -c Release --no-restore
+          dotnet build src/shared/TheWatch.Generators/TheWatch.Generators.csproj -c Release --no-restore
           for project in \
-            TheWatch.P1.CoreGateway \
-            TheWatch.P2.VoiceEmergency \
-            TheWatch.P3.MeshNetwork \
-            TheWatch.P4.Wearable \
-            TheWatch.P5.AuthSecurity \
-            TheWatch.P6.FirstResponder \
-            TheWatch.P7.FamilyHealth \
-            TheWatch.P8.DisasterRelief \
-            TheWatch.P9.DoctorServices \
-            TheWatch.P10.Gamification \
-            TheWatch.Geospatial \
-            TheWatch.Dashboard; do
-            dotnet build "$project/$project.csproj" -c Release --no-restore
+            src/services/TheWatch.P1.CoreGateway \
+            src/services/TheWatch.P2.VoiceEmergency \
+            src/services/TheWatch.P3.MeshNetwork \
+            src/services/TheWatch.P4.Wearable \
+            src/services/TheWatch.P5.AuthSecurity \
+            src/services/TheWatch.P6.FirstResponder \
+            src/services/TheWatch.P7.FamilyHealth \
+            src/services/TheWatch.P8.DisasterRelief \
+            src/services/TheWatch.P9.DoctorServices \
+            src/services/TheWatch.P10.Gamification \
+            src/services/TheWatch.Geospatial \
+            src/clients/TheWatch.Dashboard; do
+            dotnet build "$project/${project##*/}.csproj" -c Release --no-restore
           done
 
       - name: Perform CodeQL Analysis

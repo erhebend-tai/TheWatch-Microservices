@@ -128,7 +128,7 @@ services:
   p1-coregateway:
     build:
       context: .
-      dockerfile: TheWatch.P1.CoreGateway/Dockerfile
+      dockerfile: src/services/TheWatch.P1.CoreGateway/Dockerfile
     container_name: thewatch-p1
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -149,7 +149,7 @@ services:
   p2-voiceemergency:
     build:
       context: .
-      dockerfile: TheWatch.P2.VoiceEmergency/Dockerfile
+      dockerfile: src/services/TheWatch.P2.VoiceEmergency/Dockerfile
     container_name: thewatch-p2
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -172,7 +172,7 @@ services:
   p3-meshnetwork:
     build:
       context: .
-      dockerfile: TheWatch.P3.MeshNetwork/Dockerfile
+      dockerfile: src/services/TheWatch.P3.MeshNetwork/Dockerfile
     container_name: thewatch-p3
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -195,7 +195,7 @@ services:
   p4-wearable:
     build:
       context: .
-      dockerfile: TheWatch.P4.Wearable/Dockerfile
+      dockerfile: src/services/TheWatch.P4.Wearable/Dockerfile
     container_name: thewatch-p4
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -215,7 +215,7 @@ services:
   p5-authsecurity:
     build:
       context: .
-      dockerfile: TheWatch.P5.AuthSecurity/Dockerfile
+      dockerfile: src/services/TheWatch.P5.AuthSecurity/Dockerfile
     container_name: thewatch-p5
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -235,7 +235,7 @@ services:
   p6-firstresponder:
     build:
       context: .
-      dockerfile: TheWatch.P6.FirstResponder/Dockerfile
+      dockerfile: src/services/TheWatch.P6.FirstResponder/Dockerfile
     container_name: thewatch-p6
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -258,7 +258,7 @@ services:
   p7-familyhealth:
     build:
       context: .
-      dockerfile: TheWatch.P7.FamilyHealth/Dockerfile
+      dockerfile: src/services/TheWatch.P7.FamilyHealth/Dockerfile
     container_name: thewatch-p7
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -278,7 +278,7 @@ services:
   p8-disasterrelief:
     build:
       context: .
-      dockerfile: TheWatch.P8.DisasterRelief/Dockerfile
+      dockerfile: src/services/TheWatch.P8.DisasterRelief/Dockerfile
     container_name: thewatch-p8
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -298,7 +298,7 @@ services:
   p9-doctorservices:
     build:
       context: .
-      dockerfile: TheWatch.P9.DoctorServices/Dockerfile
+      dockerfile: src/services/TheWatch.P9.DoctorServices/Dockerfile
     container_name: thewatch-p9
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -318,7 +318,7 @@ services:
   p10-gamification:
     build:
       context: .
-      dockerfile: TheWatch.P10.Gamification/Dockerfile
+      dockerfile: src/services/TheWatch.P10.Gamification/Dockerfile
     container_name: thewatch-p10
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -338,7 +338,7 @@ services:
   p11-surveillance:
     build:
       context: .
-      dockerfile: TheWatch.P11.Surveillance/Dockerfile
+      dockerfile: src/services/TheWatch.P11.Surveillance/Dockerfile
     container_name: thewatch-p11
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -365,7 +365,7 @@ services:
   p12-notifications:
     build:
       context: .
-      dockerfile: TheWatch.P12.Notifications/Dockerfile
+      dockerfile: src/services/TheWatch.P12.Notifications/Dockerfile
     container_name: thewatch-p12
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -393,7 +393,7 @@ services:
   geospatial:
     build:
       context: .
-      dockerfile: TheWatch.Geospatial/Dockerfile
+      dockerfile: src/services/TheWatch.Geospatial/Dockerfile
     container_name: thewatch-geo
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -415,7 +415,7 @@ services:
   dashboard:
     build:
       context: .
-      dockerfile: TheWatch.Dashboard/Dockerfile
+      dockerfile: src/clients/TheWatch.Dashboard/Dockerfile
     container_name: thewatch-dashboard
     environment:
       ASPNETCORE_ENVIRONMENT: Production
