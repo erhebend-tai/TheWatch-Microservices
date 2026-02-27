@@ -63,6 +63,7 @@ builder.Services.AddSurveillanceClient()
 // Services
 builder.Services.AddScoped<IEmergencyService, EmergencyService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
+builder.Services.AddScoped<IEmergencyCallService, EmergencyCallService>();
 builder.Services.AddScoped<IWatchDataSeeder, VoiceEmergencySeeder>();
 builder.AddWatchControllers();
 

@@ -9,6 +9,7 @@
 @inject EmergencyLocationService EmergencyLocation
 @inject IOfflineQueueService OfflineQueue
 @inject IConnectivityMonitorService Connectivity
+@inject ILogger<SOSPage> Logger
 
 <div class="page-content" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh;">
 
@@ -86,8 +87,21 @@
                             Location: @_location.Value.lat.ToString("F4"), @_location.Value.lon.ToString("F4")
                         </RadzenText>
                     }
+                    @if (_911Called)
+                    {
+                        <RadzenText Style="color: var(--watch-danger); font-weight: 600;">
+                            📞 911 contacted
+                        </RadzenText>
+                    }
                 </RadzenStack>
             </div>
+
+            @if (_show911Button)
+            {
+                <RadzenButton Text="Call 911 Now" Icon="call"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Click="@Call911Manually" />
+            }
 
             <RadzenButton Text="Back to Home" Icon="home"
                           ButtonStyle="ButtonStyle.Secondary" Click="@(() => Nav.NavigateTo("/"))" />
@@ -100,6 +114,8 @@
     private int _severity = 3;
     private bool _activating;
     private bool _incidentCreated;
+    private bool _911Called;
+    private bool _show911Button;
     private (double lat, double lon)? _location;
 
     private readonly List<TypeOption> _emergencyTypes = Enum.GetValues<EmergencyType>()
@@ -159,6 +175,9 @@
             _incidentCreated = true;
             Notification.Notify(NotificationSeverity.Warning, "SOS Sent",
                 "Emergency dispatched. Help is on the way.");
+
+            // Automatically open the phone dialer to call 911 on the user's behalf
+            Dial911();
         }
         catch (Exception ex)
         {
@@ -171,6 +190,9 @@
                 _incidentCreated = true;
                 Notification.Notify(NotificationSeverity.Warning, "SOS Queued",
                     "You're offline. SOS will be sent when connectivity is restored.");
+
+                // Still attempt 911 even when offline — the dialer is a local OS feature
+                Dial911();
             }
             else
             {
@@ -179,6 +201,44 @@
         }
 
         _activating = false;
+    }
+
+    /// <summary>
+    /// Opens the platform phone dialer with 911 pre-filled.
+    /// If the dialer is not supported on this device (e.g. tablet without SIM), a
+    /// manual "Call 911 Now" button is shown instead.
+    /// </summary>
+    private void Dial911()
+    {
+        try
+        {
+            if (PhoneDialer.IsSupported)
+            {
+                PhoneDialer.Open("911");
+                _911Called = true;
+            }
+            else
+            {
+                // Dialer not available — show a manual button
+                _show911Button = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "PhoneDialer.Open(\"911\") failed: {Message}", ex.Message);
+            _show911Button = true;
+        }
+    }
+
+    private void Call911Manually()
+    {
+        try
+        {
+            PhoneDialer.Open("911");
+            _911Called = true;
+            _show911Button = false;
+        }
+        catch { /* ignore if dialer unavailable */ }
     }
 
     private record TypeOption(string Text, EmergencyType Value);
