@@ -23,9 +23,15 @@ using MfaVerifyRequest = TheWatch.P5.AuthSecurity.Auth.MfaVerifyRequest;
 using SmsMfaSendRequest = TheWatch.P5.AuthSecurity.Auth.SmsMfaSendRequest;
 using SmsMfaVerifyRequest = TheWatch.P5.AuthSecurity.Auth.SmsMfaVerifyRequest;
 using MagicLinkRequest = TheWatch.P5.AuthSecurity.Auth.MagicLinkRequest;
+using ChangePasswordRequest = TheWatch.P5.AuthSecurity.Auth.ChangePasswordRequest;
+using CompleteOnboardingStepRequest = TheWatch.P5.AuthSecurity.Auth.CompleteOnboardingStepRequest;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
 using TheWatch.Shared.Security;
+using TheWatch.Shared.Health;
+using FluentValidation;
+using TheWatch.Shared.Api;
+using TheWatch.Shared.Observability;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -89,6 +95,14 @@ builder.Services.AddHangfire(config =>
         .UseBatches());
 builder.Services.AddHangfireServer();
 
+// Item 305: Distributed cache for SMS OTP storage (Redis in production, in-memory in dev)
+// In production, override with AddStackExchangeRedisCache() via a Redis connection string.
+var redisConn = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrEmpty(redisConn))
+    builder.Services.AddStackExchangeRedisCache(opts => opts.Configuration = redisConn);
+else
+    builder.Services.AddDistributedMemoryCache(); // dev/test fallback
+
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<MfaService>();
@@ -103,19 +117,33 @@ builder.Services.AddScoped<OnboardingService>();
 builder.Services.AddScoped<SessionManagementService>();
 builder.Services.AddScoped<StrideThreatService>();
 builder.Services.AddScoped<MitreDetectionService>();
+builder.Services.AddScoped<DataPurgeService>();
 builder.AddWatchControllers();
 
+// Item 246: Dependency health checks (SQL Server, Redis, Kafka, PostGIS connectivity)
+builder.Services.AddWatchHealthChecks(builder.Configuration);
+// Item 226: Register FluentValidation validators for all request DTOs [STIG V-222606, OWASP A03]
+builder.Services.AddValidatorsFromAssemblyContaining<Program>(lifetime: ServiceLifetime.Scoped);
+// Item 229: API versioning — v1 prefix for current endpoints, header-based negotiation
+builder.Services.AddWatchApiVersioning();
+// Item 244: Prometheus metrics (request duration, active incidents, SOS, auth failures)
+builder.Services.AddWatchMetrics();
+// Item 247: Distributed tracing span enrichment (user ID, incident ID, device ID)
+builder.Services.AddWatchTracing("TheWatch.P5.AuthSecurity");
 var app = builder.Build();
 
 // Seed roles and MITRE rules
 await SeedDataAsync(app.Services);
 
 app.UseCors();
+app.UseWatchMetrics();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
 app.UseWatchSecurity(); // Rate limiter + security audit middleware (from SecurityGenerator)
 app.UseAuthentication();
 app.UseAuthorization();
+// Item 231: ETag / If-None-Match conditional response support
+app.UseWatchETagSupport();
 
 // IP Throttling middleware (Item 75)
 app.UseMiddleware<IpThrottlingMiddleware>();
@@ -136,9 +164,42 @@ app.MapWatchControllers();
 // Schedule recurring security jobs
 RecurringJob.AddOrUpdate<StrideThreatService>("stride-threat-scan", s => s.ScanAsync(), "*/15 * * * *");
 RecurringJob.AddOrUpdate<MitreDetectionService>("mitre-detection-scan", s => s.ScanAsync(), "*/15 * * * *");
+// Item 294: Automated data purge jobs per retention policy (NIST MP-6, SI-12)
+RecurringJob.AddOrUpdate<DataPurgeService>("expired-token-purge", s => s.PurgeExpiredRefreshTokensAsync(), "0 3 * * *"); // Daily at 3 AM
+RecurringJob.AddOrUpdate<DataPurgeService>("audit-log-purge", s => s.PurgeOldAuditEventsAsync(), "0 2 * * 0"); // Weekly Sunday at 2 AM
 
 // Health endpoint — stripped of internal details (DISA STIG V-222609)
+// Item 246: Readiness probe — checks SQL Server, Redis, Kafka, PostGIS connectivity
+app.MapHealthChecks("/health/ready");
+// Item 249: Canary endpoints for synthetic monitoring (/canary + /canary/deep)
+app.MapWatchCanaryEndpoints("TheWatch.P5.AuthSecurity");
+
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
+
+// Item 271: JWKS endpoint — exposes public key for consumer service JWT validation
+// In production, consumers load the public key from this endpoint or a cached copy.
+app.MapGet("/.well-known/jwks.json", (IConfiguration config) =>
+{
+    var publicKeyPath = config["Jwt:AsymmetricPublicKeyPath"];
+    if (!string.IsNullOrEmpty(publicKeyPath) && System.IO.File.Exists(publicKeyPath))
+    {
+        try
+        {
+            var rsa = System.Security.Cryptography.RSA.Create();
+            rsa.ImportFromPem(System.IO.File.ReadAllText(publicKeyPath));
+            var rsaParams = rsa.ExportParameters(false);
+            var n = Convert.ToBase64String(rsaParams.Modulus!).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+            var e = Convert.ToBase64String(rsaParams.Exponent!).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+            return Results.Ok(new
+            {
+                keys = new[] { new { kty = "RSA", use = "sig", alg = "RS256", n, e } }
+            });
+        }
+        catch { /* Fall through to empty set */ }
+    }
+    // Dev: no asymmetric key configured — return empty JWKS (HMAC symmetric is in use)
+    return Results.Ok(new { keys = Array.Empty<object>() });
+}).ExcludeFromDescription();
 
 // Service info — admin-only (DISA STIG V-222609: no unauthenticated service metadata)
 app.MapGet("/info", () => new
@@ -158,12 +219,12 @@ app.MapPost("/api/auth/register", async (RegisterRequest request, IAuthService a
     try
     {
         var response = await auth.RegisterAsync(request);
-        await audit.LogAsync("Register", response.User.Id, ctx, true);
+        await audit.LogAsync("Register", response.User.Id, ctx, true, attemptedIdentity: request.Email);
         return Results.Ok(response);
     }
     catch (InvalidOperationException ex)
     {
-        await audit.LogAsync("Register", null, ctx, false, ex.Message);
+        await audit.LogAsync("Register", null, ctx, false, ex.Message, attemptedIdentity: request.Email);
         return Results.Conflict(new { error = ex.Message });
     }
 });
@@ -174,12 +235,12 @@ app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService auth, A
     {
         var response = await auth.LoginAsync(request);
         if (!response.MfaRequired)
-            await audit.LogAsync("Login", response.User.Id, ctx, true);
+            await audit.LogAsync("Login", response.User.Id, ctx, true, attemptedIdentity: request.Email);
         return Results.Ok(response);
     }
     catch (UnauthorizedAccessException)
     {
-        await audit.LogAsync("Login", null, ctx, false, "Invalid credentials");
+        await audit.LogAsync("Login", null, ctx, false, "Invalid credentials", attemptedIdentity: request.Email);
         return Results.Unauthorized();
     }
 });
@@ -231,6 +292,24 @@ app.MapPost("/api/auth/roles/assign", async (AssignRoleRequest request, IAuthSer
     }
 }).RequireAuthorization(WatchPolicies.AdminOnly);
 
+// Item 299/300: Change password — 60-day expiry, 24-hour min age, ≥8 character-position delta (STIG V-222541/544/545)
+app.MapPost("/api/auth/change-password", async (ChangePasswordRequest request, ClaimsPrincipal principal, IAuthService auth, AuditService audit, HttpContext ctx) =>
+{
+    var userId = GetUserId(principal);
+    if (userId is null) return Results.Unauthorized();
+    try
+    {
+        await auth.ChangePasswordAsync(userId.Value, request);
+        await audit.LogAsync("ChangePassword", userId, ctx, true);
+        return Results.Ok(new { message = "Password changed successfully." });
+    }
+    catch (InvalidOperationException ex)
+    {
+        await audit.LogAsync("ChangePassword", userId, ctx, false, ex.Message);
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}).RequireAuthorization();
+
 // === MFA Endpoints (Items 63-66) ===
 
 // TOTP MFA
@@ -267,7 +346,7 @@ app.MapPost("/api/auth/mfa/sms/send", async (SmsMfaSendRequest request, SmsMfaSe
 
 app.MapPost("/api/auth/mfa/sms/verify", async (SmsMfaVerifyRequest request, SmsMfaService sms) =>
 {
-    var valid = sms.VerifyCode(request.PhoneNumber, request.Code);
+    var valid = await sms.VerifyCodeAsync(request.PhoneNumber, request.Code);
     return valid ? Results.Ok(new { verified = true }) : Results.BadRequest(new { error = "Invalid or expired code." });
 });
 
@@ -358,17 +437,21 @@ app.MapGet("/api/onboarding/progress", async (ClaimsPrincipal user, OnboardingSe
     return Results.Ok(progress);
 }).RequireAuthorization();
 
-app.MapPost("/api/onboarding/complete-step", async (string step, ClaimsPrincipal user, OnboardingService onboarding) =>
+app.MapPost("/api/onboarding/complete-step", async (CompleteOnboardingStepRequest request, ClaimsPrincipal user, OnboardingService onboarding) =>
 {
-    var validSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "profile", "eula", "mfa", "emergency-contacts", "notification-preferences", "tutorial"
-    };
-    if (!validSteps.Contains(step))
-        return Results.BadRequest(new { error = "Invalid onboarding step." });
-
     var userId = GetUserId(user);
     if (userId is null) return Results.Unauthorized();
+    // Map enum to the canonical step string expected by OnboardingService
+    var step = request.Step switch
+    {
+        Auth.OnboardingStep.Profile => "profile",
+        Auth.OnboardingStep.Eula => "eula",
+        Auth.OnboardingStep.Mfa => "mfa",
+        Auth.OnboardingStep.EmergencyContacts => "emergency-contacts",
+        Auth.OnboardingStep.NotificationPreferences => "notification-preferences",
+        Auth.OnboardingStep.Tutorial => "tutorial",
+        _ => request.Step.ToString().ToLowerInvariant()
+    };
     await onboarding.CompleteStepAsync(userId.Value, step);
     return Results.Ok(new { completed = step });
 }).RequireAuthorization();

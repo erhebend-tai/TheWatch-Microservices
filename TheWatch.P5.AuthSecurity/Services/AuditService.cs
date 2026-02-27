@@ -18,12 +18,13 @@ public class AuditService
         _logger = logger;
     }
 
-    public async Task LogAsync(string eventType, Guid? userId, HttpContext ctx, bool isSuccess, string? failureReason = null)
+    public async Task LogAsync(string eventType, Guid? userId, HttpContext ctx, bool isSuccess, string? failureReason = null, string? attemptedIdentity = null)
     {
         var audit = new AuditEvent
         {
             EventType = eventType,
             UserId = userId,
+            AttemptedIdentity = attemptedIdentity,
             IpAddress = ctx.Connection.RemoteIpAddress?.ToString(),
             SourcePort = ctx.Connection.RemotePort,
             UserAgent = ctx.Request.Headers.UserAgent.ToString(),
@@ -35,6 +36,10 @@ public class AuditService
         _db.AuditEvents.Add(audit);
         await _db.SaveChangesAsync();
 
+        // STIG V-222441: log timestamp (implicit), identity, IP, port, event type, success/failure
+        _logger.LogInformation(
+            "Audit: {EventType} UserId={UserId} Identity={Identity} Success={IsSuccess} IP={IpAddress} Port={SourcePort}",
+            eventType, userId, attemptedIdentity ?? userId?.ToString(), isSuccess, audit.IpAddress, audit.SourcePort);
         // STIG V-222441-449: log timestamp (UTC), user identity, source IP, source port,
         // event type, success/failure, device fingerprint, and user agent string.
         _logger.LogInformation(

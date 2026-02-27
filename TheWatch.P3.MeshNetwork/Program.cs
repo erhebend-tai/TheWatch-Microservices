@@ -13,6 +13,10 @@ using TheWatch.Shared.Security;
 using TheWatch.Contracts.Abstractions;
 using TheWatch.Contracts.DisasterRelief;
 using TheWatch.Contracts.VoiceEmergency;
+using TheWatch.Shared.Health;
+using FluentValidation;
+using TheWatch.Shared.Api;
+using TheWatch.Shared.Observability;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -54,15 +58,28 @@ builder.Services.AddVoiceEmergencyClient()
 
 builder.AddWatchControllers();
 
+// Item 246: Dependency health checks (SQL Server, Redis, Kafka, PostGIS connectivity)
+builder.Services.AddWatchHealthChecks(builder.Configuration);
+// Item 226: Register FluentValidation validators for all request DTOs [STIG V-222606, OWASP A03]
+builder.Services.AddValidatorsFromAssemblyContaining<Program>(lifetime: ServiceLifetime.Scoped);
+// Item 229: API versioning — v1 prefix for current endpoints, header-based negotiation
+builder.Services.AddWatchApiVersioning();
+// Item 244: Prometheus metrics (request duration, active incidents, SOS, auth failures)
+builder.Services.AddWatchMetrics();
+// Item 247: Distributed tracing span enrichment (user ID, incident ID, device ID)
+builder.Services.AddWatchTracing("TheWatch.P3.MeshNetwork");
 var app = builder.Build();
 await app.UseWatchMigrations();
 
 app.UseCors();
+app.UseWatchMetrics();
 app.UseWatchSecurity();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
+// Item 231: ETag / If-None-Match conditional response support
+app.UseWatchETagSupport();
 app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
 {
     Authorization = [new TheWatch.Shared.Security.HangfireDashboardAuthFilter()],
@@ -77,6 +94,11 @@ RecurringJob.AddOrUpdate<IMeshService>(
     "*/10 * * * *"); // Every 10 minutes
 
 // Health endpoint
+// Item 246: Readiness probe — checks SQL Server, Redis, Kafka, PostGIS connectivity
+app.MapHealthChecks("/health/ready");
+// Item 249: Canary endpoints for synthetic monitoring (/canary + /canary/deep)
+app.MapWatchCanaryEndpoints("TheWatch.P3.MeshNetwork");
+
 app.MapGet("/health", () => new HealthResponse(
     "TheWatch.P3.MeshNetwork",
     "P3",
