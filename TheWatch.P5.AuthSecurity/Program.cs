@@ -27,6 +27,9 @@ using ChangePasswordRequest = TheWatch.P5.AuthSecurity.Auth.ChangePasswordReques
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
 using TheWatch.Shared.Security;
+using TheWatch.Shared.Health;
+using FluentValidation;
+using TheWatch.Shared.Api;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -114,6 +117,12 @@ builder.Services.AddScoped<StrideThreatService>();
 builder.Services.AddScoped<MitreDetectionService>();
 builder.AddWatchControllers();
 
+// Item 246: Dependency health checks (SQL Server, Redis, Kafka, PostGIS connectivity)
+builder.Services.AddWatchHealthChecks(builder.Configuration);
+// Item 226: Register FluentValidation validators for all request DTOs [STIG V-222606, OWASP A03]
+builder.Services.AddValidatorsFromAssemblyContaining<Program>(lifetime: ServiceLifetime.Scoped);
+// Item 229: API versioning — v1 prefix for current endpoints, header-based negotiation
+builder.Services.AddWatchApiVersioning();
 var app = builder.Build();
 
 // Seed roles and MITRE rules
@@ -125,6 +134,8 @@ app.UseWatchOpenApi();
 app.UseWatchSecurity(); // Rate limiter + security audit middleware (from SecurityGenerator)
 app.UseAuthentication();
 app.UseAuthorization();
+// Item 231: ETag / If-None-Match conditional response support
+app.UseWatchETagSupport();
 
 // IP Throttling middleware (Item 75)
 app.UseMiddleware<IpThrottlingMiddleware>();
@@ -147,6 +158,9 @@ RecurringJob.AddOrUpdate<StrideThreatService>("stride-threat-scan", s => s.ScanA
 RecurringJob.AddOrUpdate<MitreDetectionService>("mitre-detection-scan", s => s.ScanAsync(), "*/15 * * * *");
 
 // Health endpoint — stripped of internal details (DISA STIG V-222609)
+// Item 246: Readiness probe — checks SQL Server, Redis, Kafka, PostGIS connectivity
+app.MapHealthChecks("/health/ready");
+
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
 // Service info — admin-only (DISA STIG V-222609: no unauthenticated service metadata)

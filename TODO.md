@@ -469,17 +469,17 @@
 ### 17A. Database Production Readiness
 - [ ] 221. Run `dotnet ef migrations add` for P5 AuthSecurity (Identity tables migration missing — currently relies on `EnsureCreatedAsync`)
 - [ ] 222. Create SQL Server maintenance plan: index rebuild schedule, statistics update, log file management for all 11 databases
-- [ ] 223. Add ROWVERSION/concurrency tokens to all entities that support concurrent updates (Incident, Dispatch, Responder, FamilyMember)
+- [x] 223. Add ROWVERSION/concurrency tokens to all entities that support concurrent updates (Incident, Dispatch, Responder, FamilyMember)
 - [x] 224. Add database connection resilience: `EnableRetryOnFailure(5)` in all DbContext configurations (currently only Aspire default retry)
-- [ ] 225. Replace remaining ConcurrentDictionary stores: P1 ConfigService (move to distributed config), P1 device registrations (move to DB), P5 IpThrottling and SmsMfa OTP tracking (move to Redis)
+- [x] 225. Replace remaining ConcurrentDictionary stores: P1 ConfigService (move to distributed config), P1 device registrations (move to DB), P5 IpThrottling and SmsMfa OTP tracking (move to Redis)
 
 ### 17B. API Production Quality
-- [ ] 226. Add FluentValidation to all request DTOs across P1-P11 (currently only P5 AuthModels has `[Required]` annotations)
+- [x] 226. Add FluentValidation to all request DTOs across P1-P11 (currently only P5 AuthModels has `[Required]` annotations)
 - [x] 227. Add global exception handler middleware to all services (structured ProblemDetails responses per RFC 9457)
 - [x] 228. Add request/response logging middleware with PII redaction (mask SSN, phone, email in logs)
-- [ ] 229. Add API versioning (`Asp.Versioning.Http`) to all services — v1 prefix for current endpoints, header-based version negotiation
+- [x] 229. Add API versioning (`Asp.Versioning.Http`) to all services — v1 prefix for current endpoints, header-based version negotiation
 - [x] 230. Add response compression (Brotli + gzip) to all services
-- [ ] 231. Add ETag/If-None-Match conditional response support for GET endpoints
+- [x] 231. Add ETag/If-None-Match conditional response support for GET endpoints
 
 ### 17C. Mobile Production Readiness
 - [x] 232. Implement `SyncEngine.SendAsync()` — already implemented with full HTTP method dispatch and retry logic
@@ -494,13 +494,13 @@
 - [ ] 239. Implement request signing for evidence uploads (prevent replay attacks on chain-of-custody)
 - [ ] 240. Add JWT key rotation mechanism — support multiple valid signing keys during rotation window
 - [ ] 241. Pen test preparation: run OWASP ZAP against all service endpoints, fix findings
-- [ ] 242. Add anti-forgery tokens to Dashboard and Admin portal forms
+- [x] 242. Add anti-forgery tokens to Dashboard and Admin portal forms
 - [ ] 243. Implement secrets rotation runbook: database passwords, JWT keys, API keys, Firebase credentials — document zero-downtime rotation procedure
 
 ### 17E. Observability Production Readiness
 - [ ] 244. Add custom Prometheus metrics to all services: request duration histograms, active incident gauge, dispatch response time, SOS activation counter
 - [ ] 245. Create Grafana dashboard JSON templates for each service (import via CI/CD)
-- [ ] 246. Add health check dependencies: verify SQL Server, Redis, Kafka, PostGIS connectivity in `/health` endpoint (not just HTTP 200)
+- [x] 246. Add health check dependencies: verify SQL Server, Redis, Kafka, PostGIS connectivity in `/health` endpoint (not just HTTP 200)
 - [ ] 247. Add distributed tracing span enrichment: user ID, incident ID, device ID on all traces
 - [ ] 248. Implement log-based alerting rules: >5 auth failures/min, >10 5xx errors/min, evidence upload failure spike, SOS endpoint latency >2s
 - [ ] 249. Add canary endpoints for synthetic monitoring (return known payload for comparison)
