@@ -427,11 +427,11 @@
 - [x] 200. Implement `GoogleHealthcareProvider` FHIR methods — `UpsertPatientAsync`, `GetPatientAsync`, `SearchPatientsAsync`, `CreateObservationAsync`, `GetObservationsAsync`, `CreateEncounterAsync`, `ExportPatientDataAsync` using Google Healthcare API FHIR store
 
 ### 15B. Cloudflare Provider Implementations
-- [ ] 201. Implement `CloudflareCdnService` — `PurgeCacheAsync`, `PurgeAllAsync`, `PurgeByTagAsync`, `GetAnalyticsAsync` via Cloudflare API v4
-- [ ] 202. Implement `CloudflareWorkerAuthService` — `ValidateAccessTokenAsync`, `GetIdentityAsync` via Cloudflare Access JWT validation
-- [ ] 203. Implement `CloudflareWafService` — `DeployRulesAsync`, `DeployRateLimitsAsync`, `GetRecentEventsAsync`, `BlockIpAsync` via Cloudflare Firewall Rules API
-- [ ] 204. Implement `CloudflareTunnelService` — `GetTunnelStatusAsync`, `GetConnectionsAsync` via Cloudflare Tunnels API
-- [ ] 205. Implement `CloudflareZeroTrustService.ValidateServiceTokenAsync()` via Cloudflare Zero Trust API
+- [x] 201. Implement `CloudflareCdnService` — `PurgeCacheAsync`, `PurgeAllAsync`, `PurgeByTagAsync`, `GetAnalyticsAsync` via Cloudflare API v4
+- [x] 202. Implement `CloudflareWorkerAuthService` — `ValidateAccessTokenAsync`, `GetIdentityAsync` via Cloudflare Access JWT validation
+- [x] 203. Implement `CloudflareWafService` — `DeployRulesAsync`, `DeployRateLimitsAsync`, `GetRecentEventsAsync`, `BlockIpAsync` via Cloudflare Firewall Rules API
+- [x] 204. Implement `CloudflareTunnelService` — `GetTunnelStatusAsync`, `GetConnectionsAsync` via Cloudflare Tunnels API
+- [x] 205. Implement `CloudflareZeroTrustService.ValidateServiceTokenAsync()` via Cloudflare Zero Trust API
 
 ### 15C. Azure Provider Completions
 - [ ] 206. Implement `AzureMapsGeospatialService` remaining methods — replace any ConcurrentDictionary caching with Redis-backed distributed cache
@@ -470,15 +470,15 @@
 - [ ] 221. Run `dotnet ef migrations add` for P5 AuthSecurity (Identity tables migration missing — currently relies on `EnsureCreatedAsync`)
 - [ ] 222. Create SQL Server maintenance plan: index rebuild schedule, statistics update, log file management for all 11 databases
 - [ ] 223. Add ROWVERSION/concurrency tokens to all entities that support concurrent updates (Incident, Dispatch, Responder, FamilyMember)
-- [ ] 224. Add database connection resilience: `EnableRetryOnFailure(5)` in all DbContext configurations (currently only Aspire default retry)
+- [x] 224. Add database connection resilience: `EnableRetryOnFailure(5)` in all DbContext configurations (currently only Aspire default retry)
 - [ ] 225. Replace remaining ConcurrentDictionary stores: P1 ConfigService (move to distributed config), P1 device registrations (move to DB), P5 IpThrottling and SmsMfa OTP tracking (move to Redis)
 
 ### 17B. API Production Quality
 - [ ] 226. Add FluentValidation to all request DTOs across P1-P11 (currently only P5 AuthModels has `[Required]` annotations)
-- [ ] 227. Add global exception handler middleware to all services (structured ProblemDetails responses per RFC 9457)
-- [ ] 228. Add request/response logging middleware with PII redaction (mask SSN, phone, email in logs)
+- [x] 227. Add global exception handler middleware to all services (structured ProblemDetails responses per RFC 9457)
+- [x] 228. Add request/response logging middleware with PII redaction (mask SSN, phone, email in logs)
 - [ ] 229. Add API versioning (`Asp.Versioning.Http`) to all services — v1 prefix for current endpoints, header-based version negotiation
-- [ ] 230. Add response compression (Brotli + gzip) to all services
+- [x] 230. Add response compression (Brotli + gzip) to all services
 - [ ] 231. Add ETag/If-None-Match conditional response support for GET endpoints
 
 ### 17C. Mobile Production Readiness
