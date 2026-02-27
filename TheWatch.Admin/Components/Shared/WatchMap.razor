@@ -1,0 +1,104 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div id="@_mapElementId" class="watch-map-container" style="height: @Height;"></div>
+
+@code {
+    private string _mapElementId = $"watch-map-{Guid.NewGuid():N}";
+    private bool _initialized;
+
+    [Parameter] public string Height { get; set; } = "400px";
+    [Parameter] public double CenterLat { get; set; } = 39.8283;
+    [Parameter] public double CenterLng { get; set; } = -98.5795;
+    [Parameter] public int Zoom { get; set; } = 4;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("WatchMap.init", _mapElementId, CenterLat, CenterLng, Zoom);
+            _initialized = true;
+        }
+    }
+
+    public async Task InvalidateSizeAsync()
+    {
+        if (_initialized)
+            await JS.InvokeVoidAsync("WatchMap.invalidateSize", _mapElementId);
+    }
+
+    public async Task SetViewAsync(double lat, double lng, int zoom)
+    {
+        if (_initialized)
+            await JS.InvokeVoidAsync("WatchMap.setView", _mapElementId, lat, lng, zoom);
+    }
+
+    public async Task FlyToAsync(double lat, double lng, int zoom)
+    {
+        if (_initialized)
+            await JS.InvokeVoidAsync("WatchMap.flyTo", _mapElementId, lat, lng, zoom);
+    }
+
+    public async Task AddMarkerAsync(string markerId, double lat, double lng, string iconType, string? tooltip = null, string? popupHtml = null)
+    {
+        if (_initialized)
+            await JS.InvokeVoidAsync("WatchMap.addMarker", _mapElementId, markerId, lat, lng, iconType, tooltip, popupHtml);
+    }
+
+    public async Task MoveMarkerAsync(string markerId, double lat, double lng, bool animate = true)
+    {
+        if (_initialized)
+            await JS.InvokeVoidAsync("WatchMap.moveMarker", _mapElementId, markerId, lat, lng, animate);
+    }
+
+    public async Task RemoveMarkerAsync(string markerId)
+    {
+        if (_initialized)
+            await JS.InvokeVoidAsync("WatchMap.removeMarker", _mapElementId, markerId);
+    }
+
+    public async Task UpdateMarkerPopupAsync(string markerId, string popupHtml)
+    {
+        if (_initialized)
+            await JS.InvokeVoidAsync("WatchMap.updateMarkerPopup", _mapElementId, markerId, popupHtml);
+    }
+
+    public async Task AddCircleZoneAsync(string zoneId, double lat, double lng, double radiusMeters, string color = "#e74c3c", double fillOpacity = 0.15, string? popupHtml = null)
+    {
+        if (_initialized)
+            await JS.InvokeVoidAsync("WatchMap.addCircleZone", _mapElementId, zoneId, lat, lng, radiusMeters, color, fillOpacity, popupHtml);
+    }
+
+    public async Task RemoveZoneAsync(string zoneId)
+    {
+        if (_initialized)
+            await JS.InvokeVoidAsync("WatchMap.removeZone", _mapElementId, zoneId);
+    }
+
+    public async Task SetUserLocationAsync(double lat, double lng)
+    {
+        if (_initialized)
+            await JS.InvokeVoidAsync("WatchMap.setUserLocation", _mapElementId, lat, lng);
+    }
+
+    public async Task FitAllMarkersAsync(double padding = 0.1)
+    {
+        if (_initialized)
+            await JS.InvokeVoidAsync("WatchMap.fitAllMarkers", _mapElementId, padding);
+    }
+
+    public async Task ClearAllAsync()
+    {
+        if (_initialized)
+            await JS.InvokeVoidAsync("WatchMap.clearAll", _mapElementId);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_initialized)
+        {
+            try { await JS.InvokeVoidAsync("WatchMap.destroy", _mapElementId); } catch { }
+        }
+    }
+}
