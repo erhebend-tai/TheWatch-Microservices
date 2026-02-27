@@ -402,16 +402,16 @@
 - [x] 187. Add `footage-submitted` and `crime-location-reported` Kafka topics to Azure Service Bus and AWS MSK Terraform modules
 
 ### 14B. P11 Monitoring & Testing
-- [ ] 188. Add `ISurveillanceClient` to `HealthController.cs` parallel health check array (currently only 11 services checked)
-- [ ] 189. Add P11 Surveillance to Dashboard `ServiceHealth.razor` and `Home.razor` service grid
-- [ ] 190. Create `TheWatch.P11.Surveillance.Tests` project with `WebApplicationFactory<Program>` integration tests (camera CRUD, footage submission, detection retrieval, crime location)
-- [ ] 191. Add P11 to CI/CD matrix: `ci.yml` build/test matrix, `docker-publish.yml` image build, deploy workflows
-- [ ] 192. Create EF Core migration for P11 (`dotnet ef migrations add InitialCreate`)
+- [x] 188. Add `ISurveillanceClient` to `HealthController.cs` parallel health check array (currently only 11 services checked)
+- [x] 189. Add P11 Surveillance to Dashboard `ServiceHealth.razor` and `Home.razor` service grid
+- [x] 190. Create `TheWatch.P11.Surveillance.Tests` project with `WebApplicationFactory<Program>` integration tests (camera CRUD, footage submission, detection retrieval, crime location)
+- [x] 191. Add P11 to CI/CD matrix: `ci.yml` build/test matrix, `docker-publish.yml` image build, deploy workflows
+- [x] 192. Create EF Core migration for P11 (`dotnet ef migrations add InitialCreate`)
 
 ### 14C. P11 Data & Events
-- [ ] 193. Create `SurveillanceSeeder.cs` seed data class (sample cameras, test footage entries, demo crime locations) and register as `IWatchDataSeeder`
-- [ ] 194. Add Kafka consumer in P2 VoiceEmergency for `footage-submitted` events (auto-correlate footage with active incidents by proximity)
-- [ ] 195. Add Kafka consumer in P6 FirstResponder for `crime-location-reported` events (alert nearby responders)
+- [x] 193. Create `SurveillanceSeeder.cs` seed data class (sample cameras, test footage entries, demo crime locations) and register as `IWatchDataSeeder`
+- [x] 194. Add Kafka consumer in P2 VoiceEmergency for `footage-submitted` events (auto-correlate footage with active incidents by proximity)
+- [x] 195. Add Kafka consumer in P6 FirstResponder for `crime-location-reported` events (alert nearby responders)
 
 ---
 
