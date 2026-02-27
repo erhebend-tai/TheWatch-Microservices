@@ -32,13 +32,7 @@
 # Models.json, Interfaces.json, _mapping.json are needed — do not exclude
 
 # Scripts and docs
-**/generate_projects.py
-**/map_specs_to_code.py
-**/resume-work.bat
-**/run-parallel-todos.bat
-**/start-workflows.bat
-**/stop-workflows.bat
-**/workflow-settings.json
+**/scripts
 **/parallel-build
 **/ROADMAP.md
 **/TODO.md

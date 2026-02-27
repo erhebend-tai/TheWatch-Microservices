@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.Batches;
 using Hangfire.InMemory;
 using Serilog;
 using TheWatch.P7.FamilyHealth;
@@ -9,6 +10,9 @@ using TheWatch.P7.FamilyHealth.Data.Seeders;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
 using TheWatch.Shared.Security;
+using TheWatch.Contracts.Abstractions;
+using TheWatch.Contracts.Wearable;
+using TheWatch.Contracts.CoreGateway;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -26,9 +30,11 @@ builder.Services.AddWatchCors(builder.Configuration, requiresSignalR: true);
 // SignalR real-time hubs (CheckInHub, VitalReadingHub, MedicalAlertHub, etc.)
 builder.Services.AddWatchSignalR();
 
-// Hangfire with InMemory storage
+// Hangfire with InMemory storage + Pro batches
 builder.Services.AddHangfire(config =>
-    config.UseInMemoryStorage());
+    config
+        .UseInMemoryStorage()
+        .UseBatches());
 builder.Services.AddHangfireServer();
 
 // Services
@@ -37,6 +43,18 @@ builder.Services.AddScoped<ICheckInService, CheckInService>();
 builder.Services.AddScoped<IVitalService, VitalService>();
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, FamilyHealthSeeder>();
+
+// Item 216: Contract client wiring — typed inter-service clients with Polly resilience
+builder.Services.AddWatchClientHandlers();
+
+// IWearableClient — query device heartbeat/vital data for health monitoring
+builder.Services.AddWearableClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:Wearable"] ?? "https+http://p4-wearable");
+
+// ICoreGatewayClient — user profile lookups for family member resolution
+builder.Services.AddCoreGatewayClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:CoreGateway"] ?? "https+http://p1-coregateway");
+
 builder.AddWatchControllers();
 
 var app = builder.Build();

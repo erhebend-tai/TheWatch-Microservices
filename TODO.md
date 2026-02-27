@@ -663,7 +663,7 @@
 
 ### 23A. Software Bill of Materials (SBOM)
 - [x] 326. Add CycloneDX SBOM generation to CI build — install `dotnet-CycloneDX` tool in `docker-publish.yml`. Generate SBOM in CycloneDX JSON format for each service. Upload SBOMs as build artifacts. Store alongside container images in registry. EO 14028 requires SBOM for all federal software. Files: `.github/workflows/docker-publish.yml`. [NIST SR-4, SSDF PS.2, OWASP A08] **HIGH**
-- [ ] 327. Generate aggregate SBOM for full solution — create a merged SBOM covering all 14 web projects + Shared + Generators. Include transitive dependencies. Capture NuGet package versions, license identifiers, and package hashes. Output as both CycloneDX and SPDX formats. Files: new `generate-sbom.sh` script, CI workflow update. [NIST SR-4, SSDF PS.2] **MEDIUM**
+- [ ] 327. Generate aggregate SBOM for full solution — create a merged SBOM covering all 14 web projects + Shared + Generators. Include transitive dependencies. Capture NuGet package versions, license identifiers, and package hashes. Output as both CycloneDX and SPDX formats. Files: `scripts/generate-sbom.sh` script, CI workflow update. [NIST SR-4, SSDF PS.2] **MEDIUM**
 - [ ] 328. Automate SBOM vulnerability cross-reference — after SBOM generation, run `grype` or `trivy sbom` against the SBOM to identify known CVEs. Fail builds on CRITICAL/HIGH CVEs. Generate vulnerability report as CI artifact. Files: CI workflow update. [NIST SI-2, SSDF RV.1] **MEDIUM**
 
 ### 23B. Container Security

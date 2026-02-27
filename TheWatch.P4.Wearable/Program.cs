@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.Batches;
 using Hangfire.InMemory;
 using Serilog;
 using TheWatch.P4.Wearable;
@@ -9,6 +10,9 @@ using TheWatch.P4.Wearable.Data.Seeders;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
 using TheWatch.Shared.Security;
+using TheWatch.Contracts.Abstractions;
+using TheWatch.Contracts.FamilyHealth;
+using TheWatch.Contracts.CoreGateway;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -23,12 +27,26 @@ builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 builder.Services.AddWatchCors(builder.Configuration);
 
 builder.Services.AddHangfire(config =>
-    config.UseInMemoryStorage());
+    config
+        .UseInMemoryStorage()
+        .UseBatches());
 builder.Services.AddHangfireServer();
 
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, WearableSeeder>();
+
+// Item 216: Contract client wiring — typed inter-service clients with Polly resilience
+builder.Services.AddWatchClientHandlers();
+
+// IFamilyHealthClient — forward vitals/alerts to family health service
+builder.Services.AddFamilyHealthClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:FamilyHealth"] ?? "https+http://p7-familyhealth");
+
+// ICoreGatewayClient — user profile lookups for device owner resolution
+builder.Services.AddCoreGatewayClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:CoreGateway"] ?? "https+http://p1-coregateway");
+
 builder.AddWatchControllers();
 
 var app = builder.Build();
@@ -46,6 +64,17 @@ app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
     IsReadOnlyFunc = _ => true
 });
 app.MapWatchControllers();
+
+// Recurring Hangfire jobs
+RecurringJob.AddOrUpdate<IDeviceService>(
+    "stale-device-detection",
+    svc => svc.MarkStaleDevicesOfflineAsync(TimeSpan.FromHours(1)),
+    "*/10 * * * *"); // Every 10 minutes
+
+RecurringJob.AddOrUpdate<IDeviceService>(
+    "heartbeat-data-cleanup",
+    svc => svc.CleanupOldHeartbeatReadingsAsync(TimeSpan.FromDays(90)),
+    "0 4 * * *"); // Daily at 4 AM
 
 app.MapGet("/health", () => new HealthResponse(
     "TheWatch.P4.Wearable", "P4", "Healthy", DateTime.UtcNow));

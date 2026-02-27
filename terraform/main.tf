@@ -19,15 +19,16 @@ locals {
     "WatchDoctorServicesDB" = { service = "p9-doctorservices", tier = "standard" }
     "WatchGamificationDB"   = { service = "p10-gamification", tier = "standard" }
     "WatchSurveillanceDB"   = { service = "p11-surveillance", tier = "standard" }
+    "WatchNotificationsDB"  = { service = "p12-notifications", tier = "standard" }
   }
 
   # Service Bus topics (replacing Kafka in cloud)
   servicebus_topics = {
-    "incident-created"    = { subscriptions = ["p6-firstresponder", "p3-meshnetwork", "dashboard"] }
+    "incident-created"    = { subscriptions = ["p6-firstresponder", "p3-meshnetwork", "dashboard", "p12-notifications"] }
     "dispatch-requested"  = { subscriptions = ["p3-meshnetwork", "p6-firstresponder"] }
     "responder-located"   = { subscriptions = ["p2-voiceemergency", "dashboard"] }
-    "checkin-completed"   = { subscriptions = ["p7-familyhealth", "dashboard"] }
-    "vital-alert"         = { subscriptions = ["p7-familyhealth", "p9-doctorservices"] }
+    "checkin-completed"   = { subscriptions = ["p7-familyhealth", "dashboard", "p12-notifications"] }
+    "vital-alert"         = { subscriptions = ["p7-familyhealth", "p9-doctorservices", "p12-notifications"] }
     "evidence-uploaded"   = { subscriptions = ["p2-voiceemergency"] }
     "disaster-declared"   = { subscriptions = ["p8-disasterrelief", "p6-firstresponder", "dashboard"] }
     "footage-submitted"   = { subscriptions = ["p11-surveillance", "p2-voiceemergency"] }
@@ -48,6 +49,7 @@ locals {
     "p9-doctorservices" = { cpu = 0.25, memory = "0.5Gi", min_replicas = 1, max_replicas = 3 }
     "p10-gamification"  = { cpu = 0.25, memory = "0.5Gi", min_replicas = 1, max_replicas = 2 }
     "p11-surveillance"  = { cpu = 0.5, memory = "1Gi", min_replicas = 1, max_replicas = 10 }
+    "p12-notifications" = { cpu = 0.25, memory = "0.5Gi", min_replicas = 1, max_replicas = 5 }
     "geospatial"        = { cpu = 0.5, memory = "1Gi", min_replicas = 1, max_replicas = 5 }
     "dashboard"         = { cpu = 0.25, memory = "0.5Gi", min_replicas = 1, max_replicas = 3 }
   }

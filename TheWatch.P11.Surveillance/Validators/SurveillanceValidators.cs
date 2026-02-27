@@ -119,3 +119,23 @@ public class SurveillanceSearchRequestValidator : AbstractValidator<Surveillance
             .WithMessage("Time window end must be after start");
     }
 }
+
+public class ObjectTrackingRequestValidator : AbstractValidator<ObjectTrackingRequest>
+{
+    public ObjectTrackingRequestValidator()
+    {
+        RuleFor(x => x.CrimeLocationId).NotEmpty();
+        RuleFor(x => x.InitiatedBy).NotEmpty();
+        RuleFor(x => x.ObjectDescription).NotEmpty().MaximumLength(4096)
+            .WithMessage("Object description is required and must be under 4096 characters");
+        RuleFor(x => x.SearchRadiusKm).GreaterThan(0).LessThanOrEqualTo(100)
+            .WithMessage("Search radius must be between 0 and 100 km");
+        RuleFor(x => x.TimeWindowEnd).GreaterThan(x => x.TimeWindowStart)
+            .When(x => x.TimeWindowStart.HasValue && x.TimeWindowEnd.HasValue)
+            .WithMessage("Time window end must be after start");
+        RuleFor(x => x.FootageMediaUrl).MaximumLength(1000)
+            .Must(u => string.IsNullOrEmpty(u) || Uri.TryCreate(u, UriKind.Absolute, out _))
+            .When(x => !string.IsNullOrEmpty(x.FootageMediaUrl))
+            .WithMessage("Footage media URL must be a valid absolute URI");
+    }
+}

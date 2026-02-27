@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.Batches;
 using Hangfire.InMemory;
 using Serilog;
 using TheWatch.P10.Gamification;
@@ -9,6 +10,9 @@ using TheWatch.P10.Gamification.Data.Seeders;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
 using TheWatch.Shared.Security;
+using TheWatch.Contracts.Abstractions;
+using TheWatch.Contracts.CoreGateway;
+using TheWatch.Contracts.VoiceEmergency;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -23,12 +27,26 @@ builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 builder.Services.AddWatchCors(builder.Configuration);
 
 builder.Services.AddHangfire(config =>
-    config.UseInMemoryStorage());
+    config
+        .UseInMemoryStorage()
+        .UseBatches());
 builder.Services.AddHangfireServer();
 
 builder.Services.AddScoped<IGamificationService, GamificationService>();
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, GamificationSeeder>();
+
+// Item 216: Contract client wiring — typed inter-service clients with Polly resilience
+builder.Services.AddWatchClientHandlers();
+
+// ICoreGatewayClient — user profile lookups for player/badge award
+builder.Services.AddCoreGatewayClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:CoreGateway"] ?? "https+http://p1-coregateway");
+
+// IVoiceEmergencyClient — award points on incident reporting and resolution
+builder.Services.AddVoiceEmergencyClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:VoiceEmergency"] ?? "https+http://p2-voiceemergency");
+
 builder.AddWatchControllers();
 
 var app = builder.Build();

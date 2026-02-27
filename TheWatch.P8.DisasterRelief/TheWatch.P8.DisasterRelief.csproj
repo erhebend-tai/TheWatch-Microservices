@@ -25,6 +25,10 @@
   <ItemGroup>
     <ProjectReference Include="..\TheWatch.Shared\TheWatch.Shared.csproj" />
     <ProjectReference Include="..\TheWatch.Generators\TheWatch.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <!-- IGeospatialClient — spatial queries for shelter/evacuation routing -->
+    <ProjectReference Include="..\TheWatch.Contracts.Geospatial\TheWatch.Contracts.Geospatial.csproj" />
+    <!-- IMeshNetworkClient — broadcast emergency alerts via mesh -->
+    <ProjectReference Include="..\TheWatch.Contracts.MeshNetwork\TheWatch.Contracts.MeshNetwork.csproj" />
   </ItemGroup>
 
   <ItemGroup>

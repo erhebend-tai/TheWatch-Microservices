@@ -26,6 +26,7 @@
     <ProjectReference Include="..\TheWatch.Contracts.MeshNetwork\TheWatch.Contracts.MeshNetwork.csproj" />
     <ProjectReference Include="..\TheWatch.Contracts.Surveillance\TheWatch.Contracts.Surveillance.csproj" />
     <ProjectReference Include="..\TheWatch.Contracts.Geospatial\TheWatch.Contracts.Geospatial.csproj" />
+    <ProjectReference Include="..\TheWatch.Contracts.Notifications\TheWatch.Contracts.Notifications.csproj" />
     <ProjectReference Include="..\TheWatch.Shared\TheWatch.Shared.csproj" />
   </ItemGroup>
 

@@ -25,6 +25,10 @@
   <ItemGroup>
     <ProjectReference Include="..\TheWatch.Shared\TheWatch.Shared.csproj" />
     <ProjectReference Include="..\TheWatch.Generators\TheWatch.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <!-- ICoreGatewayClient — user profile lookups for camera owners -->
+    <ProjectReference Include="..\TheWatch.Contracts.CoreGateway\TheWatch.Contracts.CoreGateway.csproj" />
+    <!-- IVoiceEmergencyClient — link footage to incidents -->
+    <ProjectReference Include="..\TheWatch.Contracts.VoiceEmergency\TheWatch.Contracts.VoiceEmergency.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -25,6 +25,10 @@
   <ItemGroup>
     <ProjectReference Include="..\TheWatch.Shared\TheWatch.Shared.csproj" />
     <ProjectReference Include="..\TheWatch.Generators\TheWatch.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <!-- IDisasterReliefClient — mesh broadcasts for disaster evacuations -->
+    <ProjectReference Include="..\TheWatch.Contracts.DisasterRelief\TheWatch.Contracts.DisasterRelief.csproj" />
+    <!-- IVoiceEmergencyClient — incident alerts via mesh -->
+    <ProjectReference Include="..\TheWatch.Contracts.VoiceEmergency\TheWatch.Contracts.VoiceEmergency.csproj" />
   </ItemGroup>
 
   <ItemGroup>

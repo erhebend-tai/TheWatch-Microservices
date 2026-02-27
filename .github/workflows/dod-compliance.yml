@@ -317,7 +317,7 @@ jobs:
           echo "|--------|---------|---------------------|--------|" >> $GITHUB_STEP_SUMMARY
 
           # Check SBOM generation (EO 14028, SSDF PS.3)
-          if grep -rq "sbom\|cyclonedx\|spdx" .github/workflows/ 2>/dev/null || [ -f "generate-sbom.sh" ]; then
+          if grep -rq "sbom\|cyclonedx\|spdx" .github/workflows/ 2>/dev/null || [ -f "scripts/generate-sbom.sh" ]; then
             PASS=$((PASS + 1))
             echo "| ✅ | SBOM generation | \`SSDF PS.3\` | SBOM workflow/script configured |" >> $GITHUB_STEP_SUMMARY
           else

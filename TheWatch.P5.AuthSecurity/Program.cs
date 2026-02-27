@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Hangfire;
+using Hangfire.Batches;
 using Hangfire.InMemory;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -81,9 +82,11 @@ builder.Services.AddWatchJwtAuth(builder.Configuration);
 // Rate Limiting (Item 74)
 builder.Services.AddWatchRateLimiting();
 
-// Hangfire
+// Hangfire with Pro batches
 builder.Services.AddHangfire(config =>
-    config.UseInMemoryStorage());
+    config
+        .UseInMemoryStorage()
+        .UseBatches());
 builder.Services.AddHangfireServer();
 
 // Services
@@ -410,7 +413,12 @@ static async Task SeedDataAsync(IServiceProvider services)
 {
     using var scope = services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AuthIdentityDbContext>();
-    await db.Database.EnsureCreatedAsync();
+
+    // Use MigrateAsync for SQL Server (production), EnsureCreatedAsync for InMemory (dev/test)
+    if (db.Database.IsSqlServer())
+        await db.Database.MigrateAsync();
+    else
+        await db.Database.EnsureCreatedAsync();
 
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<WatchRole>>();
     foreach (var role in WatchRoles.All)

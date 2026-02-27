@@ -1,9 +1,8 @@
-// Copyright (c) 2018 Barton Milnor Mallory. All rights reserved.
-
 using Hangfire;
 using Hangfire.InMemory;
 using Hangfire.Batches;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Serilog;
 using TheWatch.P11.Surveillance;
 using TheWatch.P11.Surveillance.Surveillance;
@@ -12,6 +11,9 @@ using TheWatch.Shared.Contracts;
 using TheWatch.Shared.Events;
 using TheWatch.Shared.ML;
 using TheWatch.Shared.Security;
+using TheWatch.Contracts.Abstractions;
+using TheWatch.Contracts.CoreGateway;
+using TheWatch.Contracts.VoiceEmergency;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -38,16 +40,39 @@ builder.Services.AddHangfireServer();
 builder.AddWatchSecurity();
 
 // ML.NET Object Detector (singleton — loads ONNX model once)
+var localDetector = new OnnxObjectDetector(builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>().CreateLogger<OnnxObjectDetector>());
+
+// Multi-cloud object detection with fallback (Local ONNX → Azure → GCP → AWS)
+builder.Services.Configure<CloudObjectDetectorOptions>(
+    builder.Configuration.GetSection(CloudObjectDetectorOptions.SectionName));
 builder.Services.AddSingleton<IObjectDetector>(sp =>
-    new OnnxObjectDetector(sp.GetRequiredService<ILogger<OnnxObjectDetector>>()));
+    new ResilientObjectDetector(
+        localDetector,
+        sp.GetServices<ICloudObjectDetector>(),
+        sp.GetRequiredService<IOptions<CloudObjectDetectorOptions>>(),
+        sp.GetRequiredService<ILogger<ResilientObjectDetector>>()));
 
 // Domain Services
 builder.Services.AddScoped<ICameraService, CameraService>();
 builder.Services.AddScoped<IFootageService, FootageService>();
 builder.Services.AddScoped<ICrimeLocationService, CrimeLocationService>();
 builder.Services.AddScoped<IVideoAnalysisService, VideoAnalysisService>();
+builder.Services.AddScoped<IObjectTrackingService, ObjectTrackingService>();
 builder.AddWatchControllers();
 builder.Services.AddScoped<IWatchDataSeeder, TheWatch.P11.Surveillance.Data.Seeders.SurveillanceSeeder>();
+
+// Item 216: Contract client wiring — typed inter-service clients with Polly resilience
+builder.Services.AddWatchClientHandlers();
+
+// ICoreGatewayClient — user profile lookups for camera owner verification
+builder.Services.AddCoreGatewayClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:CoreGateway"] ?? "https+http://p1-coregateway");
+
+// IVoiceEmergencyClient — link surveillance footage to active incidents
+builder.Services.AddVoiceEmergencyClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:VoiceEmergency"] ?? "https+http://p2-voiceemergency");
+
+builder.AddWatchControllers();
 
 var app = builder.Build();
 await app.UseWatchMigrations();
@@ -247,6 +272,38 @@ app.MapGet("/api/surveillance/stats", async (
 
     return Results.Ok(stats);
 }).RequireAuthorization("AdminOnly");
+
+// === Object Tracking (multi-cloud ML backup) ===
+
+app.MapPost("/api/object-tracking", async (ObjectTrackingRequest request, IObjectTrackingService svc) =>
+{
+    var result = await svc.TrackObjectsAsync(request);
+    return result.Status == TrackingStatus.Failed && result.TrackingSessionId == Guid.Empty
+        ? Results.NotFound(new { message = "Crime location not found" })
+        : Results.Created($"/api/object-tracking/{result.TrackingSessionId}", result);
+}).RequireAuthorization("ResponderAccess");
+
+app.MapGet("/api/object-tracking", async (
+    IObjectTrackingService svc,
+    Guid? crimeLocationId,
+    int? page,
+    int? pageSize) =>
+{
+    var result = await svc.ListTrackingSessionsAsync(crimeLocationId, page ?? 1, pageSize ?? 20);
+    return Results.Ok(result);
+}).RequireAuthorization("ResponderAccess");
+
+app.MapGet("/api/object-tracking/{id:guid}", async (Guid id, IObjectTrackingService svc) =>
+{
+    var session = await svc.GetTrackingSessionAsync(id);
+    return session is not null ? Results.Ok(session) : Results.NotFound();
+}).RequireAuthorization("ResponderAccess");
+
+app.MapGet("/api/object-tracking/{id:guid}/matches", async (Guid id, IObjectTrackingService svc) =>
+{
+    var matches = await svc.GetMatchesForSessionAsync(id);
+    return Results.Ok(matches);
+}).RequireAuthorization("ResponderAccess");
 
 // SignalR hub endpoints (/hubs/cameras, /hubs/detections, /hubs/footagesubmissions)
 app.MapWatchHubs();
