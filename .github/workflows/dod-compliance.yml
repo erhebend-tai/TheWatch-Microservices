@@ -14,6 +14,9 @@ concurrency:
   group: dod-compliance-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   # ===========================================================
   # Policy Documents — Verify all required DoD/NIST documents
