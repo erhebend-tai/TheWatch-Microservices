@@ -9,6 +9,9 @@ using TheWatch.P8.DisasterRelief.Data.Seeders;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
 using TheWatch.Shared.Security;
+using TheWatch.Contracts.Abstractions;
+using TheWatch.Contracts.Geospatial;
+using TheWatch.Contracts.MeshNetwork;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -33,6 +36,18 @@ builder.Services.AddScoped<IShelterService, ShelterService>();
 builder.Services.AddScoped<IResourceService, ResourceService>();
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, DisasterReliefSeeder>();
+
+// Item 216: Contract client wiring — typed inter-service clients with Polly resilience
+builder.Services.AddWatchClientHandlers();
+
+// IGeospatialClient — nearest shelter/evacuation route spatial queries
+builder.Services.AddGeospatialClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:Geospatial"] ?? "https+http://geospatial");
+
+// IMeshNetworkClient — broadcast evacuation alerts via mesh network
+builder.Services.AddMeshNetworkClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:MeshNetwork"] ?? "https+http://p3-meshnetwork");
+
 builder.AddWatchControllers();
 
 var app = builder.Build();

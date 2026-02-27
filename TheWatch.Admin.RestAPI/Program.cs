@@ -21,6 +21,7 @@ using TheWatch.Contracts.DoctorServices;
 using TheWatch.Contracts.Gamification;
 using TheWatch.Contracts.Geospatial;
 using TheWatch.Contracts.Surveillance;
+using TheWatch.Contracts.Notifications;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -235,6 +236,7 @@ ConfigureClient(builder.Services.AddDoctorServicesClient(), "p9-doctorservices")
 ConfigureClient(builder.Services.AddGamificationClient(), "p10-gamification");
 ConfigureClient(builder.Services.AddGeospatialClient(), "geospatial");
 ConfigureClient(builder.Services.AddSurveillanceClient(), "p11-surveillance");
+ConfigureClient(builder.Services.AddNotificationsClient(), "p12-notifications");
 
 // ──────── App Pipeline (Security+ 3.1: Defense in Depth layers) ─────
 var app = builder.Build();

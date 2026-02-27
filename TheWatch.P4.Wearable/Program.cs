@@ -9,6 +9,9 @@ using TheWatch.P4.Wearable.Data.Seeders;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
 using TheWatch.Shared.Security;
+using TheWatch.Contracts.Abstractions;
+using TheWatch.Contracts.FamilyHealth;
+using TheWatch.Contracts.CoreGateway;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -29,6 +32,18 @@ builder.Services.AddHangfireServer();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, WearableSeeder>();
+
+// Item 216: Contract client wiring — typed inter-service clients with Polly resilience
+builder.Services.AddWatchClientHandlers();
+
+// IFamilyHealthClient — forward vitals/alerts to family health service
+builder.Services.AddFamilyHealthClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:FamilyHealth"] ?? "https+http://p7-familyhealth");
+
+// ICoreGatewayClient — user profile lookups for device owner resolution
+builder.Services.AddCoreGatewayClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:CoreGateway"] ?? "https+http://p1-coregateway");
+
 builder.AddWatchControllers();
 
 var app = builder.Build();

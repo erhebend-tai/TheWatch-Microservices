@@ -79,6 +79,7 @@ jobs:
             TheWatch.P9.DoctorServices \
             TheWatch.P10.Gamification \
             TheWatch.P11.Surveillance \
+            TheWatch.P12.Notifications \
             TheWatch.Geospatial \
             TheWatch.Dashboard; do
             echo "::group::Building $project"
@@ -100,6 +101,7 @@ jobs:
             TheWatch.P9.DoctorServices.Tests \
             TheWatch.P10.Gamification.Tests \
             TheWatch.P11.Surveillance.Tests \
+            TheWatch.P12.Notifications.Tests \
             TheWatch.Geospatial.Tests \
             TheWatch.Mobile.Tests; do
             echo "::group::Building $project"
@@ -123,6 +125,7 @@ jobs:
             "TheWatch.Contracts.Gamification"
             "TheWatch.Contracts.Geospatial"
             "TheWatch.Contracts.Surveillance"
+            "TheWatch.Contracts.Notifications"
             "TheWatch.Shared"
             "TheWatch.Generators"
           )
@@ -167,6 +170,7 @@ jobs:
           - TheWatch.P9.DoctorServices.Tests
           - TheWatch.P10.Gamification.Tests
           - TheWatch.P11.Surveillance.Tests
+          - TheWatch.P12.Notifications.Tests
           - TheWatch.Geospatial.Tests
           - TheWatch.Mobile.Tests
 

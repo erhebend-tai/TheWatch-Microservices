@@ -1,5 +1,3 @@
-// Copyright (c) 2018 Barton Milnor Mallory. All rights reserved.
-
 using Hangfire;
 using Hangfire.InMemory;
 using Hangfire.Batches;
@@ -12,6 +10,9 @@ using TheWatch.Shared.Contracts;
 using TheWatch.Shared.Events;
 using TheWatch.Shared.ML;
 using TheWatch.Shared.Security;
+using TheWatch.Contracts.Abstractions;
+using TheWatch.Contracts.CoreGateway;
+using TheWatch.Contracts.VoiceEmergency;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -46,8 +47,20 @@ builder.Services.AddScoped<ICameraService, CameraService>();
 builder.Services.AddScoped<IFootageService, FootageService>();
 builder.Services.AddScoped<ICrimeLocationService, CrimeLocationService>();
 builder.Services.AddScoped<IVideoAnalysisService, VideoAnalysisService>();
-builder.AddWatchControllers();
 builder.Services.AddScoped<IWatchDataSeeder, TheWatch.P11.Surveillance.Data.Seeders.SurveillanceSeeder>();
+
+// Item 216: Contract client wiring — typed inter-service clients with Polly resilience
+builder.Services.AddWatchClientHandlers();
+
+// ICoreGatewayClient — user profile lookups for camera owner verification
+builder.Services.AddCoreGatewayClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:CoreGateway"] ?? "https+http://p1-coregateway");
+
+// IVoiceEmergencyClient — link surveillance footage to active incidents
+builder.Services.AddVoiceEmergencyClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:VoiceEmergency"] ?? "https+http://p2-voiceemergency");
+
+builder.AddWatchControllers();
 
 var app = builder.Build();
 await app.UseWatchMigrations();

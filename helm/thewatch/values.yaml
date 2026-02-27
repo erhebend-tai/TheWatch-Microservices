@@ -260,6 +260,24 @@ services:
         memory: "1Gi"
     pathPrefix: /api/p11
 
+  p12-notifications:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: thewatch-p12-notifications
+    port: 8080
+    database: WatchNotificationsDB
+    dbType: sqlserver
+    kafka: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 512Mi
+    pathPrefix: /api/p12
+
   geospatial:
     enabled: true
     replicaCount: 2

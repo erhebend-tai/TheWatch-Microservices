@@ -160,3 +160,26 @@ services:
       - "5100:8080"
     volumes:
       - ./TheWatch.Dashboard/logs:/app/logs
+
+  p11-surveillance:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WatchSurveillanceDB: "Server=sqlserver;Database=WatchSurveillanceDB;User Id=sa;Password=Watch@Dev2024!;TrustServerCertificate=true"
+      Logging__LogLevel__Default: Debug
+      Serilog__MinimumLevel: Debug
+    ports:
+      - "5113:8080"
+    volumes:
+      - ./TheWatch.P11.Surveillance/logs:/app/logs
+
+  p12-notifications:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WatchNotificationsDB: "Server=sqlserver;Database=WatchNotificationsDB;User Id=sa;Password=Watch@Dev2024!;TrustServerCertificate=true"
+      ServiceUrls__CoreGateway: "http://p1-coregateway:8080"
+      Logging__LogLevel__Default: Debug
+      Serilog__MinimumLevel: Debug
+    ports:
+      - "5114:8080"
+    volumes:
+      - ./TheWatch.P12.Notifications/logs:/app/logs

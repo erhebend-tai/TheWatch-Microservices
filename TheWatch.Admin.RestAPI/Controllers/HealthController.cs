@@ -11,6 +11,7 @@ using TheWatch.Contracts.DoctorServices;
 using TheWatch.Contracts.Gamification;
 using TheWatch.Contracts.Geospatial;
 using TheWatch.Contracts.Surveillance;
+using TheWatch.Contracts.Notifications;
 
 namespace TheWatch.Admin.RestAPI.Controllers;
 
@@ -32,6 +33,7 @@ public class HealthController(
     IGamificationClient gamification,
     IGeospatialClient geospatial,
     ISurveillanceClient surveillance,
+    INotificationsClient notifications,
     ILogger<HealthController> logger) : ControllerBase
 {
     [HttpGet]
@@ -51,7 +53,8 @@ public class HealthController(
             ("DoctorServices", async () => await doctorServices.ListDoctorsAsync(1, 1, ct)),
             ("Gamification", async () => await gamification.GetLeaderboardAsync(1, ct)),
             ("Geospatial", async () => await geospatial.FindNearestRespondersAsync(0, 0, 1, ct: ct)),
-            ("Surveillance", async () => await surveillance.ListCamerasAsync(1, 1, ct: ct))
+            ("Surveillance", async () => await surveillance.ListCamerasAsync(1, 1, ct: ct)),
+            ("Notifications", async () => await notifications.GetStatsAsync(ct))
         };
 
         await Parallel.ForEachAsync(checks, ct, async (check, token) =>
