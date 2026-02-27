@@ -420,11 +420,11 @@
 > Cloud provider stubs (GCP, Cloudflare) throw `NotImplementedException`. These items replace stubs with real SDK integrations.
 
 ### 15A. GCP Provider Implementations
-- [ ] 196. Implement `GoogleSpeechToTextProvider.TranscribeAsync()` — replace stub with real `Google.Cloud.Speech.V2.SpeechClient` call (`RecognizeAsync` with `RecognitionConfig`)
-- [ ] 197. Implement `GoogleSpeechToTextProvider.StartStreamingAsync()` — bidirectional streaming via `StreamingRecognize` with `StreamingRecognitionConfig`
-- [ ] 198. Implement `GoogleVisionProvider.AnalyzeImageAsync()` — real `Google.Cloud.Vision.V1.ImageAnnotatorClient` with `SafeSearchAnnotation` for content moderation
-- [ ] 199. Implement `GoogleVisionProvider.ExtractTextAsync()` and `DetectLabelsAsync()` — OCR and label detection via Vision API
-- [ ] 200. Implement `GoogleHealthcareProvider` FHIR methods — `UpsertPatientAsync`, `GetPatientAsync`, `SearchPatientsAsync`, `CreateObservationAsync`, `GetObservationsAsync`, `CreateEncounterAsync`, `ExportPatientDataAsync` using Google Healthcare API FHIR store
+- [x] 196. Implement `GoogleSpeechToTextProvider.TranscribeAsync()` — replace stub with real `Google.Cloud.Speech.V2.SpeechClient` call (`RecognizeAsync` with `RecognitionConfig`)
+- [x] 197. Implement `GoogleSpeechToTextProvider.StartStreamingAsync()` — bidirectional streaming via `StreamingRecognize` with `StreamingRecognitionConfig`
+- [x] 198. Implement `GoogleVisionProvider.AnalyzeImageAsync()` — real `Google.Cloud.Vision.V1.ImageAnnotatorClient` with `SafeSearchAnnotation` for content moderation
+- [x] 199. Implement `GoogleVisionProvider.ExtractTextAsync()` and `DetectLabelsAsync()` — OCR and label detection via Vision API
+- [x] 200. Implement `GoogleHealthcareProvider` FHIR methods — `UpsertPatientAsync`, `GetPatientAsync`, `SearchPatientsAsync`, `CreateObservationAsync`, `GetObservationsAsync`, `CreateEncounterAsync`, `ExportPatientDataAsync` using Google Healthcare API FHIR store
 
 ### 15B. Cloudflare Provider Implementations
 - [ ] 201. Implement `CloudflareCdnService` — `PurgeCacheAsync`, `PurgeAllAsync`, `PurgeByTagAsync`, `GetAnalyticsAsync` via Cloudflare API v4
