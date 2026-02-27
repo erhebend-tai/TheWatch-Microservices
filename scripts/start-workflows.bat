@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 echo ============================================
-echo  TheWatch - Stop Workflows
+echo  TheWatch - Start Workflows
 echo ============================================
 echo.
 
@@ -22,27 +22,34 @@ set "file_security-scan=security-scan.yml"
 set "file_docker-build=docker-build.yml"
 set "file_release=release.yml"
 
-set disabled=0
+set enabled=0
 set skipped=0
 
-:: Parse workflow-settings.json and disable each enabled workflow
+:: Parse workflow-settings.json and process each workflow
 for %%W in (build test code-quality security-scan docker-build release) do (
     set "key=%%W"
     set "filename=!file_%%W!"
 
     :: Use PowerShell to read the JSON value
-    for /f %%V in ('powershell -NoProfile -Command "(Get-Content 'workflow-settings.json' | ConvertFrom-Json).workflows.'%%W'"') do (
+    for /f %%V in ('powershell -NoProfile -Command "(Get-Content 'scripts\workflow-settings.json' | ConvertFrom-Json).workflows.'%%W'"') do (
         if /i "%%V"=="True" (
-            echo [DISABLING] %%W
-            gh workflow disable !filename! 2>nul
+            echo [ENABLING] %%W
+            gh workflow enable !filename! 2>nul
             if !errorlevel! neq 0 (
-                echo   WARNING: Could not disable !filename!
+                echo   WARNING: Could not enable !filename!
             ) else (
-                echo   Disabled !filename!
-                set /a disabled+=1
+                echo   Enabled !filename!
+                echo [RUNNING]  %%W
+                gh workflow run !filename! 2>nul
+                if !errorlevel! neq 0 (
+                    echo   WARNING: Could not trigger !filename!
+                ) else (
+                    echo   Triggered !filename!
+                )
+                set /a enabled+=1
             )
         ) else (
-            echo [SKIPPED]   %%W ^(already off in settings^)
+            echo [SKIPPED]  %%W
             set /a skipped+=1
         )
     )
@@ -50,7 +57,7 @@ for %%W in (build test code-quality security-scan docker-build release) do (
 
 echo.
 echo ============================================
-echo  Done: %disabled% disabled, %skipped% skipped
+echo  Done: %enabled% enabled, %skipped% skipped
 echo ============================================
 
 endlocal
