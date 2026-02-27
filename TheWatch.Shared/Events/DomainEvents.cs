@@ -71,6 +71,49 @@ public record SuspiciousDetectionEvent : WatchDomainEvent
     public Guid CameraId { get; init; }
 }
 
+// ── P7 FamilyHealth / P4 Wearable events ──
+
+public record CheckInCompletedEvent : WatchDomainEvent
+{
+    public Guid CheckInId { get; init; }
+    public Guid UserId { get; init; }
+    public Guid FamilyGroupId { get; init; }
+    public double Latitude { get; init; }
+    public double Longitude { get; init; }
+    public bool IsOverdue { get; init; }
+}
+
+public record VitalAlertEvent : WatchDomainEvent
+{
+    public Guid AlertId { get; init; }
+    public Guid UserId { get; init; }
+    public string VitalType { get; init; } = string.Empty;
+    public double Value { get; init; }
+    public string Severity { get; init; } = string.Empty;
+    public bool RequiresImmediate { get; init; }
+}
+
+// ── P8 DisasterRelief events ──
+
+public record DisasterDeclaredEvent : WatchDomainEvent
+{
+    public Guid EventId2 { get; init; }
+    public string DisasterType { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public double CenterLatitude { get; init; }
+    public double CenterLongitude { get; init; }
+    public double RadiusKm { get; init; }
+    public string Severity { get; init; } = string.Empty;
+}
+
+public record EvacuationOrderedEvent : WatchDomainEvent
+{
+    public Guid EvacuationId { get; init; }
+    public Guid DisasterEventId { get; init; }
+    public string ZoneName { get; init; } = string.Empty;
+    public DateTime OrderedAt { get; init; }
+}
+
 // ── Dead letter envelope ──
 
 public record DeadLetterEvent

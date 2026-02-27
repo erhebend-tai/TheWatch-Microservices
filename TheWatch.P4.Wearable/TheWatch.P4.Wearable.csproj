@@ -25,6 +25,10 @@
   <ItemGroup>
     <ProjectReference Include="..\TheWatch.Shared\TheWatch.Shared.csproj" />
     <ProjectReference Include="..\TheWatch.Generators\TheWatch.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <!-- IFamilyHealthClient — report vitals/alerts to family health service -->
+    <ProjectReference Include="..\TheWatch.Contracts.FamilyHealth\TheWatch.Contracts.FamilyHealth.csproj" />
+    <!-- ICoreGatewayClient — user profile lookups for device owners -->
+    <ProjectReference Include="..\TheWatch.Contracts.CoreGateway\TheWatch.Contracts.CoreGateway.csproj" />
   </ItemGroup>
 
   <ItemGroup>

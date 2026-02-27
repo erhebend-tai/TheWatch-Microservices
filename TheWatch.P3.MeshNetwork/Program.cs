@@ -10,6 +10,9 @@ using TheWatch.P3.MeshNetwork.Data.Seeders;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
 using TheWatch.Shared.Security;
+using TheWatch.Contracts.Abstractions;
+using TheWatch.Contracts.DisasterRelief;
+using TheWatch.Contracts.VoiceEmergency;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -37,6 +40,18 @@ builder.Services.AddScoped<IMeshService, MeshService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, MeshNetworkSeeder>();
+
+// Item 216: Contract client wiring — typed inter-service clients with Polly resilience
+builder.Services.AddWatchClientHandlers();
+
+// IDisasterReliefClient — query shelter/resource data for mesh broadcasts
+builder.Services.AddDisasterReliefClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:DisasterRelief"] ?? "https+http://p8-disasterrelief");
+
+// IVoiceEmergencyClient — fetch active incidents for mesh alert prioritization
+builder.Services.AddVoiceEmergencyClient()
+    .AddWatchClientDefaults(builder.Configuration["ServiceUrls:VoiceEmergency"] ?? "https+http://p2-voiceemergency");
+
 builder.AddWatchControllers();
 
 var app = builder.Build();

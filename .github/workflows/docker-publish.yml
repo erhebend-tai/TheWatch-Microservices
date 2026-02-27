@@ -48,6 +48,7 @@ jobs:
           - { name: p9-doctorservices,  dockerfile: TheWatch.P9.DoctorServices/Dockerfile }
           - { name: p10-gamification,   dockerfile: TheWatch.P10.Gamification/Dockerfile }
           - { name: p11-surveillance,   dockerfile: TheWatch.P11.Surveillance/Dockerfile }
+          - { name: p12-notifications,   dockerfile: TheWatch.P12.Notifications/Dockerfile }
           - { name: geospatial,         dockerfile: TheWatch.Geospatial/Dockerfile }
           - { name: dashboard,          dockerfile: TheWatch.Dashboard/Dockerfile }
 

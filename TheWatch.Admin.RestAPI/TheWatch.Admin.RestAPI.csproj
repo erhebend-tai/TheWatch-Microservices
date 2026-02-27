@@ -28,6 +28,7 @@
     <ProjectReference Include="..\TheWatch.Contracts.Gamification\TheWatch.Contracts.Gamification.csproj" />
     <ProjectReference Include="..\TheWatch.Contracts.Geospatial\TheWatch.Contracts.Geospatial.csproj" />
     <ProjectReference Include="..\TheWatch.Contracts.Surveillance\TheWatch.Contracts.Surveillance.csproj" />
+    <ProjectReference Include="..\TheWatch.Contracts.Notifications\TheWatch.Contracts.Notifications.csproj" />
   </ItemGroup>
 
 </Project>

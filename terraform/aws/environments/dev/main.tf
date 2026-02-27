@@ -46,6 +46,7 @@ locals {
     "p9-doctorservices",
     "p10-gamification",
     "p11-surveillance",
+    "p12-notifications",
     "geospatial",
     "dashboard",
   ]
@@ -62,6 +63,7 @@ locals {
     "WatchDoctorServicesDB" = { service = "p9-doctorservices", tier = "standard" }
     "WatchGamificationDB"   = { service = "p10-gamification", tier = "standard" }
     "WatchSurveillanceDB"   = { service = "p11-surveillance", tier = "standard" }
+    "WatchNotificationsDB"  = { service = "p12-notifications", tier = "standard" }
   }
 
   ecs_services = {

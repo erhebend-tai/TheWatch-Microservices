@@ -132,7 +132,7 @@ jobs:
             TheWatch.Contracts.DoctorServices \
             TheWatch.Contracts.Gamification \
             TheWatch.Contracts.Geospatial \
-            TheWatch.Contracts.Surveillance; do
+            TheWatch.Contracts.Surveillance TheWatch.Contracts.Notifications; do
             build_project "$project"
           done
 
@@ -149,6 +149,7 @@ jobs:
             TheWatch.P9.DoctorServices \
             TheWatch.P10.Gamification \
             TheWatch.P11.Surveillance \
+            TheWatch.P12.Notifications \
             TheWatch.Geospatial \
             TheWatch.Dashboard; do
             build_project "$project"
@@ -177,6 +178,7 @@ jobs:
             TheWatch.P9.DoctorServices.Tests \
             TheWatch.P10.Gamification.Tests \
             TheWatch.P11.Surveillance.Tests \
+            TheWatch.P12.Notifications.Tests \
             TheWatch.Geospatial.Tests \
             TheWatch.Mobile.Tests \
             TheWatch.Integration.Tests; do
@@ -236,6 +238,7 @@ jobs:
           - TheWatch.P9.DoctorServices.Tests
           - TheWatch.P10.Gamification.Tests
           - TheWatch.P11.Surveillance.Tests
+          - TheWatch.P12.Notifications.Tests
           - TheWatch.Geospatial.Tests
           - TheWatch.Mobile.Tests
 
