@@ -1,0 +1,62 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+
+<RadzenLayout>
+    <RadzenHeader>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" Style="padding: 0 1rem">
+            <RadzenSidebarToggle Click="@(() => sidebarExpanded = !sidebarExpanded)" />
+            <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H1" Class="rz-mb-0">
+                TheWatch Platform
+            </RadzenText>
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-left: auto">
+                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="3" />
+                <RadzenIcon Icon="notifications" />
+                <RadzenProfileMenu>
+                    <Template>
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                            <RadzenGravatar Email="user@example.com" />
+                            <RadzenText TextStyle="TextStyle.Body2">Admin User</RadzenText>
+                        </RadzenStack>
+                    </Template>
+                    <ChildContent>
+                        <RadzenProfileMenuItem Text="Profile" Icon="person" Path="/profile" />
+                        <RadzenProfileMenuItem Text="Settings" Icon="settings" Path="/settings" />
+                        <RadzenProfileMenuItem Text="Logout" Icon="logout" Path="/logout" />
+                    </ChildContent>
+                </RadzenProfileMenu>
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenHeader>
+    
+    <RadzenSidebar @bind-Expanded="@sidebarExpanded">
+        <RadzenPanelMenu>
+            <RadzenPanelMenuItem Text="Dashboard" Icon="dashboard" Path="/" />
+            <RadzenPanelMenuItem Text="Emergency" Icon="emergency" Expanded="true">
+                <RadzenPanelMenuItem Text="Incidents" Icon="warning" Path="/incidents" />
+                <RadzenPanelMenuItem Text="Reports" Icon="report" Path="/emergency/reports" />
+            </RadzenPanelMenuItem>
+            <RadzenPanelMenuItem Text="Admin" Icon="admin_panel_settings">
+                <RadzenPanelMenuItem Text="Users" Icon="people" Path="/admin/users" />
+                <RadzenPanelMenuItem Text="Settings" Icon="settings" Path="/admin/settings" />
+            </RadzenPanelMenuItem>
+        </RadzenPanelMenu>
+    </RadzenSidebar>
+    
+    <RadzenBody>
+        <RadzenStack Gap="1rem" Style="padding: 1rem">
+            @Body
+        </RadzenStack>
+    </RadzenBody>
+    
+    <RadzenFooter>
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.Center" Gap="1rem">
+            <RadzenText TextStyle="TextStyle.Body2" Class="rz-color-secondary">
+                © 2026 TheWatch Platform
+            </RadzenText>
+        </RadzenStack>
+    </RadzenFooter>
+</RadzenLayout>
+
+@code {
+    private bool sidebarExpanded = true;
+}

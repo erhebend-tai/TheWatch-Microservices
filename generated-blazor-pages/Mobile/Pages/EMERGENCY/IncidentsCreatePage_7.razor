@@ -1,0 +1,63 @@
+@page "//incidents/{incidentid}/on-scene/create"
+@using EMERGENCY.Shared.Models
+@inject NavigationManager Navigation
+
+<PageTitle>Responder marks on-scene</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="12">
+            <RadzenBreadCrumb>
+                <RadzenBreadCrumbItem Path="//incidents/{incidentid}/on-scene" Text="Back to List" Icon="arrow_back" />
+                <RadzenBreadCrumbItem Text="Create New" />
+            </RadzenBreadCrumb>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow>
+        <RadzenColumn Size="12" SizeMD="8" OffsetMD="2">
+            <RadzenCard>
+                @if (isLoading)
+                {
+                    <RadzenStack AlignItems="AlignItems.Center" Gap="1rem">
+                        <RadzenProgressBarCircular ShowValue="true" Mode="ProgressBarMode.Indeterminate" />
+                        <RadzenText TextStyle="TextStyle.Body1">Loading...</RadzenText>
+                    </RadzenStack>
+                }
+                else
+                {
+                    <RadzenTemplateForm Data="@model" Submit="@OnSubmit">
+                        <RadzenStack Gap="1rem">
+                            <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H2">
+                                Create New Responder marks on-scene
+                            </RadzenText>
+
+                            <RadzenFieldset Text="Basic Information">
+                                <RadzenStack Gap="1rem">
+                                    <!-- TODO: Add form fields based on schema -->
+                                    
+                                    <RadzenFormField Text="Name:" Variant="Variant.Outlined">
+                                        <RadzenTextBox @bind-Value="@model.Name" Name="Name" />
+                                        <RadzenRequiredValidator Component="Name" Text="Name is required" />
+                                    </RadzenFormField>
+
+                                    <RadzenFormField Text="Description:" Variant="Variant.Outlined">
+                                        <RadzenTextArea @bind-Value="@model.Description" Name="Description" Rows="4" />
+                                    </RadzenFormField>
+                                </RadzenStack>
+                            </RadzenFieldset>
+
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
+                                <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" 
+                                              Click="@OnCancel" />
+                                <RadzenButton ButtonType="ButtonType.Submit" Text="Create" 
+                                              Icon="save" ButtonStyle="ButtonStyle.Primary" 
+                                              IsBusy="@isSaving" />
+                            </RadzenStack>
+                        </RadzenStack>
+                    </RadzenTemplateForm>
+                }
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+</RadzenStack>

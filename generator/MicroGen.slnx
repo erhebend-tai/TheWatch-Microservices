@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MicroGen.Cli/MicroGen.Cli.csproj" />
+    <Project Path="src/MicroGen.Core/MicroGen.Core.csproj" />
+    <Project Path="src/MicroGen.Generator/MicroGen.Generator.csproj" />
+  </Folder>
+</Solution>

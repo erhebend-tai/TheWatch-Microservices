@@ -1,0 +1,555 @@
+using MicroGen.Core.Configuration;
+using MicroGen.Core.Models;
+using MicroGen.Generator.Emitters;
+using MicroGen.Generator.Templates;
+using Microsoft.Extensions.Logging;
+
+namespace MicroGen.Generator.Generators;
+
+/// <summary>
+/// Generates Nginx reverse proxy configuration per service:
+/// nginx.conf, upstream blocks, SSL/TLS, rate limiting, CORS,
+/// Dockerfile, and K8s Ingress manifests.
+/// </summary>
+public sealed class NginxGenerator
+{
+    private readonly TemplateEngine _engine;
+    private readonly GeneratorConfig _config;
+    private readonly ILogger _logger;
+
+    public NginxGenerator(TemplateEngine engine, GeneratorConfig config, ILogger logger)
+    {
+        _engine = engine;
+        _config = config;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Generates Nginx config per-service (placed in deploy/nginx/).
+    /// </summary>
+    public async Task GenerateAsync(
+        ServiceDescriptor service,
+        string serviceRoot,
+        FileEmitter emitter,
+        CancellationToken ct)
+    {
+        _logger.LogDebug("  Generating Nginx config for {Service}...", service.PascalName);
+
+        // ─── Service-level nginx site config ───
+        await emitter.EmitAsync(
+            Path.Combine(serviceRoot, "deploy", "nginx", "conf.d", $"{service.KebabName}.conf"),
+            _engine.Render(Templates.ServiceSiteConf, new { Service = service }),
+            ct);
+
+        // ─── K8s Ingress manifest ───
+        await emitter.EmitAsync(
+            Path.Combine(serviceRoot, "deploy", "k8s", "ingress.yaml"),
+            _engine.Render(Templates.K8sIngress, new { Service = service }),
+            ct);
+    }
+
+    /// <summary>
+    /// Generates the root-level Nginx gateway config that spans all services in a domain.
+    /// Called once per domain (not per service).
+    /// </summary>
+    public async Task GenerateDomainGatewayAsync(
+        DomainDescriptor domain,
+        string domainRoot,
+        FileEmitter emitter,
+        CancellationToken ct)
+    {
+        _logger.LogDebug("  Generating Nginx gateway for domain {Domain}...", domain.DomainName);
+
+        // ─── Main nginx.conf ───
+        await emitter.EmitAsync(
+            Path.Combine(domainRoot, "gateway", "nginx", "nginx.conf"),
+            _engine.Render(Templates.MainNginxConf, new { Domain = domain }),
+            ct);
+
+        // ─── Upstream definitions ───
+        await emitter.EmitAsync(
+            Path.Combine(domainRoot, "gateway", "nginx", "conf.d", "upstreams.conf"),
+            _engine.Render(Templates.Upstreams, new { Domain = domain }),
+            ct);
+
+        // ─── Rate limiting zone ───
+        await emitter.EmitAsync(
+            Path.Combine(domainRoot, "gateway", "nginx", "conf.d", "rate-limiting.conf"),
+            _engine.Render(Templates.RateLimiting, new { Domain = domain }),
+            ct);
+
+        // ─── SSL params snippet ───
+        await emitter.EmitAsync(
+            Path.Combine(domainRoot, "gateway", "nginx", "snippets", "ssl-params.conf"),
+            _engine.Render(Templates.SslParams, new { Domain = domain }),
+            ct);
+
+        // ─── CORS snippet ───
+        await emitter.EmitAsync(
+            Path.Combine(domainRoot, "gateway", "nginx", "snippets", "cors.conf"),
+            _engine.Render(Templates.CorsSnippet, new { Domain = domain }),
+            ct);
+
+        // ─── Security headers snippet ───
+        await emitter.EmitAsync(
+            Path.Combine(domainRoot, "gateway", "nginx", "snippets", "security-headers.conf"),
+            _engine.Render(Templates.SecurityHeaders, new { Domain = domain }),
+            ct);
+
+        // ─── Proxy params snippet ───
+        await emitter.EmitAsync(
+            Path.Combine(domainRoot, "gateway", "nginx", "snippets", "proxy-params.conf"),
+            _engine.Render(Templates.ProxyParams, new { Domain = domain }),
+            ct);
+
+        // ─── Dockerfile for Nginx ───
+        await emitter.EmitAsync(
+            Path.Combine(domainRoot, "gateway", "nginx", "Dockerfile"),
+            _engine.Render(Templates.Dockerfile, new { Domain = domain }),
+            ct);
+
+        // ─── docker-compose for gateway ───
+        await emitter.EmitAsync(
+            Path.Combine(domainRoot, "gateway", "docker-compose.yaml"),
+            _engine.Render(Templates.DockerCompose, new { Domain = domain }),
+            ct);
+
+        // ─── K8s Nginx Ingress Controller config ───
+        await emitter.EmitAsync(
+            Path.Combine(domainRoot, "gateway", "k8s", "nginx-configmap.yaml"),
+            _engine.Render(Templates.K8sNginxConfigMap, new { Domain = domain }),
+            ct);
+    }
+
+    private static class Templates
+    {
+        // ─── Per-service site config ──────────────────────────────────
+        public const string ServiceSiteConf = """
+            # {{ Service.PascalName }} — Nginx reverse proxy site configuration
+            # Auto-generated by MicroGen
+
+            upstream {{ Service.KebabName }}_backend {
+                least_conn;
+                server {{ Service.KebabName }}:8080 max_fails=3 fail_timeout=30s;
+                # Add more upstream servers for load balancing:
+                # server {{ Service.KebabName }}-2:8080 max_fails=3 fail_timeout=30s;
+            }
+
+            server {
+                listen 80;
+                server_name {{ Service.KebabName }}.local {{ Service.KebabName }}.svc.cluster.local;
+
+                # Redirect HTTP to HTTPS in production
+                # return 301 https://$server_name$request_uri;
+
+                include snippets/cors.conf;
+                include snippets/security-headers.conf;
+
+                # Health check endpoint (bypass auth)
+                location /health/ {
+                    proxy_pass http://{{ Service.KebabName }}_backend;
+                    include snippets/proxy-params.conf;
+                    access_log off;
+                }
+
+                # API routes
+                location /api/ {
+                    limit_req zone=api_limit burst=20 nodelay;
+                    proxy_pass http://{{ Service.KebabName }}_backend;
+                    include snippets/proxy-params.conf;
+                }
+
+                # Swagger / OpenAPI docs (development only)
+                location /swagger {
+                    proxy_pass http://{{ Service.KebabName }}_backend;
+                    include snippets/proxy-params.conf;
+                }
+
+                # Deny access to sensitive paths
+                location ~ /\. {
+                    deny all;
+                    return 404;
+                }
+
+                # Error pages
+                error_page 502 503 504 /50x.html;
+                location = /50x.html {
+                    root /usr/share/nginx/html;
+                    internal;
+                }
+            }
+            """;
+
+        // ─── Main nginx.conf ──────────────────────────────────────────
+        public const string MainNginxConf = """
+            # {{ Domain.DomainName }} Domain — Nginx Gateway
+            # Auto-generated by MicroGen
+            #
+            # Services: {{ Domain.Services.size }}
+            # Total operations: {{ Domain.TotalOperations }}
+
+            user nginx;
+            worker_processes auto;
+            pid /run/nginx.pid;
+            error_log /var/log/nginx/error.log warn;
+
+            events {
+                worker_connections 4096;
+                multi_accept on;
+                use epoll;
+            }
+
+            http {
+                # ─── Basic settings ───
+                sendfile on;
+                tcp_nopush on;
+                tcp_nodelay on;
+                keepalive_timeout 65;
+                types_hash_max_size 2048;
+                server_tokens off;
+                client_max_body_size 50m;
+
+                include /etc/nginx/mime.types;
+                default_type application/octet-stream;
+
+                # ─── Logging ───
+                log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                                '$status $body_bytes_sent "$http_referer" '
+                                '"$http_user_agent" "$http_x_forwarded_for" '
+                                'rt=$request_time urt=$upstream_response_time';
+
+                log_format json escape=json '{'
+                    '"time":"$time_iso8601",'
+                    '"remote_addr":"$remote_addr",'
+                    '"request":"$request",'
+                    '"status":$status,'
+                    '"body_bytes_sent":$body_bytes_sent,'
+                    '"request_time":$request_time,'
+                    '"upstream_response_time":"$upstream_response_time",'
+                    '"http_user_agent":"$http_user_agent",'
+                    '"http_x_correlation_id":"$http_x_correlation_id"'
+                    '}';
+
+                access_log /var/log/nginx/access.log json;
+
+                # ─── Gzip ───
+                gzip on;
+                gzip_vary on;
+                gzip_proxied any;
+                gzip_comp_level 6;
+                gzip_types text/plain text/css application/json application/javascript
+                           text/xml application/xml application/xml+rss text/javascript;
+
+                # ─── Rate limiting and connection zones ───
+                include /etc/nginx/conf.d/rate-limiting.conf;
+
+                # ─── Upstream definitions ───
+                include /etc/nginx/conf.d/upstreams.conf;
+
+                # ─── Virtual host configs ───
+                include /etc/nginx/conf.d/*.conf;
+            }
+            """;
+
+        // ─── Upstream definitions ─────────────────────────────────────
+        public const string Upstreams = """
+            # Upstream definitions for {{ Domain.DomainName }} domain
+            # Auto-generated by MicroGen
+
+            {{~ for svc in Domain.Services ~}}
+            upstream {{ svc.KebabName }}_backend {
+                least_conn;
+                server {{ svc.KebabName }}:8080;
+                keepalive 32;
+            }
+
+            {{~ end ~}}
+            """;
+
+        // ─── Rate limiting ────────────────────────────────────────────
+        public const string RateLimiting = """
+            # Rate limiting zones for {{ Domain.DomainName }}
+            # Auto-generated by MicroGen
+
+            # General API rate limit: 100 requests/second per IP
+            limit_req_zone $binary_remote_addr zone=api_limit:10m rate=100r/s;
+
+            # Authentication endpoints: stricter limit
+            limit_req_zone $binary_remote_addr zone=auth_limit:10m rate=10r/s;
+
+            # Webhook endpoints: generous limit
+            limit_req_zone $binary_remote_addr zone=webhook_limit:10m rate=500r/s;
+
+            # Per-client rate limit (by API key header)
+            map $http_x_api_key $api_client_key {
+                default $binary_remote_addr;
+                "~.+"   $http_x_api_key;
+            }
+            limit_req_zone $api_client_key zone=client_limit:10m rate=200r/s;
+
+            # Rate limit response
+            limit_req_status 429;
+            limit_req_log_level warn;
+            """;
+
+        // ─── SSL params ──────────────────────────────────────────────
+        public const string SslParams = """
+            # SSL/TLS configuration snippet
+            # Auto-generated by MicroGen
+
+            ssl_protocols TLSv1.2 TLSv1.3;
+            ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+            ssl_prefer_server_ciphers off;
+            ssl_session_cache shared:SSL:10m;
+            ssl_session_timeout 1d;
+            ssl_session_tickets off;
+            ssl_stapling on;
+            ssl_stapling_verify on;
+            resolver 8.8.8.8 8.8.4.4 valid=300s;
+            resolver_timeout 5s;
+            """;
+
+        // ─── CORS snippet ────────────────────────────────────────────
+        public const string CorsSnippet = """
+            # CORS configuration snippet
+            # Auto-generated by MicroGen
+
+            set $cors_origin "";
+            set $cors_methods "GET, POST, PUT, PATCH, DELETE, OPTIONS";
+            set $cors_headers "Authorization, Content-Type, X-Requested-With, X-API-Key, X-Correlation-ID";
+
+            if ($http_origin ~* "(https?://localhost(:[0-9]+)?|https?://.*\.thewatch\.app)") {
+                set $cors_origin $http_origin;
+            }
+
+            add_header 'Access-Control-Allow-Origin' $cors_origin always;
+            add_header 'Access-Control-Allow-Methods' $cors_methods always;
+            add_header 'Access-Control-Allow-Headers' $cors_headers always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            add_header 'Access-Control-Max-Age' 86400 always;
+
+            if ($request_method = 'OPTIONS') {
+                add_header 'Content-Type' 'text/plain charset=UTF-8';
+                add_header 'Content-Length' 0;
+                return 204;
+            }
+            """;
+
+        // ─── Security headers ────────────────────────────────────────
+        public const string SecurityHeaders = """
+            # Security headers snippet
+            # Auto-generated by MicroGen
+
+            add_header X-Frame-Options "SAMEORIGIN" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header X-XSS-Protection "1; mode=block" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" always;
+            add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+            add_header Permissions-Policy "camera=(), microphone=(), geolocation=(self)" always;
+            """;
+
+        // ─── Proxy params ────────────────────────────────────────────
+        public const string ProxyParams = """
+            # Proxy parameters snippet
+            # Auto-generated by MicroGen
+
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            proxy_set_header X-Correlation-ID $http_x_correlation_id;
+            proxy_set_header Connection "";
+
+            proxy_connect_timeout 10s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+
+            proxy_buffering on;
+            proxy_buffer_size 4k;
+            proxy_buffers 8 4k;
+
+            proxy_next_upstream error timeout invalid_header http_502 http_503 http_504;
+            proxy_next_upstream_tries 2;
+            """;
+
+        // ─── Nginx Dockerfile ────────────────────────────────────────
+        public const string Dockerfile = """
+            # Nginx Gateway for {{ Domain.DomainName }}
+            # Auto-generated by MicroGen
+            FROM nginx:1.27-alpine
+
+            # Remove default config
+            RUN rm /etc/nginx/conf.d/default.conf
+
+            # Copy configuration
+            COPY nginx.conf /etc/nginx/nginx.conf
+            COPY conf.d/ /etc/nginx/conf.d/
+            COPY snippets/ /etc/nginx/snippets/
+
+            # Create log directory
+            RUN mkdir -p /var/log/nginx
+
+            # Health check
+            HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+                CMD wget --no-verbose --tries=1 --spider http://localhost/health/ || exit 1
+
+            EXPOSE 80 443
+
+            CMD ["nginx", "-g", "daemon off;"]
+            """;
+
+        // ─── Docker Compose for gateway ──────────────────────────────
+        public const string DockerCompose = """
+            # {{ Domain.DomainName }} Gateway — Docker Compose
+            # Auto-generated by MicroGen
+            version: '3.9'
+
+            services:
+              nginx-gateway:
+                build:
+                  context: ./nginx
+                  dockerfile: Dockerfile
+                ports:
+                  - "80:80"
+                  - "443:443"
+                volumes:
+                  - ./nginx/conf.d:/etc/nginx/conf.d:ro
+                  - ./nginx/snippets:/etc/nginx/snippets:ro
+                  - ./certs:/etc/nginx/certs:ro
+                  - nginx-logs:/var/log/nginx
+                networks:
+                  - {{ Domain.DomainName | string.downcase }}-network
+                depends_on:
+            {{~ for svc in Domain.Services ~}}
+                  {{ svc.KebabName }}:
+                    condition: service_healthy
+            {{~ end ~}}
+                healthcheck:
+                  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health/"]
+                  interval: 30s
+                  timeout: 5s
+                  retries: 3
+                restart: unless-stopped
+
+            {{~ for svc in Domain.Services ~}}
+              {{ svc.KebabName }}:
+                image: {{ svc.KebabName }}:latest
+                expose:
+                  - "8080"
+                networks:
+                  - {{ Domain.DomainName | string.downcase }}-network
+                healthcheck:
+                  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/live"]
+                  interval: 30s
+                  timeout: 5s
+                  retries: 3
+
+            {{~ end ~}}
+            networks:
+              {{ Domain.DomainName | string.downcase }}-network:
+                driver: bridge
+
+            volumes:
+              nginx-logs:
+            """;
+
+        // ─── K8s Ingress per service ─────────────────────────────────
+        public const string K8sIngress = """
+            # Kubernetes Ingress for {{ Service.PascalName }}
+            # Auto-generated by MicroGen
+            apiVersion: networking.k8s.io/v1
+            kind: Ingress
+            metadata:
+              name: {{ Service.KebabName }}-ingress
+              namespace: {{ Service.KebabName }}
+              annotations:
+                nginx.ingress.kubernetes.io/rewrite-target: /
+                nginx.ingress.kubernetes.io/ssl-redirect: "true"
+                nginx.ingress.kubernetes.io/rate-limit: "100"
+                nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+                nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+                nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+                nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+                nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+                nginx.ingress.kubernetes.io/enable-cors: "true"
+                nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+                nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-API-Key, X-Correlation-ID"
+                cert-manager.io/cluster-issuer: "letsencrypt-prod"
+              labels:
+                app.kubernetes.io/name: {{ Service.KebabName }}
+                app.kubernetes.io/component: ingress
+            spec:
+              ingressClassName: nginx
+              tls:
+                - hosts:
+                    - {{ Service.KebabName }}.thewatch.app
+                  secretName: {{ Service.KebabName }}-tls
+              rules:
+                - host: {{ Service.KebabName }}.thewatch.app
+                  http:
+                    paths:
+                      - path: /api/
+                        pathType: Prefix
+                        backend:
+                          service:
+                            name: {{ Service.KebabName }}
+                            port:
+                              number: 80
+                      - path: /health
+                        pathType: Prefix
+                        backend:
+                          service:
+                            name: {{ Service.KebabName }}
+                            port:
+                              number: 80
+            """;
+
+        // ─── K8s Nginx ConfigMap ─────────────────────────────────────
+        public const string K8sNginxConfigMap = """
+            # Nginx Ingress Controller ConfigMap for {{ Domain.DomainName }}
+            # Auto-generated by MicroGen
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: nginx-configuration
+              namespace: ingress-nginx
+              labels:
+                app.kubernetes.io/name: ingress-nginx
+                app.kubernetes.io/part-of: ingress-nginx
+            data:
+              # Performance
+              worker-processes: "auto"
+              max-worker-connections: "4096"
+              keepalive: "32"
+
+              # Security
+              server-tokens: "false"
+              ssl-protocols: "TLSv1.2 TLSv1.3"
+              ssl-ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"
+              hsts: "true"
+              hsts-max-age: "31536000"
+              hsts-include-subdomains: "true"
+
+              # Compression
+              use-gzip: "true"
+              gzip-level: "6"
+              gzip-types: "application/json application/javascript text/css text/plain text/xml"
+
+              # Rate limiting
+              limit-req-status-code: "429"
+
+              # Logging
+              log-format-upstream: '{"time":"$time_iso8601","remote_addr":"$remote_addr","request":"$request","status":$status,"body_bytes_sent":$body_bytes_sent,"request_time":$request_time,"upstream":"$upstream_addr","correlation_id":"$http_x_correlation_id"}'
+
+              # Proxy
+              proxy-connect-timeout: "10"
+              proxy-read-timeout: "30"
+              proxy-send-timeout: "30"
+              proxy-body-size: "50m"
+            """;
+    }
+}

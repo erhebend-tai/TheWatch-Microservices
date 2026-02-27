@@ -1,0 +1,84 @@
+@page "//weather/alerts/{alertid}/{{Id}}"
+@using DISASTER.Shared.Models
+@inject NavigationManager Navigation
+
+<PageTitle>Get specific weather alert details</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="12">
+            <RadzenBreadCrumb>
+                <RadzenBreadCrumbItem Path="//weather/alerts/{alertid}" Text="Back to List" Icon="arrow_back" />
+                <RadzenBreadCrumbItem Text="Details" />
+            </RadzenBreadCrumb>
+        </RadzenColumn>
+    </RadzenRow>
+
+    @if (isLoading)
+    {
+        <RadzenCard>
+            <RadzenStack AlignItems="AlignItems.Center" Gap="1rem">
+                <RadzenProgressBarCircular ShowValue="true" Mode="ProgressBarMode.Indeterminate" />
+                <RadzenText TextStyle="TextStyle.Body1">Loading details...</RadzenText>
+            </RadzenStack>
+        </RadzenCard>
+    }
+    else if (item == null)
+    {
+        <RadzenCard>
+            <RadzenStack AlignItems="AlignItems.Center" Gap="1rem">
+                <RadzenIcon Icon="error_outline" Style="font-size: 3rem; color: var(--rz-danger);" />
+                <RadzenText TextStyle="TextStyle.Body1">Item not found</RadzenText>
+                <RadzenButton Text="Back to List" Click="@(() => Navigation.NavigateTo("//weather/alerts/{alertid}"))" />
+            </RadzenStack>
+        </RadzenCard>
+    }
+    else
+    {
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="8">
+                <RadzenCard>
+                    <RadzenStack Gap="1rem">
+                        <RadzenRow>
+                            <RadzenColumn Size="12">
+                                <RadzenText TextStyle="TextStyle.H4" TagName="TagName.H2">
+                                    @item.ToString()
+                                </RadzenText>
+                            </RadzenColumn>
+                        </RadzenRow>
+
+                        <RadzenRow>
+                            <RadzenColumn Size="12" SizeMD="6">
+                                <RadzenLabel Text="ID:" />
+                                <RadzenText TextStyle="TextStyle.Body1">@Id</RadzenText>
+                            </RadzenColumn>
+                            <RadzenColumn Size="12" SizeMD="6">
+                                <RadzenLabel Text="Created At:" />
+                                <RadzenText TextStyle="TextStyle.Body1">@DateTime.Now.ToString("g")</RadzenText>
+                            </RadzenColumn>
+                        </RadzenRow>
+
+                        <!-- TODO: Add more fields based on schema -->
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenCard>
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.H6">Actions</RadzenText>
+                        <RadzenButton Text="Edit" Icon="edit" ButtonStyle="ButtonStyle.Warning" 
+                                      Click="@OnEdit" Style="width: 100%" />
+                        <RadzenButton Text="Delete" Icon="delete" ButtonStyle="ButtonStyle.Danger" 
+                                      Click="@OnDelete" Style="width: 100%" />
+                        <RadzenSeparator />
+                        <RadzenButton Text="Back to List" Icon="arrow_back" ButtonStyle="ButtonStyle.Light" 
+                                      Click="@(() => Navigation.NavigateTo("//weather/alerts/{alertid}"))" Style="width: 100%" />
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+    }
+</RadzenStack>
+
+<RadzenDialog />
