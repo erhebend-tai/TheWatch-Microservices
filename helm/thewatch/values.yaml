@@ -268,7 +268,7 @@ services:
     port: 8080
     database: WatchNotificationsDB
     dbType: sqlserver
-    kafka: false
+    kafka: true
     resources:
       requests:
         cpu: 100m

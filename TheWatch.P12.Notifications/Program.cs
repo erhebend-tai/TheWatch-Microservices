@@ -4,6 +4,7 @@ using Serilog;
 using TheWatch.P12.Notifications;
 using TheWatch.P12.Notifications.Notifications;
 using TheWatch.P12.Notifications.Services;
+using TheWatch.P12.Notifications.Events;
 using TheWatch.Shared.Contracts;
 using TheWatch.P12.Notifications.Data.Seeders;
 using TheWatch.Shared.Security;
@@ -16,6 +17,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.ConfigureWatchSerilog();
 builder.ConfigureWatchOpenApi();
 builder.AddWatchPersistenceAspire();
+builder.AddWatchKafka();
+builder.AddWatchKafkaConsumer<IncidentCreatedNotificationConsumer>();
 
 // CORS
 builder.Services.AddWatchCors(builder.Configuration);
@@ -30,6 +33,7 @@ builder.Services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
 builder.Services.AddScoped<IPreferenceService, PreferenceService>();
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, NotificationsSeeder>();
+builder.Services.AddWatchResponseCompression();
 
 // Contract client wiring
 builder.Services.AddWatchClientHandlers();
@@ -43,7 +47,11 @@ builder.AddWatchControllers();
 var app = builder.Build();
 await app.UseWatchMigrations();
 
+// RFC 9457 global exception handler must be first in the pipeline
+app.UseWatchExceptionHandler();
+
 app.UseCors();
+app.UseWatchResponseCompression();
 app.UseWatchSecurity();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();

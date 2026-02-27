@@ -374,6 +374,7 @@ services:
       Jwt__Issuer: "thewatch-auth"
       Jwt__Audience: "thewatch-services"
       ServiceUrls__CoreGateway: "http://p1-coregateway:8080"
+      Kafka__BootstrapServers: "kafka:29092"
     ports:
       - "5113:8080"
     depends_on:
@@ -381,6 +382,8 @@ services:
         condition: service_healthy
       sql-init:
         condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
     restart: unless-stopped
 
   # ============================================================

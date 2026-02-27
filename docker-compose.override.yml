@@ -177,6 +177,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__WatchNotificationsDB: "Server=sqlserver;Database=WatchNotificationsDB;User Id=sa;Password=Watch@Dev2024!;TrustServerCertificate=true"
       ServiceUrls__CoreGateway: "http://p1-coregateway:8080"
+      Kafka__BootstrapServers: "kafka:29092"
       Logging__LogLevel__Default: Debug
       Serilog__MinimumLevel: Debug
     ports:
