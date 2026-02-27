@@ -69,3 +69,22 @@ public record MagicLinkRequest(
 public record ChangePasswordRequest(
     [property: Required, MinLength(1)] string CurrentPassword,
     [property: Required, MinLength(15), MaxLength(128)] string NewPassword);
+
+/// <summary>
+/// Item 323: Validated request body for completing an onboarding step.
+/// Replaces raw query string <c>string step</c> parameter with an enum-backed DTO
+/// to prevent injection via uncontrolled query string values. [STIG V-222606, OWASP A03]
+/// </summary>
+public record CompleteOnboardingStepRequest(
+    [property: Required] OnboardingStep Step);
+
+/// <summary>Valid onboarding steps that can be completed.</summary>
+public enum OnboardingStep
+{
+    Profile,
+    Eula,
+    Mfa,
+    EmergencyContacts,
+    NotificationPreferences,
+    Tutorial
+}

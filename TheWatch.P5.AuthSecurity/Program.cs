@@ -24,12 +24,14 @@ using SmsMfaSendRequest = TheWatch.P5.AuthSecurity.Auth.SmsMfaSendRequest;
 using SmsMfaVerifyRequest = TheWatch.P5.AuthSecurity.Auth.SmsMfaVerifyRequest;
 using MagicLinkRequest = TheWatch.P5.AuthSecurity.Auth.MagicLinkRequest;
 using ChangePasswordRequest = TheWatch.P5.AuthSecurity.Auth.ChangePasswordRequest;
+using CompleteOnboardingStepRequest = TheWatch.P5.AuthSecurity.Auth.CompleteOnboardingStepRequest;
 using TheWatch.Shared.Gcp;
 using TheWatch.Shared.Cloudflare;
 using TheWatch.Shared.Security;
 using TheWatch.Shared.Health;
 using FluentValidation;
 using TheWatch.Shared.Api;
+using TheWatch.Shared.Observability;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -123,12 +125,17 @@ builder.Services.AddWatchHealthChecks(builder.Configuration);
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(lifetime: ServiceLifetime.Scoped);
 // Item 229: API versioning — v1 prefix for current endpoints, header-based negotiation
 builder.Services.AddWatchApiVersioning();
+// Item 244: Prometheus metrics (request duration, active incidents, SOS, auth failures)
+builder.Services.AddWatchMetrics();
+// Item 247: Distributed tracing span enrichment (user ID, incident ID, device ID)
+builder.Services.AddWatchTracing("TheWatch.P5.AuthSecurity");
 var app = builder.Build();
 
 // Seed roles and MITRE rules
 await SeedDataAsync(app.Services);
 
 app.UseCors();
+app.UseWatchMetrics();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();
 app.UseWatchSecurity(); // Rate limiter + security audit middleware (from SecurityGenerator)
@@ -391,17 +398,13 @@ app.MapGet("/api/onboarding/progress", async (ClaimsPrincipal user, OnboardingSe
     return Results.Ok(progress);
 }).RequireAuthorization();
 
-app.MapPost("/api/onboarding/complete-step", async (string step, ClaimsPrincipal user, OnboardingService onboarding) =>
+app.MapPost("/api/onboarding/complete-step", async (CompleteOnboardingStepRequest request, ClaimsPrincipal user, OnboardingService onboarding) =>
 {
-    var validSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "profile", "eula", "mfa", "emergency-contacts", "notification-preferences", "tutorial"
-    };
-    if (!validSteps.Contains(step))
-        return Results.BadRequest(new { error = "Invalid onboarding step." });
-
     var userId = GetUserId(user);
     if (userId is null) return Results.Unauthorized();
+    // Step is validated by enum binding — invalid values produce a 400 automatically
+    var step = request.Step.ToString().ToLowerInvariant().Replace("emergencycontacts", "emergency-contacts")
+                                                          .Replace("notificationpreferences", "notification-preferences");
     await onboarding.CompleteStepAsync(userId.Value, step);
     return Results.Ok(new { completed = step });
 }).RequireAuthorization();

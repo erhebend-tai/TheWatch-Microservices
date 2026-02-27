@@ -17,6 +17,7 @@ using TheWatch.Contracts.VoiceEmergency;
 using TheWatch.Shared.Health;
 using FluentValidation;
 using TheWatch.Shared.Api;
+using TheWatch.Shared.Observability;
 
 SerilogSetup.BootstrapSerilog();
 
@@ -83,10 +84,15 @@ builder.Services.AddWatchHealthChecks(builder.Configuration);
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(lifetime: ServiceLifetime.Scoped);
 // Item 229: API versioning — v1 prefix for current endpoints, header-based negotiation
 builder.Services.AddWatchApiVersioning();
+// Item 244: Prometheus metrics (request duration, active incidents, SOS, auth failures)
+builder.Services.AddWatchMetrics();
+// Item 247: Distributed tracing span enrichment (user ID, incident ID, device ID)
+builder.Services.AddWatchTracing("TheWatch.P11.Surveillance");
 var app = builder.Build();
 await app.UseWatchMigrations();
 
 app.UseCors();
+app.UseWatchMetrics();
 app.UseWatchSecurity();
 app.UseWatchSerilogRequestLogging();
 app.UseWatchOpenApi();

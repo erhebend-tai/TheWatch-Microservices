@@ -498,10 +498,10 @@
 - [ ] 243. Implement secrets rotation runbook: database passwords, JWT keys, API keys, Firebase credentials — document zero-downtime rotation procedure
 
 ### 17E. Observability Production Readiness
-- [ ] 244. Add custom Prometheus metrics to all services: request duration histograms, active incident gauge, dispatch response time, SOS activation counter
+- [x] 244. Add custom Prometheus metrics to all services: request duration histograms, active incident gauge, dispatch response time, SOS activation counter
 - [ ] 245. Create Grafana dashboard JSON templates for each service (import via CI/CD)
 - [x] 246. Add health check dependencies: verify SQL Server, Redis, Kafka, PostGIS connectivity in `/health` endpoint (not just HTTP 200)
-- [ ] 247. Add distributed tracing span enrichment: user ID, incident ID, device ID on all traces
+- [x] 247. Add distributed tracing span enrichment: user ID, incident ID, device ID on all traces
 - [ ] 248. Implement log-based alerting rules: >5 auth failures/min, >10 5xx errors/min, evidence upload failure spike, SOS endpoint latency >2s
 - [ ] 249. Add canary endpoints for synthetic monitoring (return known payload for comparison)
 - [ ] 250. Create runbook documentation: incident response, rollback procedure, database recovery, secret rotation
@@ -649,11 +649,11 @@
 ### 22C. Request Size & SSRF Protection
 - [x] 321. Apply consistent Kestrel request limits to all services — create shared `ConfigureWatchKestrel()` extension: `MaxRequestBodySize = 10_485_760` (10MB), `MaxRequestHeadersTotalSize = 32_768` (32KB), `MaxRequestLineSize = 8_192` (8KB), `RequestHeadersTimeout = TimeSpan.FromSeconds(30)`, suppress Server header. Apply to all 12 services (Admin.RestAPI already has this). Files: new shared extension, 12 `Program.cs`. [NIST SC-5, STIG V-222602] **MEDIUM**
 - [x] 322. Implement SSRF protection — create `SafeHttpClientHandler` that blocks requests to: private IP ranges (10.x, 172.16-31.x, 192.168.x), link-local (169.254.x — cloud metadata endpoint), localhost. Apply to all `HttpClient` instances that fetch user-supplied URLs (evidence processing, webhook delivery). Files: new `SafeHttpClientHandler.cs` in Shared. [OWASP A10] **MEDIUM**
-- [ ] 323. Validate all query string parameters against allowlists — audit all `MapGet`/`MapPost` endpoints accepting query parameters. Replace raw `string` parameters with typed enums or validated DTOs. Specifically fix P5 `/api/onboarding/complete-step` which accepts raw `string step` — change to request body with validated enum. Files: affected endpoints across all services. [STIG V-222606, OWASP A03] **MEDIUM**
+- [x] 323. Validate all query string parameters against allowlists — audit all `MapGet`/`MapPost` endpoints accepting query parameters. Replace raw `string` parameters with typed enums or validated DTOs. Specifically fix P5 `/api/onboarding/complete-step` which accepts raw `string step` — change to request body with validated enum. Files: affected endpoints across all services. [STIG V-222606, OWASP A03] **MEDIUM**
 
 ### 22D. CORS & CSRF
-- [ ] 324. Enforce production CORS origins — remove `SetIsOriginAllowed(_ => true)` from all code paths. Create `docker-compose.production.yml` override that sets `Cors:AllowedOrigins` to production domain only. Verify `WatchCorsExtensions.cs` is used consistently by all services (currently some use `SetIsOriginAllowed`). Add CI check that greps for `SetIsOriginAllowed` and fails if found. Files: all `Program.cs` with CORS config, `WatchCorsExtensions.cs`, new CI check. [NIST AC-4, STIG V-222602] **MEDIUM**
-- [ ] 325. Add anti-forgery tokens to Dashboard and Admin — implement `AntiforgeryStateProvider` for Blazor Server forms. Add `[ValidateAntiForgeryToken]` to any MVC controller actions. Configure `SameSite=Strict` on antiforgery cookies. Files: Dashboard/Admin `Program.cs`, form components. [STIG V-222603, OWASP A01] **MEDIUM**
+- [x] 324. Enforce production CORS origins — remove `SetIsOriginAllowed(_ => true)` from all code paths. Create `docker-compose.production.yml` override that sets `Cors:AllowedOrigins` to production domain only. Verify `WatchCorsExtensions.cs` is used consistently by all services (currently some use `SetIsOriginAllowed`). Add CI check that greps for `SetIsOriginAllowed` and fails if found. Files: all `Program.cs` with CORS config, `WatchCorsExtensions.cs`, new CI check. [NIST AC-4, STIG V-222602] **MEDIUM**
+- [x] 325. Add anti-forgery tokens to Dashboard and Admin — implement `AntiforgeryStateProvider` for Blazor Server forms. Add `[ValidateAntiForgeryToken]` to any MVC controller actions. Configure `SameSite=Strict` on antiforgery cookies. Files: Dashboard/Admin `Program.cs`, form components. [STIG V-222603, OWASP A01] **MEDIUM**
 
 ---
 
