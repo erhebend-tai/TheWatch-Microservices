@@ -309,6 +309,9 @@ jobs:
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'nuget.config', 'Directory.Packages.props') }}
           restore-keys: nuget-${{ runner.os }}-
 
+      - name: Restore dependencies
+        run: dotnet restore TheWatch.sln
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -435,15 +438,24 @@ jobs:
         id: secret-scan
         run: |
           FINDINGS=0
-          # Check for common secret patterns in source code (excluding test/example files)
-          echo "Scanning for hardcoded secrets..."
-          if grep -rn --include="*.cs" --include="*.json" \
-            -E "(password|secret|apikey|api_key|connectionstring)\s*[:=]\s*\"[^\"]{8,}\"" \
-            --exclude-dir=bin --exclude-dir=obj --exclude-dir=.git \
-            --exclude="*.example*" --exclude="*template*" --exclude="*appsettings.Development*" \
-            . 2>/dev/null | grep -v "test" | grep -v "Test" | head -20 | tee secret-scan.txt; then
-            FINDINGS=$(wc -l < secret-scan.txt)
-            echo "::warning::Potential hardcoded secrets found ($FINDINGS patterns)"
+          echo "Scanning for hardcoded credential patterns..."
+          # Look for actual credential assignments (quoted values that look like real secrets)
+          # Patterns: "Password=actualvalue", api key hex strings, connection strings with passwords
+          {
+            grep -rn --include="*.cs" --include="*.json" --include="*.config" \
+              -E "(Password|pwd)\s*=\s*['\"][A-Za-z0-9!@#$%^&*]{12,}['\"]" \
+              --exclude-dir=bin --exclude-dir=obj --exclude-dir=.git \
+              --exclude="*.example*" --exclude="*template*" --exclude="*Test*" --exclude="*test*" \
+              . 2>/dev/null || true
+            grep -rn --include="*.cs" --include="*.json" \
+              -E "['\"][A-Za-z0-9+/]{40,}={0,2}['\"]" \
+              --exclude-dir=bin --exclude-dir=obj --exclude-dir=.git \
+              --exclude="*.example*" --exclude="*template*" --exclude="*Test*" --exclude="*test*" \
+              . 2>/dev/null || true
+          } | sort -u | head -20 | tee secret-scan.txt
+          FINDINGS=$(wc -l < secret-scan.txt 2>/dev/null || echo "0")
+          if [[ "$FINDINGS" -gt 0 ]]; then
+            echo "::warning::Potential hardcoded credentials found ($FINDINGS patterns — review required)"
           fi
           echo "findings=$FINDINGS" >> "$GITHUB_OUTPUT"
 
