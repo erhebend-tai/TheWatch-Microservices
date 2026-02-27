@@ -101,6 +101,11 @@ public static class PermissionHelper
         {
             logger?.LogInformation("All permissions granted for active voice tracking and location monitoring");
         }
+        else
+        {
+            logger?.LogWarning("Partial permissions: speech={SpeechGranted}, location={LocationGranted}",
+                speechGranted, locationGranted);
+        }
 
         return speechGranted && locationGranted;
     }

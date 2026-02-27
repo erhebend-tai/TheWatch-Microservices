@@ -55,6 +55,7 @@ public class LocationTrackingService : IDisposable
         // Location ALWAYS is required — TheWatch depends on active voice tracking
         // for safety and security, which requires continuous location monitoring
         // including from the lockscreen and background.
+        // Check status first to avoid unnecessary permission prompts when already granted.
         var status = await Permissions.CheckStatusAsync<Permissions.LocationAlways>();
         if (status != PermissionStatus.Granted)
         {
