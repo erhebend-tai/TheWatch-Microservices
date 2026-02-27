@@ -58,6 +58,7 @@ builder.Services.AddDisasterReliefClient()
 // Services
 builder.Services.AddScoped<IResponderService, ResponderService>();
 builder.Services.AddScoped<ICheckInService, CheckInService>();
+builder.Services.AddScoped<IDesignatedResponderService, DesignatedResponderService>();
 builder.AddWatchSecurity();
 builder.Services.AddScoped<IWatchDataSeeder, FirstResponderSeeder>();
 builder.AddWatchControllers();
@@ -83,6 +84,11 @@ RecurringJob.AddOrUpdate<ICheckInService>(
     "checkin-cleanup",
     svc => svc.CleanupOldCheckInsAsync(TimeSpan.FromHours(72)),
     "0 3 * * *"); // Daily at 3 AM
+
+RecurringJob.AddOrUpdate<IDesignatedResponderService>(
+    "designated-responder-schedule-sync",
+    svc => svc.ActivateScheduledRespondersAsync(),
+    "*/5 * * * *"); // Every 5 minutes
 
 // Health endpoint
 app.MapGet("/health", () => new HealthResponse(
@@ -190,6 +196,42 @@ app.MapGet("/api/incidents/{incidentId:guid}/checkins", async (Guid incidentId, 
 {
     var checkIns = await svc.GetForIncidentAsync(incidentId);
     return Results.Ok(checkIns);
+}).RequireAuthorization("ResponderAccess");
+
+// === Designated Responder Endpoints ===
+
+app.MapPost("/api/designated-responders", async (SignupDesignatedResponderRequest request, IDesignatedResponderService svc) =>
+{
+    var responder = await svc.SignupAsync(request);
+    return Results.Created($"/api/designated-responders/{responder.Id}", responder);
+}).RequireAuthorization("ResponderAccess");
+
+app.MapGet("/api/designated-responders", async (
+    IDesignatedResponderService svc,
+    int? page,
+    int? pageSize,
+    DesignatedResponderStatus? status) =>
+{
+    var result = await svc.ListAsync(page ?? 1, pageSize ?? 20, status);
+    return Results.Ok(result);
+}).RequireAuthorization("ResponderAccess");
+
+app.MapGet("/api/designated-responders/{id:guid}", async (Guid id, IDesignatedResponderService svc) =>
+{
+    var responder = await svc.GetByIdAsync(id);
+    return responder is not null ? Results.Ok(responder) : Results.NotFound();
+}).RequireAuthorization("ResponderAccess");
+
+app.MapPut("/api/designated-responders/{id:guid}/status", async (Guid id, UpdateDesignatedResponderStatusRequest request, IDesignatedResponderService svc) =>
+{
+    var responder = await svc.UpdateStatusAsync(id, request);
+    return responder is not null ? Results.Ok(responder) : Results.NotFound();
+}).RequireAuthorization("AdminOnly");
+
+app.MapGet("/api/designated-responders/map", async (IDesignatedResponderService svc, DesignatedResponderStatus? status) =>
+{
+    var items = await svc.GetMapItemsAsync(status);
+    return Results.Ok(items);
 }).RequireAuthorization("ResponderAccess");
 
 // SignalR hub endpoints (/hubs/responders, /hubs/checkins)

@@ -115,3 +115,82 @@ public record ResponderSummary(
     ResponderStatus Status,
     double? DistanceKm,
     GeoLocation? Location);
+
+// === Designated Responder Program ===
+
+public enum DesignatedResponderStatus
+{
+    Pending,
+    Approved,
+    Active,
+    Inactive,
+    Expired
+}
+
+public class DesignatedResponder
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string VolunteerName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string? Phone { get; set; }
+    public GeoLocation Location { get; set; } = new(0, 0);
+    public string? LocationDescription { get; set; }
+    public double ResponseRadiusKm { get; set; } = 5.0;
+    public DesignatedResponderStatus Status { get; set; } = DesignatedResponderStatus.Pending;
+    public List<ResponderSchedule> Schedules { get; set; } = [];
+    public List<string> Skills { get; set; } = [];
+    public string? Notes { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class ResponderSchedule
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid DesignatedResponderId { get; set; }
+    public DayOfWeek DayOfWeek { get; set; }
+    public TimeOnly StartTime { get; set; }
+    public TimeOnly EndTime { get; set; }
+    public DateTime? EffectiveFrom { get; set; }
+    public DateTime? EffectiveUntil { get; set; }
+}
+
+// Request/response records for designated responders
+
+public record SignupDesignatedResponderRequest(
+    string VolunteerName,
+    string Email,
+    double Latitude,
+    double Longitude,
+    double ResponseRadiusKm = 5.0,
+    string? Phone = null,
+    string? LocationDescription = null,
+    List<ScheduleEntry>? Schedules = null,
+    List<string>? Skills = null,
+    string? Notes = null);
+
+public record ScheduleEntry(
+    DayOfWeek DayOfWeek,
+    TimeOnly StartTime,
+    TimeOnly EndTime,
+    DateTime? EffectiveFrom = null,
+    DateTime? EffectiveUntil = null);
+
+public record UpdateDesignatedResponderStatusRequest(DesignatedResponderStatus Status);
+
+public record DesignatedResponderListResponse(
+    List<DesignatedResponder> Items,
+    int TotalCount,
+    int Page,
+    int PageSize);
+
+public record DesignatedResponderMapItem(
+    Guid Id,
+    string VolunteerName,
+    double Latitude,
+    double Longitude,
+    double ResponseRadiusKm,
+    string? LocationDescription,
+    DesignatedResponderStatus Status,
+    List<string> Skills,
+    List<ScheduleEntry> Schedules);
