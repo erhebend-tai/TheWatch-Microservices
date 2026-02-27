@@ -86,6 +86,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<SitrepService>();
         builder.Services.AddSingleton<ContentModerationService>();
 
+        // Ambulance pre-arrival triage (text/STT symptom capture + on-device medical reference)
+        builder.Services.AddSingleton<IAmbulanceTriageService, AmbulanceTriageService>();
+
         // Push notifications
         builder.Services.AddSingleton<WatchPushNotificationService>();
 

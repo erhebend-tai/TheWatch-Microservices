@@ -73,6 +73,21 @@ public class WatchApiClient
         response.EnsureSuccessStatusCode();
     }
 
+    /// <summary>
+    /// Log pre-arrival ambulance triage intake to the P2 VoiceEmergency service.
+    /// Returns the assigned triage record ID on success, or null if the request fails.
+    /// </summary>
+    public async Task<TriageIntakeDto?> LogTriageIntakeAsync(LogTriageIntakeRequest request)
+    {
+        try
+        {
+            var response = await _http.PostAsJsonAsync($"{P2}/api/triage", request);
+            if (!response.IsSuccessStatusCode) return null;
+            return await response.Content.ReadFromJsonAsync<TriageIntakeDto>();
+        }
+        catch { return null; }
+    }
+
     // === P7 Family Health ===
     public async Task<FamilyGroupDto?> GetFamilyGroupAsync()
     {

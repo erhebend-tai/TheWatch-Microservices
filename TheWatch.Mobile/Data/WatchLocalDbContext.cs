@@ -31,6 +31,8 @@ public class WatchLocalDbContext
         await _database.CreateTableAsync<OfflineQueueItem>();
         await _database.CreateTableAsync<ConflictLog>();
         await _database.CreateTableAsync<CachedLocation>();
+        await _database.CreateTableAsync<MedicalReferenceEntry>();
+        await _database.CreateTableAsync<LocalTriageLog>();
     }
 
     // User Profile Operations
@@ -193,7 +195,64 @@ public class WatchLocalDbContext
     {
         await _database.CloseAsync();
     }
-}
+
+    // Medical Reference Operations (on-device poison/medical reference database)
+
+    /// <summary>
+    /// Seed reference entries if the table is empty. Called once at app startup.
+    /// </summary>
+    public async Task SeedMedicalReferenceAsync(IEnumerable<MedicalReferenceEntry> entries)
+    {
+        var count = await _database.Table<MedicalReferenceEntry>().CountAsync();
+        if (count > 0) return;
+        foreach (var entry in entries)
+            await _database.InsertAsync(entry);
+    }
+
+    /// <summary>
+    /// Search the on-device medical reference by keyword — returns up to <paramref name="limit"/> matches.
+    /// Matching is performed against Name and Keywords columns using SQLite LIKE.
+    /// </summary>
+    public async Task<List<MedicalReferenceEntry>> SearchMedicalReferenceAsync(string keyword, int limit = 5)
+    {
+        if (string.IsNullOrWhiteSpace(keyword)) return [];
+        var lowerKeyword = keyword.ToLowerInvariant();
+        return await _database.QueryAsync<MedicalReferenceEntry>(
+            "SELECT * FROM MedicalReferenceEntries WHERE LOWER(Name) LIKE ? OR LOWER(Keywords) LIKE ? LIMIT ?",
+            $"%{lowerKeyword}%",
+            $"%{lowerKeyword}%",
+            limit);
+    }
+
+    public async Task<MedicalReferenceEntry?> GetMedicalReferenceByNameAsync(string name)
+    {
+        var lower = name.ToLowerInvariant();
+        var results = await _database.QueryAsync<MedicalReferenceEntry>(
+            "SELECT * FROM MedicalReferenceEntries WHERE LOWER(Name) = ? LIMIT 1", lower);
+        return results.FirstOrDefault();
+    }
+
+    // Local Triage Log Operations
+
+    public async Task SaveTriageLogAsync(LocalTriageLog log)
+    {
+        await _database.InsertAsync(log);
+    }
+
+    public async Task<List<LocalTriageLog>> GetUnsyncedTriageLogsAsync()
+    {
+        return await _database.Table<LocalTriageLog>()
+            .Where(t => !t.SyncedToServer)
+            .OrderBy(t => t.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task MarkTriageLogSyncedAsync(Guid logId)
+    {
+        var log = await _database.GetAsync<LocalTriageLog>(logId);
+        log.SyncedToServer = true;
+        await _database.UpdateAsync(log);
+    }
 
 // Entity Models for Local Caching
 
@@ -335,4 +394,66 @@ public class CachedLocation
     public double? Heading { get; set; }
     public DateTime Timestamp { get; set; }
     public bool Uploaded { get; set; } = false;
+}
+
+/// <summary>
+/// On-device medical/poison reference entry. Kept in SQLite so it is available
+/// without network access when a caller describes their emergency.
+/// </summary>
+[Table("MedicalReferenceEntries")]
+public class MedicalReferenceEntry
+{
+    [PrimaryKey]
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    /// <summary>Common name of the substance or condition (e.g. "Acetaminophen", "Carbon Monoxide").</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Broad category: "Poison", "Chemical", "Medical".</summary>
+    public string Category { get; set; } = string.Empty;
+
+    /// <summary>Comma-separated synonyms and search terms for keyword matching.</summary>
+    public string Keywords { get; set; } = string.Empty;
+
+    /// <summary>Known symptoms associated with this entry.</summary>
+    public string Symptoms { get; set; } = string.Empty;
+
+    /// <summary>Immediate first-aid guidance to relay to the caller.</summary>
+    public string FirstAidGuidance { get; set; } = string.Empty;
+
+    /// <summary>"Critical", "High", "Medium", or "Low".</summary>
+    public string UrgencyLevel { get; set; } = string.Empty;
+
+    /// <summary>Additional note about contacting Poison Control (1-800-222-1222).</summary>
+    public string? PoisonControlNote { get; set; }
+
+    public DateTime LastUpdatedUtc { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Locally logged triage intake, capturing what the caller described before the ambulance arrived.
+/// Synced to the backend when connectivity is available.
+/// </summary>
+[Table("LocalTriageLogs")]
+public class LocalTriageLog
+{
+    [PrimaryKey]
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ReporterId { get; set; }
+    public Guid? IncidentId { get; set; }
+
+    /// <summary>Raw symptom text from the caller (typed or speech-transcribed).</summary>
+    public string Symptoms { get; set; } = string.Empty;
+
+    /// <summary>"text" or "stt".</summary>
+    public string InputMethod { get; set; } = "text";
+
+    /// <summary>Name of the matched medical reference entry, if any.</summary>
+    public string? MatchedEntryName { get; set; }
+
+    /// <summary>First-aid guidance from the matched reference entry.</summary>
+    public string? Guidance { get; set; }
+
+    public bool SyncedToServer { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
