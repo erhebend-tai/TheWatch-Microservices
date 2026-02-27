@@ -204,12 +204,15 @@ jobs:
 
           for compose_file in docker-compose*.yml; do
             [ -f "$compose_file" ] || continue
-            if grep -PiqE '(password|secret|key)\s*[:=]\s*"?[a-zA-Z0-9_]{4,}"?' "$compose_file" | grep -vqE '\$\{'; then
-              :
-            fi
 
             # Check if passwords are parameterized (using ${VAR} syntax)
-            hardcoded=$(grep -PinE '(password|secret)\s*[:=]\s*"?[a-zA-Z0-9]{8,}"?' "$compose_file" | grep -cvE '\$\{' || true)
+            # First find lines with password/secret assignments, then exclude ${} references
+            matches=$(grep -inE '(password|secret)\s*[:=]\s*"?[a-zA-Z0-9_]{8,}' "$compose_file" 2>/dev/null || true)
+            if [ -n "$matches" ]; then
+              hardcoded=$(echo "$matches" | grep -cvE '\$\{' || true)
+            else
+              hardcoded=0
+            fi
             if [ "$hardcoded" -gt 0 ] 2>/dev/null; then
               FAIL=$((FAIL + 1))
               echo "| ❌ | \`$compose_file\` | $hardcoded potential hardcoded secret(s) found |" >> $GITHUB_STEP_SUMMARY
