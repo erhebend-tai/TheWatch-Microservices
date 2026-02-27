@@ -117,6 +117,7 @@ builder.Services.AddScoped<OnboardingService>();
 builder.Services.AddScoped<SessionManagementService>();
 builder.Services.AddScoped<StrideThreatService>();
 builder.Services.AddScoped<MitreDetectionService>();
+builder.Services.AddScoped<DataPurgeService>();
 builder.AddWatchControllers();
 
 // Item 246: Dependency health checks (SQL Server, Redis, Kafka, PostGIS connectivity)
@@ -163,6 +164,9 @@ app.MapWatchControllers();
 // Schedule recurring security jobs
 RecurringJob.AddOrUpdate<StrideThreatService>("stride-threat-scan", s => s.ScanAsync(), "*/15 * * * *");
 RecurringJob.AddOrUpdate<MitreDetectionService>("mitre-detection-scan", s => s.ScanAsync(), "*/15 * * * *");
+// Item 294: Automated data purge jobs per retention policy (NIST MP-6, SI-12)
+RecurringJob.AddOrUpdate<DataPurgeService>("expired-token-purge", s => s.PurgeExpiredRefreshTokensAsync(), "0 3 * * *"); // Daily at 3 AM
+RecurringJob.AddOrUpdate<DataPurgeService>("audit-log-purge", s => s.PurgeOldAuditEventsAsync(), "0 2 * * 0"); // Weekly Sunday at 2 AM
 
 // Health endpoint — stripped of internal details (DISA STIG V-222609)
 // Item 246: Readiness probe — checks SQL Server, Redis, Kafka, PostGIS connectivity
@@ -171,6 +175,31 @@ app.MapHealthChecks("/health/ready");
 app.MapWatchCanaryEndpoints("TheWatch.P5.AuthSecurity");
 
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
+
+// Item 271: JWKS endpoint — exposes public key for consumer service JWT validation
+// In production, consumers load the public key from this endpoint or a cached copy.
+app.MapGet("/.well-known/jwks.json", (IConfiguration config) =>
+{
+    var publicKeyPath = config["Jwt:AsymmetricPublicKeyPath"];
+    if (!string.IsNullOrEmpty(publicKeyPath) && System.IO.File.Exists(publicKeyPath))
+    {
+        try
+        {
+            var rsa = System.Security.Cryptography.RSA.Create();
+            rsa.ImportFromPem(System.IO.File.ReadAllText(publicKeyPath));
+            var rsaParams = rsa.ExportParameters(false);
+            var n = Convert.ToBase64String(rsaParams.Modulus!).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+            var e = Convert.ToBase64String(rsaParams.Exponent!).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+            return Results.Ok(new
+            {
+                keys = new[] { new { kty = "RSA", use = "sig", alg = "RS256", n, e } }
+            });
+        }
+        catch { /* Fall through to empty set */ }
+    }
+    // Dev: no asymmetric key configured — return empty JWKS (HMAC symmetric is in use)
+    return Results.Ok(new { keys = Array.Empty<object>() });
+}).ExcludeFromDescription();
 
 // Service info — admin-only (DISA STIG V-222609: no unauthenticated service metadata)
 app.MapGet("/info", () => new

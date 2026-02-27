@@ -147,6 +147,10 @@ public class AuthService : IAuthService
         if (stored.ExpiresAt < DateTime.UtcNow)
             throw new UnauthorizedAccessException("Refresh token expired.");
 
+        // Item 306: Enforce device fingerprint binding — reject if fingerprint doesn't match stored value (NIST IA-5, SC-23)
+        if (!string.IsNullOrEmpty(stored.DeviceFingerprint) && stored.DeviceFingerprint != deviceFingerprint)
+            throw new UnauthorizedAccessException("Device fingerprint mismatch. Re-authentication required.");
+
         var user = await _userManager.FindByIdAsync(stored.UserId.ToString());
         if (user is null || !user.IsActive)
             throw new UnauthorizedAccessException("User not found or inactive.");
@@ -204,8 +208,21 @@ public class AuthService : IAuthService
         // Item 303: Access token max 30 minutes (NIST AC-12, STIG V-222578)
         var expiryMinutes = int.TryParse(_config["Jwt:AccessTokenLifetimeMinutes"], out var m) ? Math.Min(m, 30) : 15;
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        // Item 269: Use RSA-2048 asymmetric signing in production when private key path is configured (NIST SC-12/SC-13)
+        SigningCredentials creds;
+        var privateKeyPath = _config["Jwt:AsymmetricPrivateKeyPath"];
+        if (!string.IsNullOrEmpty(privateKeyPath) && System.IO.File.Exists(privateKeyPath))
+        {
+            var rsa = System.Security.Cryptography.RSA.Create();
+            rsa.ImportFromPem(System.IO.File.ReadAllText(privateKeyPath));
+            creds = new SigningCredentials(new RsaSecurityKey(rsa), SecurityAlgorithms.RsaSha256);
+        }
+        else
+        {
+            // Dev fallback: symmetric HMAC-SHA256
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+            creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        }
 
         var claims = new List<Claim>
         {
