@@ -33,14 +33,14 @@ MicroGen supports five input formats through a polymorphic `ISourceParser` inter
 | Parser | Extensions | What It Extracts |
 |--------|------------|------------------|
 | **OpenAPI (SpecParser)** | `.yaml`, `.yml`, `.json` | Operations, schemas, tags → `ServiceDescriptor` |
-| **SQL (SqlParser)** | `.sql` | Tables → CRUD operations via TSql170 AST |
+| **SQL (SqlParser)** | `.sql` | Tables → CRUD operations via TSql170 AST (SQL Server 2022 TransactSql.ScriptDom) |
 | **CSV (CsvParser)** | `.csv` | Function catalogs or data tables → operations |
 | **GraphQL (GraphQlParser)** | `.gql`, `.graphql` | Queries/mutations → operations |
 | **HTML (WebsiteParser)** | `.html`, `.htm` | Forms and data → operations via AngleSharp |
 
 **Relevance:** TheWatch.Generators reads only from pre-built JSON specs (`_mapping.json`, `Controllers.json`, `Models.json`, `Interfaces.json`) and Roslyn syntax trees. Adding direct OpenAPI or SQL parsing would let us generate code without the `map_specs_to_code.py` intermediary step. However, since the Roslyn generator runs at compile time, heavy parsing libraries may not be appropriate there — this capability is better suited to a pre-build CLI step.
 
-**Recommendation:** ⚠️ **Consider but don't adopt directly.** The JSON-spec approach in TheWatch.Generators is already effective. If direct OpenAPI parsing is desired, it should be a separate CLI tool (like MicroGen itself) rather than a compile-time generator.
+**Recommendation:** ⚠️ **Consider but don't adopt directly.** The JSON-spec approach in TheWatch.Generators is already effective. Adding parsing libraries (e.g., `Microsoft.OpenApi`, `YamlDotNet`, `AngleSharp`) to a Roslyn source generator would increase compile-time overhead and introduce large dependency trees into the compiler pipeline. If direct OpenAPI parsing is desired, it should be a separate CLI tool (like MicroGen itself) rather than a compile-time generator.
 
 ---
 
