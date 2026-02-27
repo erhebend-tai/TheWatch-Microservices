@@ -28,19 +28,67 @@ public class RegisterCameraRequestValidator : AbstractValidator<RegisterCameraRe
 
 public class SubmitFootageRequestValidator : AbstractValidator<SubmitFootageRequest>
 {
+    private static readonly HashSet<string> ValidMediaExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv", ".wmv",  // Video
+        ".mp3", ".wav", ".aac", ".ogg", ".flac", ".wma",          // Audio
+        ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tiff", ".webp" // Image
+    };
+
     public SubmitFootageRequestValidator()
     {
+        // === Completeness: required fields ===
         RuleFor(x => x.CameraId).NotEmpty();
         RuleFor(x => x.SubmitterId).NotEmpty();
         RuleFor(x => x.GpsLatitude).InclusiveBetween(-90.0, 90.0);
         RuleFor(x => x.GpsLongitude).InclusiveBetween(-180.0, 180.0);
         RuleFor(x => x.StartTime).NotEmpty();
+        RuleFor(x => x.MediaType).IsInEnum()
+            .WithMessage("MediaType must be a valid type (Video, Audio, Image)");
+
+        // === Timeliness: StartTime must not be in the future ===
+        RuleFor(x => x.StartTime).LessThanOrEqualTo(DateTime.UtcNow.AddMinutes(5))
+            .WithMessage("StartTime cannot be in the future");
+
+        // === Timeliness: StartTime must not be older than 30 days ===
+        RuleFor(x => x.StartTime).GreaterThanOrEqualTo(DateTime.UtcNow.AddDays(-30))
+            .WithMessage("Footage older than 30 days cannot be submitted");
+
         RuleFor(x => x.EndTime).GreaterThan(x => x.StartTime)
             .WithMessage("End time must be after start time");
+
+        // === Relevance: duration must be reasonable (max 24 hours) ===
+        RuleFor(x => x)
+            .Must(x => (x.EndTime - x.StartTime).TotalHours <= 24)
+            .WithMessage("Footage duration cannot exceed 24 hours");
+
+        // === Accuracy: valid media URL with recognized extension ===
         RuleFor(x => x.MediaUrl).NotEmpty().MaximumLength(1000)
             .Must(u => Uri.TryCreate(u, UriKind.Absolute, out _))
             .WithMessage("Media URL must be a valid absolute URI");
+
+        RuleFor(x => x.MediaUrl)
+            .Must(BeRecognizedMediaExtension)
+            .When(x => Uri.TryCreate(x.MediaUrl, UriKind.Absolute, out _))
+            .WithMessage("Media URL must reference a recognized media file format");
+
+        // === Accuracy: SHA-256 hash format if provided ===
+        RuleFor(x => x.FileHashSha256)
+            .Matches(@"^[a-fA-F0-9]{64}$")
+            .When(x => !string.IsNullOrEmpty(x.FileHashSha256))
+            .WithMessage("FileHashSha256 must be a valid 64-character hex string");
+
         RuleFor(x => x.Description).MaximumLength(2000);
+    }
+
+    private static bool BeRecognizedMediaExtension(string? url)
+    {
+        if (string.IsNullOrEmpty(url) || !Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return false;
+
+        var path = uri.AbsolutePath;
+        var ext = Path.GetExtension(path);
+        return !string.IsNullOrEmpty(ext) && ValidMediaExtensions.Contains(ext);
     }
 }
 

@@ -13,6 +13,7 @@ public interface IObjectTrackingService
     Task<TrackingSession?> GetTrackingSessionAsync(Guid sessionId);
     Task<TrackingSessionListResponse> ListTrackingSessionsAsync(Guid? crimeLocationId = null, int page = 1, int pageSize = 20);
     Task<List<TrackedObjectMatch>> GetMatchesForSessionAsync(Guid sessionId);
+    Task<AlibiVerificationResponse> VerifyAlibiAsync(AlibiVerificationRequest request);
 }
 
 /// <summary>
@@ -28,6 +29,7 @@ public class ObjectTrackingService : IObjectTrackingService
     private readonly IFootageService _footageService;
     private readonly IVideoAnalysisService _videoAnalysisService;
     private readonly IWatchRepository<DetectionResult> _detections;
+    private readonly IWatchRepository<AlibiVerification> _alibiVerifications;
     private readonly IObjectDetector _objectDetector;
     private readonly ILogger<ObjectTrackingService> _logger;
 
@@ -38,6 +40,7 @@ public class ObjectTrackingService : IObjectTrackingService
         IFootageService footageService,
         IVideoAnalysisService videoAnalysisService,
         IWatchRepository<DetectionResult> detections,
+        IWatchRepository<AlibiVerification> alibiVerifications,
         IObjectDetector objectDetector,
         ILogger<ObjectTrackingService> logger)
     {
@@ -47,6 +50,7 @@ public class ObjectTrackingService : IObjectTrackingService
         _footageService = footageService;
         _videoAnalysisService = videoAnalysisService;
         _detections = detections;
+        _alibiVerifications = alibiVerifications;
         _objectDetector = objectDetector;
         _logger = logger;
     }
@@ -192,6 +196,108 @@ public class ObjectTrackingService : IObjectTrackingService
             .Where(m => m.TrackingSessionId == sessionId)
             .OrderBy(m => m.DistanceFromSceneKm)
             .ToListAsync();
+    }
+
+    /// <summary>
+    /// Triangulates a subject's alibi by searching surveillance footage at each claimed
+    /// location and time window. Returns corroborating evidence per checkpoint and an
+    /// overall verdict (Supported / Inconclusive / Contradicted).
+    /// </summary>
+    public async Task<AlibiVerificationResponse> VerifyAlibiAsync(AlibiVerificationRequest request)
+    {
+        var provider = _objectDetector.IsReady ? "LocalONNX" : "CloudFallback";
+
+        var verification = new AlibiVerification
+        {
+            SubjectId = request.SubjectId,
+            SubjectDescription = request.SubjectDescription,
+            InitiatedBy = request.InitiatedBy,
+            CheckpointsTotal = request.Checkpoints.Count,
+            DetectionProvider = provider
+        };
+        await _alibiVerifications.AddAsync(verification);
+
+        _logger.LogInformation(
+            "Alibi verification {VerificationId} started for subject {SubjectId} with {CheckpointCount} checkpoints",
+            verification.Id, request.SubjectId, request.Checkpoints.Count);
+
+        var checkpointResults = new List<AlibiCheckpointResult>();
+        var totalFootageChecked = 0;
+        var totalEvidenceFound = 0;
+
+        foreach (var checkpoint in request.Checkpoints)
+        {
+            var nearbyFootage = await _footageService.FindFootageNearLocationAsync(
+                checkpoint.Latitude, checkpoint.Longitude,
+                checkpoint.SearchRadiusKm,
+                checkpoint.WindowStart, checkpoint.WindowEnd);
+
+            var checkpointEvidence = new List<AlibiEvidenceItem>();
+
+            foreach (var footage in nearbyFootage)
+            {
+                if (footage.Status == FootageStatus.Submitted)
+                    await _videoAnalysisService.AnalyzeFootageAsync(footage.Id);
+
+                totalFootageChecked++;
+
+                var detectionsResponse = await _footageService.GetDetectionsForFootageAsync(footage.Id, 1, 100);
+                var detections = detectionsResponse.Items;
+
+                if (request.TargetObjectTypes is { Count: > 0 })
+                {
+                    detections = detections
+                        .Where(d => request.TargetObjectTypes.Contains(d.DetectionType))
+                        .ToList();
+                }
+
+                var distanceKm = HaversineDistanceKm(
+                    checkpoint.Latitude, checkpoint.Longitude,
+                    footage.GpsLatitude, footage.GpsLongitude);
+
+                foreach (var detection in detections)
+                {
+                    checkpointEvidence.Add(new AlibiEvidenceItem(
+                        footage.Id,
+                        detection.Id,
+                        detection.Label,
+                        detection.Confidence,
+                        distanceKm,
+                        detection.FrameTimestamp));
+                    totalEvidenceFound++;
+                }
+            }
+
+            checkpointResults.Add(new AlibiCheckpointResult
+            {
+                Checkpoint = checkpoint,
+                HasEvidence = checkpointEvidence.Count > 0,
+                FootageChecked = nearbyFootage.Count,
+                SupportingEvidence = checkpointEvidence
+            });
+        }
+
+        var supportedCount = checkpointResults.Count(r => r.HasEvidence);
+        var verdict = supportedCount == request.Checkpoints.Count && request.Checkpoints.Count > 0
+            ? AlibiVerdict.Supported
+            : AlibiVerdict.Inconclusive;
+
+        verification.Verdict = verdict;
+        verification.CheckpointsSupported = supportedCount;
+        verification.TotalFootageChecked = totalFootageChecked;
+        verification.TotalEvidenceFound = totalEvidenceFound;
+        verification.CompletedAt = DateTime.UtcNow;
+        await _alibiVerifications.UpdateAsync(verification);
+
+        _logger.LogInformation(
+            "Alibi verification {VerificationId} completed: verdict={Verdict}, {SupportedCount}/{TotalCount} checkpoints supported",
+            verification.Id, verdict, supportedCount, request.Checkpoints.Count);
+
+        return new AlibiVerificationResponse(
+            verification.Id, verdict,
+            request.Checkpoints.Count, supportedCount,
+            totalFootageChecked, totalEvidenceFound,
+            provider, checkpointResults);
     }
 
     private static double HaversineDistanceKm(double lat1, double lon1, double lat2, double lon2)

@@ -387,6 +387,34 @@ public class AdminApiClient
             return [];
         }
     }
+
+    // ---------------------------------------------------------------------------
+    //  EULA Management
+    // ---------------------------------------------------------------------------
+
+    public async Task<EulaVersionDto?> GetCurrentEulaAsync()
+    {
+        try
+        {
+            var client = CreateClient();
+            var baseUrl = GetP5BaseUrl();
+            return await client.GetFromJsonAsync<EulaVersionDto>($"{baseUrl}/api/eula/current");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<EulaVersionDto> PublishEulaVersionAsync(string version, string content)
+    {
+        var client = CreateClient();
+        var baseUrl = GetP5BaseUrl();
+        var response = await client.PostAsJsonAsync($"{baseUrl}/api/eula/versions",
+            new { version, content, isCurrent = true });
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<EulaVersionDto>())!;
+    }
 }
 
 // =============================================================================
@@ -498,3 +526,11 @@ public record AuditEventDto(
     string User,
     string Action,
     string Severity);
+
+// EULA
+public record EulaVersionDto(
+    Guid Id,
+    string Version,
+    string Content,
+    DateTime PublishedAt,
+    bool IsCurrent);

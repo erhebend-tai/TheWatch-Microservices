@@ -20,6 +20,12 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
+        // Load appsettings.json from embedded resources
+        using var stream = typeof(MauiProgram).Assembly
+            .GetManifestResourceStream("TheWatch.Mobile.appsettings.json");
+        if (stream is not null)
+            builder.Configuration.AddJsonStream(stream);
+
         builder.Services.AddMauiBlazorWebView();
 
 #if DEBUG
@@ -85,6 +91,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<EvidenceUploadService>();
         builder.Services.AddSingleton<SitrepService>();
         builder.Services.AddSingleton<ContentModerationService>();
+
+        // Ambulance pre-arrival triage (text/STT symptom capture + on-device medical reference)
+        builder.Services.AddSingleton<IAmbulanceTriageService, AmbulanceTriageService>();
 
         // Push notifications
         builder.Services.AddSingleton<WatchPushNotificationService>();

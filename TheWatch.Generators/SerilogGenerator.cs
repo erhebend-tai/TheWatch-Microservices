@@ -46,6 +46,15 @@ public class SerilogGenerator : IIncrementalGenerator
         return parts.Length >= 3 ? parts[parts.Length - 1] : program;
     }
 
+    private static readonly System.Collections.Generic.HashSet<string> SecurityServiceNames =
+        new(System.StringComparer.OrdinalIgnoreCase)
+        {
+            "TheWatch.P5.AuthSecurity",
+        };
+
+    private static int GetRetainedFileCount(string serviceName) =>
+        SecurityServiceNames.Contains(serviceName) ? 365 : 90;
+
     private static void EmitSerilogSetup(SourceProductionContext ctx, string rootNs,
         string serviceName, string shortName, string program)
     {
@@ -58,6 +67,7 @@ public class SerilogGenerator : IIncrementalGenerator
         sb.AppendLine("using Serilog.Events;");
         sb.AppendLine("using Microsoft.AspNetCore.Builder;");
         sb.AppendLine("using Microsoft.Extensions.Hosting;");
+        sb.AppendLine("using TheWatch.Shared.Security;");
         sb.AppendLine();
         sb.AppendLine($"namespace {rootNs};");
         sb.AppendLine();
@@ -86,7 +96,8 @@ public class SerilogGenerator : IIncrementalGenerator
         // ConfigureWatchSerilog — extension on WebApplicationBuilder
         sb.AppendLine("    /// <summary>");
         sb.AppendLine("    /// Configures Serilog on the host with TheWatch standard settings.");
-        sb.AppendLine("    /// Console + rolling file sink, enriched with service metadata.");
+        sb.AppendLine("    /// Console + rolling file sink + optional Seq sink, enriched with service metadata.");
+        sb.AppendLine("    /// PII in structured log properties is masked via PiiMaskingEnricher.");
         sb.AppendLine("    /// </summary>");
         sb.AppendLine("    public static WebApplicationBuilder ConfigureWatchSerilog(this WebApplicationBuilder builder)");
         sb.AppendLine("    {");
@@ -105,13 +116,26 @@ public class SerilogGenerator : IIncrementalGenerator
         sb.AppendLine($"                .Enrich.WithProperty(\"Service\", \"{serviceName}\")");
         if (program != null)
             sb.AppendLine($"                .Enrich.WithProperty(\"Program\", \"{program}\")");
+        // Item 364: PII masking enricher
+        sb.AppendLine("                .Enrich.With<PiiMaskingEnricher>()");
         sb.AppendLine("                .WriteTo.Console(");
         sb.AppendLine("                    outputTemplate: \"[{Timestamp:HH:mm:ss} {Level:u3}] [{Service}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}\")");
+        // Item 363: retention — security service uses 365 days, all others use 90 days
+        var retainedDays = GetRetainedFileCount(serviceName);
         sb.AppendLine("                .WriteTo.File(");
         sb.AppendLine($"                    path: $\"logs/{shortName}-.log\",");
         sb.AppendLine("                    rollingInterval: RollingInterval.Day,");
-        sb.AppendLine("                    retainedFileCountLimit: 30,");
+        sb.AppendLine($"                    retainedFileCountLimit: {retainedDays},");
         sb.AppendLine("                    outputTemplate: \"{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{Service}] {SourceContext} {Message:lj}{NewLine}{Exception}\");");
+        // Item 361: optional Seq sink — enabled when Serilog:Seq:ServerUrl is set in configuration
+        sb.AppendLine("            var seqUrl = context.Configuration[\"Serilog:Seq:ServerUrl\"];");
+        sb.AppendLine("            if (!string.IsNullOrWhiteSpace(seqUrl))");
+        sb.AppendLine("            {");
+        sb.AppendLine("                var seqApiKey = context.Configuration[\"Serilog:Seq:ApiKey\"];");
+        sb.AppendLine("                configuration.WriteTo.Seq(seqUrl,");
+        sb.AppendLine("                    apiKey: string.IsNullOrWhiteSpace(seqApiKey) ? null : seqApiKey,");
+        sb.AppendLine("                    restrictedToMinimumLevel: LogEventLevel.Information);");
+        sb.AppendLine("            }");
         sb.AppendLine("        });");
         sb.AppendLine("        return builder;");
         sb.AppendLine("    }");
@@ -146,12 +170,15 @@ public class SerilogGenerator : IIncrementalGenerator
         sb.AppendLine("            .Enrich.WithMachineName()");
         sb.AppendLine("            .Enrich.WithThreadId()");
         sb.AppendLine($"            .Enrich.WithProperty(\"Service\", \"{serviceName}\")");
+        // Item 364: PII masking enricher
+        sb.AppendLine("            .Enrich.With<PiiMaskingEnricher>()");
         sb.AppendLine("            .WriteTo.Console(");
         sb.AppendLine("                outputTemplate: \"[{Timestamp:HH:mm:ss} {Level:u3}] [{Service}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}\")");
+        // Item 363: retention — security service uses 365 days, all others use 90 days
         sb.AppendLine("            .WriteTo.File(");
         sb.AppendLine($"                path: $\"logs/{shortName}-.log\",");
         sb.AppendLine("                rollingInterval: RollingInterval.Day,");
-        sb.AppendLine("                retainedFileCountLimit: 30);");
+        sb.AppendLine($"                retainedFileCountLimit: {retainedDays});");
         sb.AppendLine("    }");
 
         sb.AppendLine("}");

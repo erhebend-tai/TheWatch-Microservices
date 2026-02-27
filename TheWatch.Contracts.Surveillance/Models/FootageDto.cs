@@ -16,6 +16,8 @@ public class FootageSubmissionDto
     public string MediaUrl { get; set; } = string.Empty;
     public string? ThumbnailUrl { get; set; }
     public double? DurationSeconds { get; set; }
+    public MediaType MediaType { get; set; }
+    public string? FileHashSha256 { get; set; }
     public string? Description { get; set; }
     public List<string> Tags { get; set; } = [];
     public DateTime? AnalysisCompletedAt { get; set; }

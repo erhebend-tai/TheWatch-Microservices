@@ -154,6 +154,17 @@
                 </RadzenStack>
             </div>
 
+            <!-- Legal -->
+            <div class="watch-card" @onclick="@(() => Nav.NavigateTo("/eula"))" style="cursor: pointer;">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                             AlignItems="AlignItems.Center">
+                    <RadzenText>End User License Agreement</RadzenText>
+                    <span class="material-symbols-outlined" style="color: var(--watch-muted);">
+                        chevron_right
+                    </span>
+                </RadzenStack>
+            </div>
+
             <!-- Logout -->
             <RadzenButton Text="Logout" Icon="logout" ButtonStyle="ButtonStyle.Danger"
                           Variant="Variant.Outlined" Style="width: 100%; margin-top: 1rem;"

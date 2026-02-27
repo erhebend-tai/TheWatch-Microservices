@@ -359,6 +359,28 @@ services:
     restart: unless-stopped
 
   # ============================================================
+  # Nginx Gateway (reverse proxy for all services)
+  # ============================================================
+
+  nginx-gateway:
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile
+    container_name: thewatch-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - p1-coregateway
+      - p2-voiceemergency
+      - p5-authsecurity
+      - p11-surveillance
+      - dashboard
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost/nginx-health || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
   # P12 Notifications
   # ============================================================
 

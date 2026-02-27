@@ -1,0 +1,132 @@
+@page "/eula"
+@inject WatchAuthService AuthService
+@inject NavigationManager Nav
+@inject NotificationService Notification
+
+<div class="page-content">
+    <RadzenStack Gap="1rem">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
+            <span class="material-symbols-outlined" style="font-size: 2rem; color: var(--rz-primary);">gavel</span>
+            <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">End User License Agreement</RadzenText>
+        </RadzenStack>
+
+        @if (_loading)
+        {
+            <RadzenStack AlignItems="AlignItems.Center" style="padding: 2rem;">
+                <RadzenProgressBarCircular ShowValue="false" Size="ProgressBarCircularSize.Large" />
+                <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">Loading EULA…</RadzenText>
+            </RadzenStack>
+        }
+        else if (_eula is null)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false">
+                Unable to load the current EULA. Please check your connection and try again.
+            </RadzenAlert>
+            <RadzenButton Text="Retry" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                          Click="@LoadEula" Style="width: 100%;" />
+        }
+        else
+        {
+            <div class="watch-card">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween"
+                             AlignItems="AlignItems.Center">
+                    <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                        Version @_eula.Version
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--watch-muted);">
+                        Published @_eula.PublishedAt.ToString("MMMM d, yyyy")
+                    </RadzenText>
+                </RadzenStack>
+            </div>
+
+            <div class="watch-card" style="max-height: 60vh; overflow-y: auto;">
+                <pre style="white-space: pre-wrap; word-wrap: break-word; font-family: inherit;
+                            font-size: 0.8rem; line-height: 1.6; color: var(--rz-text-color);">@_eula.Content</pre>
+            </div>
+
+            @if (_acceptMode)
+            {
+                <div class="watch-card">
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            By tapping <strong>Accept</strong> you confirm that you have read and agree to be
+                            bound by this End User License Agreement.
+                        </RadzenText>
+
+                        @if (!string.IsNullOrEmpty(_error))
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">@_error</RadzenAlert>
+                        }
+
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem">
+                            <RadzenButton Text="Decline" Icon="close" ButtonStyle="ButtonStyle.Light"
+                                          Variant="Variant.Outlined" Style="flex: 1;"
+                                          Click="@OnDecline" Disabled="@_accepting" />
+                            <RadzenButton Text="Accept" Icon="check_circle" ButtonStyle="ButtonStyle.Primary"
+                                          Style="flex: 1;" Click="@OnAccept" IsBusy="@_accepting" />
+                        </RadzenStack>
+                    </RadzenStack>
+                </div>
+            }
+            else
+            {
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+                    <RadzenButton Text="Close" Icon="close" ButtonStyle="ButtonStyle.Light"
+                                  Click="@(() => Nav.NavigateTo(-1))" />
+                </RadzenStack>
+            }
+        }
+    </RadzenStack>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "accept")]
+    public bool AcceptMode { get; set; }
+
+    private EulaDto? _eula;
+    private bool _loading = true;
+    private bool _acceptMode;
+    private bool _accepting;
+    private string? _error;
+
+    private string P5Url => "http://localhost:5005";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _acceptMode = AcceptMode;
+        await LoadEula();
+    }
+
+    private async Task LoadEula()
+    {
+        _loading = true;
+        _eula = null;
+        _eula = await AuthService.GetCurrentEulaAsync(P5Url);
+        _loading = false;
+    }
+
+    private async Task OnAccept()
+    {
+        _accepting = true;
+        _error = null;
+
+        var success = await AuthService.AcceptEulaAsync(P5Url);
+        if (success)
+        {
+            Notification.Notify(NotificationSeverity.Success, "EULA Accepted",
+                "Thank you for accepting the End User License Agreement.");
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            _error = "Failed to record EULA acceptance. Please try again.";
+        }
+
+        _accepting = false;
+    }
+
+    private void OnDecline()
+    {
+        Nav.NavigateTo(-1);
+    }
+}

@@ -36,12 +36,12 @@ services:
         echo "=== TheWatch Database Initialization ==="
         sleep 5
         SQLCMD="/opt/mssql-tools18/bin/sqlcmd -S thewatch-sql -U sa -P TheWatch!Dev2025 -C -b"
-        for DB in WatchCoreGatewayDB WatchVoiceEmergencyDB WatchMeshNetworkDB WatchWearableDB WatchAuthSecurityDB WatchFirstResponderDB WatchFamilyHealthDB WatchDisasterReliefDB WatchDoctorServicesDB WatchGamificationDB; do
+        for DB in WatchCoreGatewayDB WatchVoiceEmergencyDB WatchMeshNetworkDB WatchWearableDB WatchAuthSecurityDB WatchFirstResponderDB WatchFamilyHealthDB WatchDisasterReliefDB WatchDoctorServicesDB WatchGamificationDB WatchSurveillanceDB WatchNotificationsDB; do
           echo "Creating database: $${DB}"
           $$SQLCMD -Q "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = '$${DB}') BEGIN CREATE DATABASE [$${DB}]; PRINT 'Created $${DB}'; END ELSE PRINT '$${DB} already exists';"
           $$SQLCMD -Q "ALTER DATABASE [$${DB}] SET RECOVERY FULL;"
         done
-        echo "=== All 10 TheWatch databases initialized ==="
+        echo "=== All 12 TheWatch databases initialized ==="
         $$SQLCMD -Q "SELECT name, state_desc, recovery_model_desc FROM sys.databases WHERE name LIKE 'Watch%' ORDER BY name;"
 
   sql-backup:
@@ -61,7 +61,7 @@ services:
         INTERVAL=$${BACKUP_INTERVAL_HOURS:-6}
         INTERVAL_SECONDS=$$((INTERVAL * 3600))
         RETENTION_DAYS=7
-        DBS="WatchCoreGatewayDB WatchVoiceEmergencyDB WatchMeshNetworkDB WatchWearableDB WatchAuthSecurityDB WatchFirstResponderDB WatchFamilyHealthDB WatchDisasterReliefDB WatchDoctorServicesDB WatchGamificationDB"
+        DBS="WatchCoreGatewayDB WatchVoiceEmergencyDB WatchMeshNetworkDB WatchWearableDB WatchAuthSecurityDB WatchFirstResponderDB WatchFamilyHealthDB WatchDisasterReliefDB WatchDoctorServicesDB WatchGamificationDB WatchSurveillanceDB WatchNotificationsDB"
 
         run_backup() {
           TS=$$(date +%Y%m%d_%H%M%S)
@@ -108,6 +108,60 @@ services:
           cleanup
         done
     environment:
+      BACKUP_INTERVAL_HOURS: "6"
+    restart: unless-stopped
+
+  postgres-backup:
+    image: postgres:16-alpine
+    container_name: thewatch-postgres-backup
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - sqlbackups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        BACKUP_DIR="/backups/postgres"
+        mkdir -p "$$BACKUP_DIR"
+        INTERVAL=$${BACKUP_INTERVAL_HOURS:-6}
+        INTERVAL_SECONDS=$$((INTERVAL * 3600))
+        RETENTION_DAYS=7
+
+        run_backup() {
+          TS=$$(date +%Y%m%d_%H%M%S)
+          BFILE="$$BACKUP_DIR/WatchGeospatialDB_FULL_$$TS.pgdump"
+          echo "[$$(date +%H:%M:%S)] Backing up WatchGeospatialDB (PostGIS)..."
+          pg_dump --host=$$PGHOST --port=$$PGPORT --username=$$PGUSER \
+            --format=custom --compress=9 --file="$$BFILE" WatchGeospatialDB && \
+            echo "[$$(date +%H:%M:%S)] OK: WatchGeospatialDB -> $$BFILE" || \
+            echo "[$$(date +%H:%M:%S)] FAILED: WatchGeospatialDB"
+        }
+
+        cleanup() {
+          COUNT=$$(find "$$BACKUP_DIR" -name "*.pgdump" -mtime +$$RETENTION_DAYS 2>/dev/null | wc -l)
+          if [ "$$COUNT" -gt 0 ]; then
+            find "$$BACKUP_DIR" -name "*.pgdump" -mtime +$$RETENTION_DAYS -delete
+            echo "Removed $$COUNT old PostgreSQL backup files"
+          fi
+        }
+
+        echo "=== TheWatch PostgreSQL Backup Scheduler ==="
+        echo "Interval: every $$INTERVAL hours | Retention: $$RETENTION_DAYS days"
+        run_backup
+        cleanup
+        while true; do
+          echo "Next PostgreSQL backup in $$INTERVAL hours..."
+          sleep $$INTERVAL_SECONDS
+          run_backup
+          cleanup
+        done
+    environment:
+      PGHOST: "postgres"
+      PGPORT: "5432"
+      PGUSER: "${POSTGRES_USER:-postgres}"
+      PGPASSWORD: "${POSTGRES_PASSWORD:-TheWatch!Dev2025}"
       BACKUP_INTERVAL_HOURS: "6"
     restart: unless-stopped
 

@@ -46,6 +46,13 @@ public enum SubmissionSource
     Other
 }
 
+public enum MediaType
+{
+    Video,
+    Audio,
+    Image
+}
+
 public class CameraRegistration
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -80,6 +87,8 @@ public class FootageSubmission
     public string? ThumbnailUrl { get; set; }
     public double? DurationSeconds { get; set; }
     public FootageStatus Status { get; set; } = FootageStatus.Submitted;
+    public MediaType MediaType { get; set; } = MediaType.Video;
+    public string? FileHashSha256 { get; set; }
     public string? Description { get; set; }
     public List<string> Tags { get; set; } = [];
     public DateTime? AnalysisCompletedAt { get; set; }
@@ -139,6 +148,8 @@ public record SubmitFootageRequest(
     DateTime StartTime,
     DateTime EndTime,
     string MediaUrl,
+    MediaType MediaType = MediaType.Video,
+    string? FileHashSha256 = null,
     string? Description = null,
     List<string>? Tags = null);
 
@@ -270,3 +281,85 @@ public record TrackingSessionListResponse(
     int TotalCount,
     int Page,
     int PageSize);
+
+// ─── Alibi Verification ───
+
+public enum AlibiVerdict
+{
+    /// <summary>All alibi checkpoints have corroborating footage evidence.</summary>
+    Supported,
+    /// <summary>Partial or no footage evidence found at claimed locations.</summary>
+    Inconclusive,
+    /// <summary>Reserved: evidence found at the crime scene during the crime window contradicts the alibi.
+    /// Requires cross-referencing with a crime location; not yet implemented.</summary>
+    Contradicted
+}
+
+/// <summary>
+/// A single claimed location and time window provided as part of an alibi.
+/// </summary>
+public record AlibiCheckpoint(
+    double Latitude,
+    double Longitude,
+    DateTime WindowStart,
+    DateTime WindowEnd,
+    string Description,
+    double SearchRadiusKm = 0.5);
+
+/// <summary>
+/// A single detection that supports an alibi checkpoint, returned as part of verification results.
+/// </summary>
+public record AlibiEvidenceItem(
+    Guid FootageId,
+    Guid DetectionId,
+    string Label,
+    float Confidence,
+    double DistanceFromCheckpointKm,
+    DateTime DetectedAt);
+
+/// <summary>
+/// The verification result for a single alibi checkpoint.
+/// </summary>
+public class AlibiCheckpointResult
+{
+    public AlibiCheckpoint Checkpoint { get; set; } = null!;
+    public bool HasEvidence { get; set; }
+    public int FootageChecked { get; set; }
+    public List<AlibiEvidenceItem> SupportingEvidence { get; set; } = [];
+}
+
+/// <summary>
+/// Persisted record of an alibi verification request and its outcome.
+/// </summary>
+public class AlibiVerification
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid SubjectId { get; set; }
+    public string SubjectDescription { get; set; } = string.Empty;
+    public Guid InitiatedBy { get; set; }
+    public AlibiVerdict Verdict { get; set; } = AlibiVerdict.Inconclusive;
+    public int CheckpointsTotal { get; set; }
+    public int CheckpointsSupported { get; set; }
+    public int TotalFootageChecked { get; set; }
+    public int TotalEvidenceFound { get; set; }
+    public string? DetectionProvider { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? CompletedAt { get; set; }
+}
+
+public record AlibiVerificationRequest(
+    Guid SubjectId,
+    string SubjectDescription,
+    List<AlibiCheckpoint> Checkpoints,
+    Guid InitiatedBy,
+    List<DetectionType>? TargetObjectTypes = null);
+
+public record AlibiVerificationResponse(
+    Guid VerificationId,
+    AlibiVerdict Verdict,
+    int CheckpointsTotal,
+    int CheckpointsSupported,
+    int TotalFootageChecked,
+    int TotalEvidenceFound,
+    string? DetectionProvider,
+    List<AlibiCheckpointResult> CheckpointResults);

@@ -67,3 +67,29 @@ public record CreateDispatchRequest(
     [property: Required] Guid IncidentId,
     [property: Range(0.1, 100.0)] double RadiusKm = 5.0,
     [property: Range(1, 50)] int RespondersRequested = 8);
+
+/// <summary>
+/// Ambulance pre-arrival triage intake submitted from the mobile app via text or speech-to-text.
+/// </summary>
+public record LogTriageIntakeRequest(
+    [property: Required] Guid ReporterId,
+    [property: Required, MaxLength(5000)] string Symptoms,
+    string InputMethod = "text",
+    Guid? IncidentId = null,
+    [property: MaxLength(300)] string? SubstanceName = null,
+    [property: MaxLength(5000)] string? MatchedGuidance = null,
+    [property: Range(0, 5)] int TriageSeverity = 0);
+
+/// <summary>
+/// Triage intake record returned from the backend after logging.
+/// </summary>
+public record TriageIntakeDto(
+    Guid Id,
+    Guid? IncidentId,
+    Guid ReporterId,
+    string Symptoms,
+    string InputMethod,
+    string? SubstanceName,
+    string? MatchedGuidance,
+    int TriageSeverity,
+    DateTime CreatedAt);
