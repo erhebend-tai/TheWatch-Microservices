@@ -13,6 +13,8 @@ public interface IDeviceService
     Task<HeartbeatHistory> GetHeartbeatHistoryAsync(Guid deviceId, int limit = 100);
     Task<SyncJob> StartSyncAsync(Guid deviceId, StartSyncRequest request);
     Task<List<SyncJob>> GetSyncHistoryAsync(Guid deviceId, int limit = 20);
+    Task<int> MarkStaleDevicesOfflineAsync(TimeSpan timeout);
+    Task<int> CleanupOldHeartbeatReadingsAsync(TimeSpan olderThan);
 }
 
 public class DeviceService : IDeviceService
@@ -143,5 +145,35 @@ public class DeviceService : IDeviceService
             .OrderByDescending(s => s.StartedAt)
             .Take(limit)
             .ToListAsync();
+    }
+
+    public async Task<int> MarkStaleDevicesOfflineAsync(TimeSpan timeout)
+    {
+        var cutoff = DateTime.UtcNow - timeout;
+        var stale = await _devices.Query()
+            .Where(d => d.Status == DeviceStatus.Connected && d.LastSyncAt < cutoff)
+            .ToListAsync();
+
+        foreach (var device in stale)
+        {
+            device.Status = DeviceStatus.Disconnected;
+            await _devices.UpdateAsync(device);
+        }
+
+        return stale.Count;
+    }
+
+    public async Task<int> CleanupOldHeartbeatReadingsAsync(TimeSpan olderThan)
+    {
+        var cutoff = DateTime.UtcNow - olderThan;
+        var old = await _heartbeats.Query()
+            .Where(h => h.RecordedAt < cutoff)
+            .Select(h => h.Id)
+            .ToListAsync();
+
+        foreach (var id in old)
+            await _heartbeats.DeleteAsync(id);
+
+        return old.Count;
     }
 }

@@ -1,0 +1,207 @@
+@page "/designated-responders"
+@inject IHttpClientFactory HttpClientFactory
+@inject IConfiguration Config
+@implements IDisposable
+
+<PageTitle>TheWatch — Designated Responders Map</PageTitle>
+
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mb-3">
+    <RadzenText TextStyle="TextStyle.H4" class="rz-mb-0">Designated Responders</RadzenText>
+    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="@($"{_activeCount} active")" />
+    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"{_totalCount} total")" />
+    <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Secondary"
+                  Size="ButtonSize.Small" Click="@RefreshAsync" />
+    <RadzenButton Text="Fit All" Icon="zoom_out_map" ButtonStyle="ButtonStyle.Light"
+                  Size="ButtonSize.Small" Click="@FitAllAsync" />
+</RadzenStack>
+
+<!-- Filter -->
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+    <RadzenText TextStyle="TextStyle.Body2">Filter:</RadzenText>
+    <RadzenDropDown @bind-Value="@_selectedStatus" Data="@_statusOptions" TextProperty="Text" ValueProperty="Value"
+                    Placeholder="All statuses" AllowClear="true" Style="width: 180px;"
+                    Change="@(_ => RefreshAsync())" />
+</RadzenStack>
+
+<!-- Legend -->
+<div class="map-legend rz-mb-2">
+    <span class="legend-item"><span class="legend-dot" style="background:#2ecc71"></span> Active</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#3498db"></span> Approved</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#f39c12"></span> Pending</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#95a5a6"></span> Inactive</span>
+</div>
+
+<!-- Map -->
+<div style="height: 600px; border-radius: 8px; overflow: hidden;">
+    <WatchMap @ref="_map" Height="100%" CenterLat="39.8283" CenterLng="-98.5795" Zoom="4" />
+</div>
+
+<!-- Signup Table -->
+@if (_responders.Count > 0)
+{
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mt-4 rz-mb-2">Designated Responder Signups</RadzenText>
+    <RadzenDataGrid Data="@_responders" TItem="DesignatedResponderMapDto"
+                    AllowSorting="true" Style="max-height: 300px;">
+        <Columns>
+            <RadzenDataGridColumn Property="VolunteerName" Title="Name" Width="180px" />
+            <RadzenDataGridColumn Property="Status" Title="Status" Width="120px">
+                <Template Context="item">
+                    <RadzenBadge BadgeStyle="@GetBadgeStyle(item.Status)" Text="@item.Status" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Property="ResponseRadiusKm" Title="Radius (km)" Width="120px" />
+            <RadzenDataGridColumn Property="LocationDescription" Title="Location" Width="200px" />
+            <RadzenDataGridColumn Title="Skills" Width="200px">
+                <Template Context="item">
+                    @string.Join(", ", item.Skills)
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Title="Schedule" Width="200px">
+                <Template Context="item">
+                    @string.Join(", ", item.Schedules.Select(s => $"{s.DayOfWeek} {s.StartTime}-{s.EndTime}"))
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Title="" Width="80px">
+                <Template Context="item">
+                    <RadzenButton Icon="center_focus_strong" ButtonStyle="ButtonStyle.Light"
+                                  Size="ButtonSize.ExtraSmall" Click="@(() => FlyToAsync(item))"
+                                  title="Zoom to location" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+}
+
+@code {
+    private WatchMap? _map;
+    private List<DesignatedResponderMapDto> _responders = [];
+    private int _activeCount;
+    private int _totalCount;
+    private bool _loaded;
+    private string? _selectedStatus;
+
+    private readonly List<StatusOption> _statusOptions =
+    [
+        new("Active", "Active"),
+        new("Approved", "Approved"),
+        new("Pending", "Pending"),
+        new("Inactive", "Inactive"),
+        new("Expired", "Expired")
+    ];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_loaded)
+        {
+            _loaded = true;
+            await Task.Delay(500);
+            await LoadDataAsync();
+        }
+    }
+
+    private async Task LoadDataAsync()
+    {
+        if (_map is null) return;
+
+        try
+        {
+            var baseUrl = ResolveServiceUrl("p6-firstresponder");
+            var client = HttpClientFactory.CreateClient("microservices");
+
+            var url = $"{baseUrl}/api/designated-responders/map";
+            if (!string.IsNullOrEmpty(_selectedStatus) &&
+                Enum.TryParse<DesignatedResponderStatusEnum>(_selectedStatus, out var statusEnum))
+            {
+                url += $"?status={statusEnum}";
+            }
+
+            _responders = await client.GetFromJsonAsync<List<DesignatedResponderMapDto>>(url) ?? [];
+            _totalCount = _responders.Count;
+            _activeCount = _responders.Count(r => r.Status == "Active");
+
+            foreach (var r in _responders)
+            {
+                var iconType = r.Status switch
+                {
+                    "Active" => "responder-available",
+                    "Approved" => "responder-enroute",
+                    "Pending" => "responder-busy",
+                    _ => "responder-busy"
+                };
+
+                await _map.AddMarkerAsync(
+                    $"dr-{r.Id}", r.Latitude, r.Longitude,
+                    iconType, $"{r.VolunteerName} ({r.Status})",
+                    $"<b>{r.VolunteerName}</b><br/>Status: {r.Status}<br/>Radius: {r.ResponseRadiusKm} km<br/>{r.LocationDescription ?? ""}");
+
+                var color = r.Status switch
+                {
+                    "Active" => "#2ecc71",
+                    "Approved" => "#3498db",
+                    "Pending" => "#f39c12",
+                    _ => "#95a5a6"
+                };
+
+                await _map.AddCircleZoneAsync(
+                    $"dr-zone-{r.Id}", r.Latitude, r.Longitude,
+                    r.ResponseRadiusKm * 1000, color, 0.1);
+            }
+
+            if (_responders.Count > 0)
+                await _map.FitAllMarkersAsync(0.15);
+        }
+        catch { /* P6 offline */ }
+
+        StateHasChanged();
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (_map is null) return;
+        await _map.ClearAllAsync();
+        await LoadDataAsync();
+    }
+
+    private async Task FitAllAsync()
+    {
+        if (_map is not null)
+            await _map.FitAllMarkersAsync(0.15);
+    }
+
+    private async Task FlyToAsync(DesignatedResponderMapDto item)
+    {
+        if (_map is not null)
+            await _map.FlyToAsync(item.Latitude, item.Longitude, 14);
+    }
+
+    private string ResolveServiceUrl(string resourceName)
+    {
+        var httpUrl = Config[$"services:{resourceName}:http:0"];
+        if (!string.IsNullOrEmpty(httpUrl)) return httpUrl;
+        var httpsUrl = Config[$"services:{resourceName}:https:0"];
+        if (!string.IsNullOrEmpty(httpsUrl)) return httpsUrl;
+        return $"https+http://{resourceName}";
+    }
+
+    private static BadgeStyle GetBadgeStyle(string status) => status switch
+    {
+        "Active" => BadgeStyle.Success,
+        "Approved" => BadgeStyle.Info,
+        "Pending" => BadgeStyle.Warning,
+        "Inactive" => BadgeStyle.Light,
+        "Expired" => BadgeStyle.Danger,
+        _ => BadgeStyle.Light
+    };
+
+    public void Dispose() { }
+
+    // DTOs
+    private record DesignatedResponderMapDto(
+        Guid Id, string VolunteerName, double Latitude, double Longitude,
+        double ResponseRadiusKm, string? LocationDescription, string Status,
+        List<string> Skills, List<ScheduleDto> Schedules);
+
+    private record ScheduleDto(string DayOfWeek, string StartTime, string EndTime);
+    private record StatusOption(string Text, string Value);
+    private enum DesignatedResponderStatusEnum { Pending, Approved, Active, Inactive, Expired }
+}

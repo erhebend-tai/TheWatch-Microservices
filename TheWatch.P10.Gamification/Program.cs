@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.Batches;
 using Hangfire.InMemory;
 using Serilog;
 using TheWatch.P10.Gamification;
@@ -26,7 +27,9 @@ builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 builder.Services.AddWatchCors(builder.Configuration);
 
 builder.Services.AddHangfire(config =>
-    config.UseInMemoryStorage());
+    config
+        .UseInMemoryStorage()
+        .UseBatches());
 builder.Services.AddHangfireServer();
 
 builder.Services.AddScoped<IGamificationService, GamificationService>();

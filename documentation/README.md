@@ -39,7 +39,7 @@ This folder centralizes the living documentation for the TheWatch platform: what
 - **Shared libraries**: `TheWatch.Shared` (cross-cutting concerns) and `TheWatch.Contracts.*` (typed contracts).
 - **Eventing & real time**: Kafka-based event bus, SignalR hubs for live updates, and mesh networking for offline resilience.
 - **Client surfaces**: MAUI mobile app, web Dashboard, and Admin API/CLI.
-- **Infrastructure**: Aspire AppHost for local orchestration, Docker Compose/Helm/Terraform for deployments, SBOM generation via `generate-sbom.sh`.
+- **Infrastructure**: Aspire AppHost for local orchestration, Docker Compose/Helm/Terraform for deployments, SBOM generation via `scripts/generate-sbom.sh`.
 
 ## Security, compliance, and policy references
 
@@ -53,7 +53,7 @@ This folder centralizes the living documentation for the TheWatch platform: what
 
 - **Container builds**: `docker-compose.yml` for local services; production images built via `.github/workflows/docker-publish.yml`.
 - **Kubernetes/Helm**: charts in `helm/`; Terraform in `terraform/`.
-- **SBOM & provenance**: `generate-sbom.sh` and `.github/workflows/slsa-provenance.yml`.
+- **SBOM & provenance**: `scripts/generate-sbom.sh` and `.github/workflows/slsa-provenance.yml`.
 - **CI**: `.github/workflows/ci.yml` builds per project and runs service-level tests on `main`/`develop`.
 
 ## Documentation publishing (GitHub Pages)

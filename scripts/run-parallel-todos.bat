@@ -10,8 +10,8 @@ chcp 65001 >nul 2>&1
 set "REPO_ROOT=%~dp0"
 set "REPO_ROOT=%REPO_ROOT:~0,-1%"
 set "WORKTREE_BASE=%REPO_ROOT%\..\worktrees"
-set "PROMPT_DIR=%REPO_ROOT%\parallel-build\prompts"
-set "LOG_DIR=%REPO_ROOT%\parallel-build\logs"
+set "PROMPT_DIR=%REPO_ROOT%\scripts\parallel-build\prompts"
+set "LOG_DIR=%REPO_ROOT%\scripts\parallel-build\logs"
 set "TIMESTAMP=%DATE:~10,4%%DATE:~4,2%%DATE:~7,2%_%TIME:~0,2%%TIME:~3,2%"
 set "TIMESTAMP=%TIMESTAMP: =0%"
 

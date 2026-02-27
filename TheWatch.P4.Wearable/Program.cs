@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.Batches;
 using Hangfire.InMemory;
 using Serilog;
 using TheWatch.P4.Wearable;
@@ -26,7 +27,9 @@ builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 builder.Services.AddWatchCors(builder.Configuration);
 
 builder.Services.AddHangfire(config =>
-    config.UseInMemoryStorage());
+    config
+        .UseInMemoryStorage()
+        .UseBatches());
 builder.Services.AddHangfireServer();
 
 builder.Services.AddScoped<IDeviceService, DeviceService>();
@@ -61,6 +64,17 @@ app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
     IsReadOnlyFunc = _ => true
 });
 app.MapWatchControllers();
+
+// Recurring Hangfire jobs
+RecurringJob.AddOrUpdate<IDeviceService>(
+    "stale-device-detection",
+    svc => svc.MarkStaleDevicesOfflineAsync(TimeSpan.FromHours(1)),
+    "*/10 * * * *"); // Every 10 minutes
+
+RecurringJob.AddOrUpdate<IDeviceService>(
+    "heartbeat-data-cleanup",
+    svc => svc.CleanupOldHeartbeatReadingsAsync(TimeSpan.FromDays(90)),
+    "0 4 * * *"); // Daily at 4 AM
 
 app.MapGet("/health", () => new HealthResponse(
     "TheWatch.P4.Wearable", "P4", "Healthy", DateTime.UtcNow));

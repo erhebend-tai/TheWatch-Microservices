@@ -107,13 +107,13 @@ jobs:
       # Generate SBOMs via generate-sbom.sh
       # -------------------------------------------------------
       - name: Make generate-sbom.sh executable
-        run: chmod +x ./generate-sbom.sh
+        run: chmod +x ./scripts/generate-sbom.sh
 
       - name: Generate aggregate SBOM (CycloneDX + SPDX)
         run: |
           echo "## SBOM Generation" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          ./generate-sbom.sh --verbose 2>&1 | tee sbom-generation.log
+          ./scripts/generate-sbom.sh --verbose 2>&1 | tee sbom-generation.log
           echo "" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           tail -30 sbom-generation.log >> $GITHUB_STEP_SUMMARY

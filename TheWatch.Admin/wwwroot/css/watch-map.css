@@ -1,0 +1,84 @@
+/* TheWatch — Map marker and zone styles for Leaflet */
+
+.watch-map-container {
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Custom marker pin */
+.watch-map-marker {
+    background: transparent !important;
+    border: none !important;
+}
+
+.marker-pin {
+    width: 30px;
+    height: 30px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+.marker-pin span {
+    transform: rotate(45deg);
+}
+
+/* User location pulsing dot */
+.watch-user-marker {
+    background: transparent !important;
+    border: none !important;
+}
+
+.user-dot {
+    width: 14px;
+    height: 14px;
+    background: #1abc9c;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(0,0,0,0.3);
+    position: relative;
+}
+
+.user-pulse {
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: rgba(26, 188, 156, 0.3);
+    animation: pulse-ring 2s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+    0% { transform: scale(0.5); opacity: 1; }
+    100% { transform: scale(1.5); opacity: 0; }
+}
+
+/* Legend */
+.map-legend {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}

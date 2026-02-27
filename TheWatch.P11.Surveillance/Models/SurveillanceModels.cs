@@ -194,3 +194,79 @@ public record SurveillanceStats(
     int AnalyzedFootage,
     int TotalDetections,
     int ActiveCrimeLocations);
+
+// ─── Object Tracking (multi-cloud ML backup) ───
+
+public enum TrackingStatus
+{
+    Pending,
+    InProgress,
+    Completed,
+    Failed,
+    Cancelled
+}
+
+/// <summary>
+/// A tracking session that correlates object detections across multiple footage submissions
+/// radiating outward from a crime location.
+/// </summary>
+public class TrackingSession
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid CrimeLocationId { get; set; }
+    public Guid InitiatedBy { get; set; }
+    public string ObjectDescription { get; set; } = string.Empty;
+    public List<DetectionType> TargetObjectTypes { get; set; } = [];
+    public double SearchRadiusKm { get; set; } = 5.0;
+    public DateTime? TimeWindowStart { get; set; }
+    public DateTime? TimeWindowEnd { get; set; }
+    public TrackingStatus Status { get; set; } = TrackingStatus.Pending;
+    public int FootageAnalyzedCount { get; set; }
+    public int MatchesFoundCount { get; set; }
+    public string? DetectionProvider { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? CompletedAt { get; set; }
+}
+
+/// <summary>
+/// A match found during object tracking — links a detection in footage
+/// to the tracking session with distance from the crime scene.
+/// </summary>
+public class TrackedObjectMatch
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TrackingSessionId { get; set; }
+    public Guid FootageId { get; set; }
+    public Guid DetectionId { get; set; }
+    public double DistanceFromSceneKm { get; set; }
+    public float Confidence { get; set; }
+    public string Label { get; set; } = string.Empty;
+    public DateTime DetectedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+// ─── Object Tracking DTOs ───
+
+public record ObjectTrackingRequest(
+    Guid CrimeLocationId,
+    Guid InitiatedBy,
+    string ObjectDescription,
+    List<DetectionType>? TargetObjectTypes = null,
+    double SearchRadiusKm = 5.0,
+    DateTime? TimeWindowStart = null,
+    DateTime? TimeWindowEnd = null,
+    string? FootageMediaUrl = null);
+
+public record ObjectTrackingResponse(
+    Guid TrackingSessionId,
+    TrackingStatus Status,
+    int FootageAnalyzedCount,
+    int MatchesFoundCount,
+    string? DetectionProvider,
+    List<TrackedObjectMatch> Matches);
+
+public record TrackingSessionListResponse(
+    List<TrackingSession> Items,
+    int TotalCount,
+    int Page,
+    int PageSize);
