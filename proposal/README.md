@@ -98,6 +98,7 @@ evidence of compliance:
 | Access Control Policy | `docs/policies/access-control-policy.md` | NIST 800-171 AC-1 |
 | Audit & Accountability Policy | `docs/policies/audit-accountability-policy.md` | NIST 800-171 AU-1 |
 | Identification & Auth Policy | `docs/policies/identification-authentication-policy.md` | NIST 800-171 IA-1 |
+| Government Data Sources | `docs/government-data-sources.md` | 25 cited U.S. government datasets: crimes, injuries, disasters |
 | Developer Setup Guide | `docs/developer-setup.md` | SSDF PS.1 signed commits |
 | DoD Security Analysis | `DOD_SECURITY_ANALYSIS.md` | Gap analysis & remediation roadmap |
 | System Roadmap | `ROADMAP.md` | 265-item delivery tracking |

@@ -254,6 +254,7 @@ For the full security gap analysis and remediation plan, see
 | Developer Setup | [`docs/developer-setup.md`](docs/developer-setup.md) | Environment setup & signing |
 | Vulnerability Management | [`docs/vulnerability-management-policy.md`](docs/vulnerability-management-policy.md) | Vulnerability handling procedures |
 | Penetration Testing | [`docs/pentest-program.md`](docs/pentest-program.md) | Pentest program & scope |
+| Government Data Sources | [`docs/government-data-sources.md`](docs/government-data-sources.md) | Cited U.S. government datasets: crimes, injuries, disasters |
 | Project Roadmap | [`ROADMAP.md`](ROADMAP.md) | Development status & milestones |
 
 ---
