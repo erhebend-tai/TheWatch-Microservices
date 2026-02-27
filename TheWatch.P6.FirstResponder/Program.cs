@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.Batches;
 using Hangfire.InMemory;
 using Serilog;
 using TheWatch.P6.FirstResponder;
@@ -34,9 +35,11 @@ builder.Services.AddWatchCors(builder.Configuration, requiresSignalR: true);
 // SignalR real-time hubs (ResponderHub, CheckInHub)
 builder.Services.AddWatchSignalR();
 
-// Hangfire with InMemory storage
+// Hangfire with InMemory storage + Pro batches
 builder.Services.AddHangfire(config =>
-    config.UseInMemoryStorage());
+    config
+        .UseInMemoryStorage()
+        .UseBatches());
 builder.Services.AddHangfireServer();
 
 // ── Inter-service typed HTTP clients (Items 208, 211, 214) ──

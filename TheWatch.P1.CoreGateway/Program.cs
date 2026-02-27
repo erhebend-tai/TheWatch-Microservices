@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.Batches;
 using Hangfire.InMemory;
 using Serilog;
 using TheWatch.P1.CoreGateway;
@@ -24,7 +25,9 @@ builder.Services.AddCloudflareServicesIfConfigured(builder.Configuration);
 builder.Services.AddWatchCors(builder.Configuration);
 
 builder.Services.AddHangfire(config =>
-    config.UseInMemoryStorage());
+    config
+        .UseInMemoryStorage()
+        .UseBatches());
 builder.Services.AddHangfireServer();
 
 builder.Services.AddScoped<IProfileService, ProfileService>();
@@ -49,6 +52,12 @@ app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
     IsReadOnlyFunc = _ => true
 });
 app.MapWatchControllers();
+
+// Recurring Hangfire jobs
+RecurringJob.AddOrUpdate<IConfigService>(
+    "service-health-check",
+    svc => svc.RunScheduledHealthCheckAsync(),
+    "*/5 * * * *"); // Every 5 minutes
 
 app.MapGet("/health", () => new HealthResponse(
     "TheWatch.P1.CoreGateway", "P1", "Healthy", DateTime.UtcNow));

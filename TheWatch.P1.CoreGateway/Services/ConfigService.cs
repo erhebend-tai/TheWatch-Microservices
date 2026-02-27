@@ -9,11 +9,18 @@ public interface IConfigService
     Task<PlatformConfig?> GetAsync(string key);
     Task<List<PlatformConfig>> ListAllAsync();
     Task<ServiceHealthSummary> CheckAllServicesAsync(HttpClient httpClient);
+    Task<ServiceHealthSummary> RunScheduledHealthCheckAsync();
 }
 
 public class ConfigService : IConfigService
 {
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ConcurrentDictionary<string, PlatformConfig> _configs = new();
+
+    public ConfigService(IHttpClientFactory httpClientFactory)
+    {
+        _httpClientFactory = httpClientFactory;
+    }
 
     private static readonly Dictionary<string, string> ServiceUrls = new()
     {
@@ -87,5 +94,11 @@ public class ConfigService : IConfigService
         }
 
         return new ServiceHealthSummary(services, healthy, unhealthy);
+    }
+
+    public async Task<ServiceHealthSummary> RunScheduledHealthCheckAsync()
+    {
+        var client = _httpClientFactory.CreateClient("services");
+        return await CheckAllServicesAsync(client);
     }
 }
