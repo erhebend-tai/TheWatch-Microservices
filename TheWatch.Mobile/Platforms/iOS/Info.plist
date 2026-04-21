@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+	<!--
+	  Location permissions — TheWatch requires Location ALWAYS because the
+	  application depends on active voice tracking for safety and security.
+	  Continuous background location enables real-time responder positioning
+	  and incident geolocation during emergencies.
+	-->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>TheWatch requires continuous location access because the application depends on active voice tracking for safety and security. Your location is used to geo-tag incidents and enable real-time responder positioning during emergencies.</string>
+
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>TheWatch requires always-on location access because the application depends on active voice tracking for safety and security. Continuous location monitoring ensures accurate incident positioning even when the app is in the background.</string>
+
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>TheWatch uses your location to geo-tag incidents and enable responder positioning for safety and security.</string>
+
+	<!--
+	  Microphone and speech — TheWatch depends on active voice tracking for
+	  safety and security. Microphone access enables hands-free emergency
+	  activation phrase detection, including from the lockscreen.
+	-->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>TheWatch requires microphone access because the application depends on active voice tracking for safety and security. The microphone listens for emergency activation phrases to enable hands-free incident reporting, including from the lockscreen.</string>
+
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>TheWatch uses on-device speech recognition because the application depends on active voice tracking for safety and security. Speech recognition processes activation phrases locally to detect emergencies in real time.</string>
+
+	<!--
+	  Background modes — Required for lockscreen access. TheWatch must
+	  continue listening for emergency activation phrases and tracking
+	  location even when the device is locked, as the application depends
+	  on active voice tracking for safety and security.
+	-->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>location</string>
+		<string>fetch</string>
+		<string>processing</string>
+		<string>remote-notification</string>
+	</array>
+
+</dict>
+</plist>
