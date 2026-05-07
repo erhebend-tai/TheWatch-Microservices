@@ -23,4 +23,10 @@ public class WatchUser : IdentityUser<Guid>
 
     // Onboarding
     public string? OnboardingProgress { get; set; }
+
+    // Password age policy — STIG V-222544, V-222545
+    /// <summary>UTC timestamp when the password was last changed. Set on registration and each successful password change.</summary>
+    public DateTime? PasswordLastChangedUtc { get; set; }
+    /// <summary>UTC timestamp before which password changes are blocked (24-hour minimum age). STIG V-222545.</summary>
+    public DateTime? PasswordMinAgeEnforcedUntil { get; set; }
 }

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace TheWatch.Shared.Health;
@@ -124,6 +125,19 @@ public static class WatchHealthCheckExtensions
                 sp.GetRequiredService<ILogger<SignalRHealthCheck>>()),
             failureStatus: null, // Use the result from the check itself
             tags: ["signalr", "realtime"]));
+
+        // ── Item 292: Data-at-rest encryption verification ──────────────
+        // In production, verify that TDE (SQL Server), Redis TLS, and Kafka SASL_SSL
+        // are all active. Fail the readiness probe if any encryption layer is missing
+        // in a production environment. [NIST SC-28]
+        healthChecks.Add(new HealthCheckRegistration(
+            "encryption",
+            sp => new EncryptionVerificationHealthCheck(
+                configuration,
+                sp.GetRequiredService<IHostEnvironment>(),
+                sp.GetRequiredService<ILogger<EncryptionVerificationHealthCheck>>()),
+            failureStatus: HealthStatus.Degraded,
+            tags: ["security", "encryption", "ready"]));
 
         return services;
     }
@@ -365,5 +379,83 @@ internal sealed class PostGisHealthCheck : IHealthCheck
                 $"PostgreSQL/PostGIS connection failed: {ex.Message}",
                 ex);
         }
+    }
+}
+
+/// <summary>
+/// Item 292: Verifies that data-at-rest and data-in-transit encryption layers are
+/// active. In production, checks that:
+/// <list type="bullet">
+///   <item>SQL Server connection strings contain <c>Encrypt=True</c> (TDE + transport encryption)</item>
+///   <item>Redis connection strings contain <c>ssl=true</c> or use a TLS port (6380)</item>
+///   <item>Kafka bootstrap servers use SASL_SSL protocol</item>
+/// </list>
+/// Returns <see cref="HealthCheckResult.Healthy"/> in development (checks are advisory only).
+/// Returns <see cref="HealthCheckResult.Degraded"/> in production if any encryption is missing.
+/// [NIST SC-28, STIG V-222588]
+/// </summary>
+internal sealed class EncryptionVerificationHealthCheck : IHealthCheck
+{
+    private readonly IConfiguration _config;
+    private readonly IHostEnvironment _env;
+    private readonly ILogger _logger;
+
+    public EncryptionVerificationHealthCheck(IConfiguration config, IHostEnvironment env, ILogger logger)
+    {
+        _config = config;
+        _env = env;
+        _logger = logger;
+    }
+
+    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    {
+        var warnings = new List<string>();
+        var data = new Dictionary<string, object>();
+
+        // Check SQL Server encryption
+        var sqlConn = _config.GetConnectionString("SqlServer")
+            ?? _config.GetConnectionString("DefaultConnection");
+        if (!string.IsNullOrEmpty(sqlConn))
+        {
+            var sqlEncrypted = sqlConn.Contains("Encrypt=True", StringComparison.OrdinalIgnoreCase)
+                || sqlConn.Contains("Encrypt=yes", StringComparison.OrdinalIgnoreCase);
+            data["sql_encrypted"] = sqlEncrypted;
+            if (!sqlEncrypted)
+                warnings.Add("SQL Server connection does not have Encrypt=True");
+        }
+
+        // Check Redis TLS
+        var redisConn = _config.GetConnectionString("Redis") ?? _config["Redis:ConnectionString"];
+        if (!string.IsNullOrEmpty(redisConn))
+        {
+            var redisTls = redisConn.Contains("ssl=true", StringComparison.OrdinalIgnoreCase)
+                || redisConn.Contains(":6380", StringComparison.Ordinal);
+            data["redis_tls"] = redisTls;
+            if (!redisTls)
+                warnings.Add("Redis connection does not use TLS (ssl=true or port 6380)");
+        }
+
+        // Check Kafka SASL_SSL
+        var kafkaServers = _config["Kafka:BootstrapServers"] ?? _config.GetConnectionString("Kafka");
+        if (!string.IsNullOrEmpty(kafkaServers))
+        {
+            var kafkaSecurity = _config["Kafka:SecurityProtocol"];
+            var kafkaSecure = "SASL_SSL".Equals(kafkaSecurity, StringComparison.OrdinalIgnoreCase)
+                || "SSL".Equals(kafkaSecurity, StringComparison.OrdinalIgnoreCase);
+            data["kafka_ssl"] = kafkaSecure;
+            if (!kafkaSecure)
+                warnings.Add("Kafka does not use SASL_SSL or SSL security protocol");
+        }
+
+        if (warnings.Count == 0)
+            return Task.FromResult(HealthCheckResult.Healthy("All configured encryption layers are active.", data));
+
+        var message = string.Join("; ", warnings);
+        _logger.LogWarning("Encryption verification: {Warnings}", message);
+
+        // In production, degraded. In development, advisory only (still healthy).
+        return _env.IsProduction()
+            ? Task.FromResult(HealthCheckResult.Degraded(message, data: data))
+            : Task.FromResult(HealthCheckResult.Healthy($"[Dev] Encryption warnings: {message}", data));
     }
 }

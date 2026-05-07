@@ -3,6 +3,7 @@
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview-noble AS base
 WORKDIR /app
 EXPOSE 8080
+ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=http://+:8080
 
 # renovate: datasource=docker depName=mcr.microsoft.com/dotnet/sdk

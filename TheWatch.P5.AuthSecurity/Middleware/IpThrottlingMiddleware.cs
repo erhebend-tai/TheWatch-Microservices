@@ -1,19 +1,26 @@
-using System.Collections.Concurrent;
+using System.Text.Json;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace TheWatch.P5.AuthSecurity.Middleware;
 
 /// <summary>
 /// Per-IP progressive throttling. 5 failures → 30s, 10 → 5min, 20 → 1hr.
 /// Independent from Identity lockout (per-account).
+/// Item 225: Uses IDistributedCache (Redis-backed in production) instead of
+/// ConcurrentDictionary so throttling state is shared across multiple service instances. [NIST IA-2]
 /// </summary>
 public class IpThrottlingMiddleware
 {
     private readonly RequestDelegate _next;
-    private static readonly ConcurrentDictionary<string, IpRecord> _records = new();
+    private readonly IDistributedCache _cache;
 
-    public IpThrottlingMiddleware(RequestDelegate next)
+    // Maximum TTL for any blocked record (longest block = 1 hour)
+    private static readonly TimeSpan MaxBlockDuration = TimeSpan.FromHours(1);
+
+    public IpThrottlingMiddleware(RequestDelegate next, IDistributedCache cache)
     {
         _next = next;
+        _cache = cache;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -28,15 +35,15 @@ public class IpThrottlingMiddleware
             return;
         }
 
-        if (_records.TryGetValue(ip, out var record))
+        var key = $"ipthrottle:{ip}";
+        var record = await GetRecordAsync(key);
+
+        if (record?.BlockedUntil > DateTime.UtcNow)
         {
-            if (record.BlockedUntil > DateTime.UtcNow)
-            {
-                context.Response.StatusCode = 429;
-                context.Response.Headers["Retry-After"] = ((int)(record.BlockedUntil - DateTime.UtcNow).Value.TotalSeconds).ToString();
-                await context.Response.WriteAsJsonAsync(new { error = "Too many requests. Try again later." });
-                return;
-            }
+            context.Response.StatusCode = 429;
+            context.Response.Headers["Retry-After"] = ((int)(record.BlockedUntil.Value - DateTime.UtcNow).TotalSeconds).ToString();
+            await context.Response.WriteAsJsonAsync(new { error = "Too many requests. Try again later." });
+            return;
         }
 
         await _next(context);
@@ -44,26 +51,45 @@ public class IpThrottlingMiddleware
         // Track failures (4xx status)
         if (context.Response.StatusCode is >= 400 and < 500)
         {
-            var rec = _records.GetOrAdd(ip, _ => new IpRecord());
-            rec.FailureCount++;
-            rec.LastFailure = DateTime.UtcNow;
+            record ??= new IpRecord();
+            record.FailureCount++;
+            record.LastFailure = DateTime.UtcNow;
 
-            rec.BlockedUntil = rec.FailureCount switch
+            record.BlockedUntil = record.FailureCount switch
             {
                 >= 20 => DateTime.UtcNow.AddHours(1),
                 >= 10 => DateTime.UtcNow.AddMinutes(5),
                 >= 5 => DateTime.UtcNow.AddSeconds(30),
                 _ => null
             };
+
+            await SetRecordAsync(key, record, MaxBlockDuration);
         }
         else if (context.Response.StatusCode is >= 200 and < 300)
         {
             // Reset on success
-            _records.TryRemove(ip, out _);
+            await _cache.RemoveAsync(key);
         }
     }
 
-    private class IpRecord
+    private async Task<IpRecord?> GetRecordAsync(string key)
+    {
+        var data = await _cache.GetStringAsync(key);
+        if (data is null) return null;
+        try { return JsonSerializer.Deserialize<IpRecord>(data); }
+        catch { return null; }
+    }
+
+    private async Task SetRecordAsync(string key, IpRecord record, TimeSpan ttl)
+    {
+        var data = JsonSerializer.Serialize(record);
+        await _cache.SetStringAsync(key, data, new DistributedCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = ttl
+        });
+    }
+
+    private sealed class IpRecord
     {
         public int FailureCount { get; set; }
         public DateTime LastFailure { get; set; }
